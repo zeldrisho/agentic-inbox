@@ -11,22 +11,22 @@
  */
 
 export interface SendEmailParams {
-	to: string | string[];
-	from: string | { email: string; name: string };
-	subject: string;
-	html?: string;
-	text?: string;
-	cc?: string | string[];
-	bcc?: string | string[];
-	replyTo?: string | { email: string; name: string };
-	attachments?: {
-		content: string; // base64 encoded
-		filename: string;
-		type: string;
-		disposition: "attachment" | "inline";
-		contentId?: string;
-	}[];
-	headers?: Record<string, string>;
+  to: string | string[];
+  from: string | { email: string; name: string };
+  subject: string;
+  html?: string;
+  text?: string;
+  cc?: string | string[];
+  bcc?: string | string[];
+  replyTo?: string | { email: string; name: string };
+  attachments?: {
+    content: string; // base64 encoded
+    filename: string;
+    type: string;
+    disposition: "attachment" | "inline";
+    contentId?: string;
+  }[];
+  headers?: Record<string, string>;
 }
 
 /**
@@ -38,35 +38,35 @@ export interface SendEmailParams {
  * @throws On validation or delivery errors (error has `.code` property)
  */
 export async function sendEmail(
-	binding: SendEmail,
-	params: SendEmailParams,
+  binding: SendEmail,
+  params: SendEmailParams,
 ): Promise<{ messageId: string }> {
-	const message: Record<string, unknown> = {
-		to: params.to,
-		from: params.from,
-		subject: params.subject,
-	};
+  const message: Record<string, unknown> = {
+    to: params.to,
+    from: params.from,
+    subject: params.subject,
+  };
 
-	if (params.html) message.html = params.html;
-	if (params.text) message.text = params.text;
-	if (params.cc) message.cc = params.cc;
-	if (params.bcc) message.bcc = params.bcc;
-	if (params.replyTo) message.replyTo = params.replyTo;
+  if (params.html) message.html = params.html;
+  if (params.text) message.text = params.text;
+  if (params.cc) message.cc = params.cc;
+  if (params.bcc) message.bcc = params.bcc;
+  if (params.replyTo) message.replyTo = params.replyTo;
 
-	if (params.headers && Object.keys(params.headers).length > 0) {
-		message.headers = params.headers;
-	}
+  if (params.headers && Object.keys(params.headers).length > 0) {
+    message.headers = params.headers;
+  }
 
-	if (params.attachments && params.attachments.length > 0) {
-		message.attachments = params.attachments.map((att) => ({
-			content: att.content,
-			filename: att.filename,
-			type: att.type,
-			disposition: att.disposition,
-			...(att.contentId ? { contentId: att.contentId } : {}),
-		}));
-	}
+  if (params.attachments && params.attachments.length > 0) {
+    message.attachments = params.attachments.map((att) => ({
+      content: att.content,
+      filename: att.filename,
+      type: att.type,
+      disposition: att.disposition,
+      ...(att.contentId ? { contentId: att.contentId } : {}),
+    }));
+  }
 
-	const result = await binding.send(message as any);
-	return { messageId: result.messageId };
+  const result = await binding.send(message as any);
+  return { messageId: result.messageId };
 }

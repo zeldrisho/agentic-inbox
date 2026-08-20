@@ -12,13 +12,13 @@
 
 /** Parse safely — returns null on invalid dates instead of NaN-date. */
 function safeParse(dateStr: string | undefined | null): Date | null {
-	if (!dateStr) return null;
-	try {
-		const d = new Date(dateStr);
-		return isNaN(d.getTime()) ? null : d;
-	} catch {
-		return null;
-	}
+  if (!dateStr) return null;
+  try {
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? null : d;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -28,27 +28,27 @@ function safeParse(dateStr: string | undefined | null): Date | null {
  * - Older: "Apr 15, 2024"
  */
 export function formatListDate(dateStr: string): string {
-	const date = safeParse(dateStr);
-	if (!date) return dateStr;
+  const date = safeParse(dateStr);
+  if (!date) return dateStr;
 
-	const now = new Date();
-	if (date.toDateString() === now.toDateString()) {
-		return date.toLocaleTimeString(undefined, {
-			hour: "numeric",
-			minute: "2-digit",
-		});
-	}
-	if (date.getFullYear() === now.getFullYear()) {
-		return date.toLocaleDateString(undefined, {
-			month: "short",
-			day: "numeric",
-		});
-	}
-	return date.toLocaleDateString(undefined, {
-		month: "short",
-		day: "numeric",
-		year: "numeric",
-	});
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) {
+    return date.toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+  if (date.getFullYear() === now.getFullYear()) {
+    return date.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+    });
+  }
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 /**
@@ -56,16 +56,16 @@ export function formatListDate(dateStr: string): string {
  * "Tue, Apr 15, 3:42 PM"
  */
 export function formatDetailDate(dateStr: string): string {
-	const date = safeParse(dateStr);
-	if (!date) return dateStr;
+  const date = safeParse(dateStr);
+  if (!date) return dateStr;
 
-	return date.toLocaleDateString(undefined, {
-		weekday: "short",
-		month: "short",
-		day: "numeric",
-		hour: "numeric",
-		minute: "2-digit",
-	});
+  return date.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 /**
@@ -73,13 +73,13 @@ export function formatDetailDate(dateStr: string): string {
  * "3:42 PM"
  */
 export function formatShortDate(dateStr: string): string {
-	const date = safeParse(dateStr);
-	if (!date) return dateStr;
+  const date = safeParse(dateStr);
+  if (!date) return dateStr;
 
-	return date.toLocaleTimeString(undefined, {
-		hour: "numeric",
-		minute: "2-digit",
-	});
+  return date.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 /**
@@ -90,17 +90,17 @@ export function formatShortDate(dateStr: string): string {
  * and Cloudflare Workers (which support `toLocaleString`).
  */
 export function formatQuotedDate(dateStr: string | undefined): string {
-	if (!dateStr) return "";
-	const date = safeParse(dateStr);
-	if (!date) return dateStr;
+  if (!dateStr) return "";
+  const date = safeParse(dateStr);
+  if (!date) return dateStr;
 
-	return date.toLocaleString("en-US", {
-		weekday: "short",
-		month: "short",
-		day: "numeric",
-		year: "numeric",
-		hour: "numeric",
-		minute: "2-digit",
-		hour12: true,
-	});
+  return date.toLocaleString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
 }

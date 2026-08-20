@@ -20,13 +20,10 @@ import { formatQuotedDate } from "../../shared/dates";
  * Resolve a MailboxDO stub from a mailbox email address.
  * Replaces the repeated 3-line ns.idFromName / ns.get pattern.
  */
-export function getMailboxStub(
-	env: Env,
-	mailboxId: string,
-): DurableObjectStub<MailboxDO> {
-	const ns = env.MAILBOX;
-	const id = ns.idFromName(mailboxId);
-	return ns.get(id);
+export function getMailboxStub(env: Env, mailboxId: string): DurableObjectStub<MailboxDO> {
+  const ns = env.MAILBOX;
+  const id = ns.idFromName(mailboxId);
+  return ns.get(id);
 }
 
 // ── Mailbox Listing ────────────────────────────────────────────────
@@ -34,14 +31,12 @@ export function getMailboxStub(
 /**
  * List all mailboxes from R2 bucket metadata.
  */
-export async function listMailboxes(
-	bucket: R2Bucket,
-): Promise<{ id: string; email: string }[]> {
-	const list = await bucket.list({ prefix: "mailboxes/" });
-	return list.objects.map((obj) => {
-		const id = obj.key.replace("mailboxes/", "").replace(".json", "");
-		return { id, email: id };
-	});
+export async function listMailboxes(bucket: R2Bucket): Promise<{ id: string; email: string }[]> {
+  const list = await bucket.list({ prefix: "mailboxes/" });
+  return list.objects.map((obj) => {
+    const id = obj.key.replace("mailboxes/", "").replace(".json", "");
+    return { id, email: id };
+  });
 }
 
 // ── Sender Validation ──────────────────────────────────────────────
@@ -51,30 +46,30 @@ export async function listMailboxes(
  * Returns the normalised values or throws with a user-facing message.
  */
 export function validateSender(
-	to: string | string[],
-	from: string | { email: string; name: string },
-	mailboxId: string,
+  to: string | string[],
+  from: string | { email: string; name: string },
+  mailboxId: string,
 ): { toStr: string; fromEmail: string; fromDomain: string } {
-	const toStr = (Array.isArray(to) ? to.join(", ") : to).toLowerCase();
-	const fromEmail = (typeof from === "string" ? from : from.email).toLowerCase();
+  const toStr = (Array.isArray(to) ? to.join(", ") : to).toLowerCase();
+  const fromEmail = (typeof from === "string" ? from : from.email).toLowerCase();
 
-	if (fromEmail !== mailboxId.toLowerCase()) {
-		throw new SenderValidationError("From address must match the mailbox email address");
-	}
+  if (fromEmail !== mailboxId.toLowerCase()) {
+    throw new SenderValidationError("From address must match the mailbox email address");
+  }
 
-	const fromDomain = fromEmail.split("@")[1];
-	if (!fromDomain) {
-		throw new SenderValidationError("Invalid sender email address");
-	}
+  const fromDomain = fromEmail.split("@")[1];
+  if (!fromDomain) {
+    throw new SenderValidationError("Invalid sender email address");
+  }
 
-	return { toStr, fromEmail, fromDomain };
+  return { toStr, fromEmail, fromDomain };
 }
 
 export class SenderValidationError extends Error {
-	constructor(message: string) {
-		super(message);
-		this.name = "SenderValidationError";
-	}
+  constructor(message: string) {
+    super(message);
+    this.name = "SenderValidationError";
+  }
 }
 
 // ── Message ID ─────────────────────────────────────────────────────
@@ -83,12 +78,12 @@ export class SenderValidationError extends Error {
  * Generate an internal UUID and a proper RFC 2822 Message-ID.
  */
 export function generateMessageId(fromDomain: string): {
-	messageId: string;
-	outgoingMessageId: string;
+  messageId: string;
+  outgoingMessageId: string;
 } {
-	const messageId = crypto.randomUUID();
-	const outgoingMessageId = `${messageId}@${fromDomain}`;
-	return { messageId, outgoingMessageId };
+  const messageId = crypto.randomUUID();
+  const outgoingMessageId = `${messageId}@${fromDomain}`;
+  return { messageId, outgoingMessageId };
 }
 
 // ── Threading ──────────────────────────────────────────────────────
@@ -97,37 +92,35 @@ export function generateMessageId(fromDomain: string): {
  * Build the References chain and In-Reply-To from an original email.
  */
 export function buildReferencesChain(original: EmailFull): {
-	originalMsgId: string;
-	references: string[];
-	threadId: string;
+  originalMsgId: string;
+  references: string[];
+  threadId: string;
 } {
-	const originalMsgId = original.message_id || original.id;
-	let existingRefs: string[] = [];
-	if (original.email_references) {
-		try {
-			existingRefs = JSON.parse(original.email_references);
-		} catch {
-			// Malformed JSON in email_references — treat as empty
-		}
-	}
-	const references = [...existingRefs, originalMsgId].filter(Boolean);
-	const threadId = original.thread_id || original.id;
-	return { originalMsgId, references, threadId };
+  const originalMsgId = original.message_id || original.id;
+  let existingRefs: string[] = [];
+  if (original.email_references) {
+    try {
+      existingRefs = JSON.parse(original.email_references);
+    } catch {
+      // Malformed JSON in email_references — treat as empty
+    }
+  }
+  const references = [...existingRefs, originalMsgId].filter(Boolean);
+  const threadId = original.thread_id || original.id;
+  return { originalMsgId, references, threadId };
 }
 
 /**
  * Build threading headers (In-Reply-To + References) for the email binding.
  */
 export function buildThreadingHeaders(
-	originalMsgId: string,
-	references: string[],
+  originalMsgId: string,
+  references: string[],
 ): Record<string, string> {
-	return {
-		"In-Reply-To": `<${originalMsgId}>`,
-		...(references.length > 0
-			? { References: references.map((r) => `<${r}>`).join(" ") }
-			: {}),
-	};
+  return {
+    "In-Reply-To": `<${originalMsgId}>`,
+    ...(references.length > 0 ? { References: references.map((r) => `<${r}>`).join(" ") } : {}),
+  };
 }
 
 // ── Draft-follows-in_reply_to ──────────────────────────────────────
@@ -137,14 +130,14 @@ export function buildThreadingHeaders(
  * Used by reply/forward routes to avoid threading against the draft itself.
  */
 export async function resolveOriginalEmail(
-	stub: DurableObjectStub<MailboxDO>,
-	email: EmailFull,
+  stub: DurableObjectStub<MailboxDO>,
+  email: EmailFull,
 ): Promise<EmailFull> {
-	if (email.folder_id === Folders.DRAFT && email.in_reply_to) {
-		const realOriginal = (await stub.getEmail(email.in_reply_to)) as EmailFull | null;
-		if (realOriginal) return realOriginal;
-	}
-	return email;
+  if (email.folder_id === Folders.DRAFT && email.in_reply_to) {
+    const realOriginal = (await stub.getEmail(email.in_reply_to)) as EmailFull | null;
+    if (realOriginal) return realOriginal;
+  }
+  return email;
 }
 
 // ── HTML Utilities ─────────────────────────────────────────────────
@@ -154,13 +147,13 @@ export async function resolveOriginalEmail(
  * Safe for use in both text content and attribute contexts.
  */
 export function escapeHtml(text: string): string {
-	if (!text) return "";
-	return text
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;")
-		.replace(/'/g, "&#39;");
+  if (!text) return "";
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 /**
@@ -169,9 +162,9 @@ export function escapeHtml(text: string): string {
  * (clients that strip inline styles, e.g. Outlook) as a belt-and-suspenders approach.
  */
 export function textToHtml(text: string): string {
-	if (!text) return "";
-	const escaped = escapeHtml(text).replace(/\n/g, "<br>");
-	return `<div style="white-space:pre-wrap">${escaped}</div>`;
+  if (!text) return "";
+  const escaped = escapeHtml(text).replace(/\n/g, "<br>");
+  return `<div style="white-space:pre-wrap">${escaped}</div>`;
 }
 
 /**
@@ -180,13 +173,13 @@ export function textToHtml(text: string): string {
  * content into the output.
  */
 export function stripHtmlToText(html: string): string {
-	if (!html) return "";
-	return html
-		.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-		.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-		.replace(/<[^>]+>/g, " ")
-		.replace(/\s+/g, " ")
-		.trim();
+  if (!html) return "";
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /**
@@ -199,45 +192,42 @@ export const formatEmailDate = formatQuotedDate;
  * Build a quoted reply block HTML string from original email data.
  */
 export function buildQuotedReplyBlock(original: {
-	date?: string;
-	sender?: string;
-	body?: string;
+  date?: string;
+  sender?: string;
+  body?: string;
 }): string {
-	if (!original.body) return "";
-	
-	// HTML-escape sender and date to prevent injection
-	const originalSender = escapeHtml(original.sender || "unknown");
-	const originalDate = escapeHtml(formatEmailDate(original.date || ""));
+  if (!original.body) return "";
 
-	// Sanitize the body to plain text to prevent stored XSS.
-	// The original HTML renders safely in the sandboxed iframe, but quoted
-	// reply blocks are injected into the compose editor and outgoing emails
-	// where raw HTML would execute. Convert to escaped plain text instead.
-	const plainBody = stripHtmlToText(original.body);
-	const bodyToQuote = escapeHtml(plainBody).replace(/\n/g, "<br>");
+  // HTML-escape sender and date to prevent injection
+  const originalSender = escapeHtml(original.sender || "unknown");
+  const originalDate = escapeHtml(formatEmailDate(original.date || ""));
 
-	return `<br><blockquote style="border-left: 2px solid #ccc; margin: 0; padding-left: 1em; color: #666;">On ${originalDate}, ${originalSender} wrote:<br><br>${bodyToQuote}</blockquote>`;
+  // Sanitize the body to plain text to prevent stored XSS.
+  // The original HTML renders safely in the sandboxed iframe, but quoted
+  // reply blocks are injected into the compose editor and outgoing emails
+  // where raw HTML would execute. Convert to escaped plain text instead.
+  const plainBody = stripHtmlToText(original.body);
+  const bodyToQuote = escapeHtml(plainBody).replace(/\n/g, "<br>");
+
+  return `<br><blockquote style="border-left: 2px solid #ccc; margin: 0; padding-left: 1em; color: #666;">On ${originalDate}, ${originalSender} wrote:<br><br>${bodyToQuote}</blockquote>`;
 }
 
 // ── Tool Logic (getFullEmail / getFullThread) ──────────────────────
 
 type MailboxThreadReaderStub = {
-	getThreadEmails: (threadId: string) => Promise<EmailFull[]>;
+  getThreadEmails: (threadId: string) => Promise<EmailFull[]>;
 };
 
 /**
  * Fetch a single email and return it with both HTML and plain-text body.
  * Returns null if the email is not found.
  */
-export async function getFullEmail(
-	stub: DurableObjectStub<MailboxDO>,
-	emailId: string,
-) {
-	const email = (await stub.getEmail(emailId)) as EmailFull | null;
-	if (!email) return null;
+export async function getFullEmail(stub: DurableObjectStub<MailboxDO>, emailId: string) {
+  const email = (await stub.getEmail(emailId)) as EmailFull | null;
+  if (!email) return null;
 
-	const textBody = email.body ? stripHtmlToText(email.body) : "";
-	return { ...email, body_text: textBody, body_html: email.body };
+  const textBody = email.body ? stripHtmlToText(email.body) : "";
+  return { ...email, body_text: textBody, body_html: email.body };
 }
 
 /**
@@ -245,22 +235,17 @@ export async function getFullEmail(
  * Uses `getThreadEmails` which runs 2 SQL queries (emails + attachments)
  * instead of the previous N+1 pattern (1 list query + N getEmail calls).
  */
-export async function getFullThread(
-	stub: DurableObjectStub<MailboxDO>,
-	threadId: string,
-) {
-	const threadStub = stub as unknown as MailboxThreadReaderStub;
-	const emails = await threadStub.getThreadEmails(threadId);
+export async function getFullThread(stub: DurableObjectStub<MailboxDO>, threadId: string) {
+  const threadStub = stub as unknown as MailboxThreadReaderStub;
+  const emails = await threadStub.getThreadEmails(threadId);
 
-	const enriched = emails.map((email) => {
-		const textBody = email.body ? stripHtmlToText(email.body) : "";
-		return { ...email, body_text: textBody };
-	});
+  const enriched = emails.map((email) => {
+    const textBody = email.body ? stripHtmlToText(email.body) : "";
+    return { ...email, body_text: textBody };
+  });
 
-	// Already sorted ASC by the DO query, but ensure consistency
-	enriched.sort(
-		(a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-	);
+  // Already sorted ASC by the DO query, but ensure consistency
+  enriched.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-	return { thread_id: threadId, message_count: enriched.length, messages: enriched };
+  return { thread_id: threadId, message_count: enriched.length, messages: enriched };
 }

@@ -7,20 +7,20 @@ import { WarningIcon } from "@phosphor-icons/react";
 import { useNavigate } from "react-router";
 
 export default function NotFoundRoute() {
-	const navigate = useNavigate();
+  const navigate = useNavigate();
 
-	return (
-		<div className="flex items-center justify-center min-h-screen">
-			<Empty
-				icon={<WarningIcon size={48} className="text-kumo-inactive" />}
-				title="404 -- Page Not Found"
-				description="The page you're looking for doesn't exist."
-				contents={
-					<Button variant="primary" size="sm" onClick={() => navigate("/")}>
-						Go Home
-					</Button>
-				}
-			/>
-		</div>
-	);
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <Empty
+        icon={<WarningIcon size={48} className="text-kumo-inactive" />}
+        title="404 -- Page Not Found"
+        description="The page you're looking for doesn't exist."
+        contents={
+          <Button variant="primary" size="sm" onClick={() => navigate("/")}>
+            Go Home
+          </Button>
+        }
+      />
+    </div>
+  );
 }
