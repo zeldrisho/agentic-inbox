@@ -62,9 +62,10 @@ function asExtended(stub: DurableObjectStub): ExtendedMailboxStub {
  * @param value - Attachment content supplied by PostalMime
  * @returns The attachment content as a `Uint8Array` or `ArrayBuffer`
  */
+// eslint-disable-next-line anti-slop/no-unknown-parameters
 function asAnyContent(value: unknown): Uint8Array | ArrayBuffer {
   // SAFETY: PostalMime attachment content is ArrayBuffer|Uint8Array; R2 put accepts either.
-  // eslint-disable-next-line anti-slop/no-unknown-parameters, anti-slop/no-chained-type-assertions
+  // eslint-disable-next-line anti-slop/no-chained-type-assertions
   return value as unknown as Uint8Array | ArrayBuffer;
 }
 
