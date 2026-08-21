@@ -50,7 +50,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   composeOptions: { mode: "new", originalEmail: null },
   isComposeModalOpen: false,
   isSidebarOpen: false,
-  isAgentPanelOpen: true,
+  isAgentPanelOpen: false,
 
   selectEmail: (id) => set({ selectedEmailId: id, isComposing: false }),
 
@@ -88,7 +88,15 @@ export const useUIStore = create<UIState>((set, get) => ({
   closeSidebar: () => set({ isSidebarOpen: false }),
   toggleSidebar: () => set({ isSidebarOpen: !get().isSidebarOpen }),
 
-  toggleAgentPanel: () => set({ isAgentPanelOpen: !get().isAgentPanelOpen }),
+  toggleAgentPanel: () => {
+    const v = !get().isAgentPanelOpen;
+    try {
+      localStorage.setItem("agentPanelOpen", JSON.stringify(v));
+    } catch {
+      // ignore storage errors
+    }
+    set({ isAgentPanelOpen: v });
+  },
 
   openComposeModal: (options) =>
     set({
@@ -102,3 +110,16 @@ export const useUIStore = create<UIState>((set, get) => ({
       composeOptions: { mode: "new", originalEmail: null },
     }),
 }));
+
+// Hydrate isAgentPanelOpen from localStorage (SSR-safe via try/catch)
+try {
+  const stored = localStorage.getItem("agentPanelOpen");
+  if (stored !== null) {
+    const parsed = JSON.parse(stored);
+    if (parsed === true) {
+      useUIStore.setState({ isAgentPanelOpen: true });
+    }
+  }
+} catch {
+  // ignore in SSR environment or on parse errors
+}

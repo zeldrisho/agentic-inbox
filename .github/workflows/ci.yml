@@ -40,8 +40,8 @@ jobs:
       - name: Lint, format & type check
         run: vp check
 
-      - name: Test
-        run: vp test
+      - name: Test (coverage gate ≥80%, ai.ts ≥90%)
+        run: vp test run --coverage
 
       - name: Build
         run: vp run build

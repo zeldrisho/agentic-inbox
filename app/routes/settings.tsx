@@ -10,7 +10,7 @@ import { useMailbox, useUpdateMailbox } from "~/queries/mailboxes";
 
 // Placeholder shown in the textarea when no custom prompt is set.
 // The authoritative default prompt lives in workers/agent/index.ts (DEFAULT_SYSTEM_PROMPT).
-const PROMPT_PLACEHOLDER = `You are an email assistant that helps manage this inbox. You read emails, draft replies, and help organize conversations.\n\nWrite like a real person. Short, direct, flowing prose. Plain text only.\n\n(Leave empty to use the full built-in default prompt)`;
+const PROMPT_PLACEHOLDER = `You are an on-demand email assistant. You help manage this inbox only when the user asks.\n\nWrite like a real person. Short, direct, flowing prose. Plain text only.\n\n(Leave empty to use the full built-in default prompt)`;
 
 /**
  * Renders the mailbox settings page for editing display and agent prompt settings.
@@ -25,12 +25,14 @@ export default function SettingsRoute() {
 
   const [displayName, setDisplayName] = useState("");
   const [agentPrompt, setAgentPrompt] = useState("");
+  const [agentAutoDraft, setAgentAutoDraft] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (mailbox) {
       setDisplayName(mailbox.settings?.fromName || mailbox.name || "");
       setAgentPrompt(mailbox.settings?.agentSystemPrompt || "");
+      setAgentAutoDraft(Boolean(mailbox.settings?.agentAutoDraft));
     }
   }, [mailbox]);
 
@@ -41,6 +43,7 @@ export default function SettingsRoute() {
       ...mailbox.settings,
       fromName: displayName,
       agentSystemPrompt: agentPrompt.trim() || undefined,
+      agentAutoDraft,
     };
     try {
       await updateMailboxMutation.mutateAsync({ mailboxId, settings });
@@ -85,6 +88,36 @@ export default function SettingsRoute() {
             />
             <Input label="Email" type="email" value={mailbox.email} disabled />
           </div>
+        </div>
+
+        {/* Agent Settings */}
+        <div className="rounded-lg border border-kumo-line bg-kumo-base p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <RobotIcon size={16} weight="duotone" className="text-kumo-subtle" />
+            <span className="text-sm font-medium text-kumo-default">AI Agent</span>
+            <Badge variant="beta">on-demand</Badge>
+          </div>
+
+          {/* Auto-draft toggle */}
+          <label className="flex items-center gap-3 py-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={agentAutoDraft}
+              onChange={(e) => setAgentAutoDraft(e.target.checked)}
+              className="h-4 w-4 rounded border-kumo-line text-kumo-brand focus:ring-kumo-ring"
+            />
+            <span className="text-sm text-kumo-default">
+              Auto-draft on new mail (costs AI credits) — off by default
+            </span>
+          </label>
+          <p className="text-xs text-kumo-subtle mb-4 ml-7">
+            When off, the agent does not run on inbound mail. Open the agent panel to summarize or
+            draft on demand.
+          </p>
+          <p className="text-xs text-kumo-subtle ml-7">
+            Model switching is now in the chat sidebar — use the selector next to the send button
+            for instant session changes.
+          </p>
         </div>
 
         {/* Agent System Prompt */}
