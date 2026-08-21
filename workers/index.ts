@@ -546,33 +546,37 @@ async function receiveEmail(
 
   const messageId = crypto.randomUUID();
 
-  // Helper: resolve the admin (catch-all) mailbox for a domain.
-  // Prefers admin@, catchall@, catch-all@, otherwise first mailbox on that domain.
-  async function resolveAdminMailboxId(domain: string | undefined): Promise<string | undefined> {
-    if (!domain) return undefined;
-    const preferred = [`admin@${domain}`, `catchall@${domain}`, `catch-all@${domain}`];
-    for (const cand of preferred) {
-      if (await env.BUCKET.head(`mailboxes/${cand}.json`)) return cand;
-    }
-    const all = await listMailboxes(env.BUCKET);
-    const sameDomain = all
-      .filter((m) => m.email.toLowerCase().endsWith(`@${domain}`))
-      .sort((a, b) => a.email.localeCompare(b.email));
-    if (sameDomain.length > 0) return sameDomain[0].email.toLowerCase();
-    return undefined;
-  }
-
-  const domain = mailboxId.split("@")[1]?.toLowerCase();
-  const adminMailboxId = await resolveAdminMailboxId(domain);
-
   // Catch-all: if the exact recipient mailbox does not exist, route to the admin mailbox for that domain
   let effectiveMailboxId = mailboxId;
+  let adminMailboxId: string | undefined;
+  let routedByCatchAll = false;
+
   if (!(await env.BUCKET.head(`mailboxes/${mailboxId}.json`))) {
+    // Helper: resolve the admin (catch-all) mailbox for a domain.
+    // Prefers admin@, catchall@, catch-all@, otherwise first mailbox on that domain.
+    async function resolveAdminMailboxId(domain: string | undefined): Promise<string | undefined> {
+      if (!domain) return undefined;
+      const preferred = [`admin@${domain}`, `catchall@${domain}`, `catch-all@${domain}`];
+      for (const cand of preferred) {
+        if (await env.BUCKET.head(`mailboxes/${cand}.json`)) return cand;
+      }
+      const all = await listMailboxes(env.BUCKET);
+      const sameDomain = all
+        .filter((m) => m.email.toLowerCase().endsWith(`@${domain}`))
+        .sort((a, b) => a.email.localeCompare(b.email));
+      if (sameDomain.length > 0) return sameDomain[0].email.toLowerCase();
+      return undefined;
+    }
+
+    const domain = mailboxId.split("@")[1]?.toLowerCase();
+    adminMailboxId = await resolveAdminMailboxId(domain);
+
     if (adminMailboxId) {
       console.log(
         `Catch-all: ${mailboxId} -> ${adminMailboxId} (mailbox ${mailboxId} does not exist)`,
       );
       effectiveMailboxId = adminMailboxId;
+      routedByCatchAll = true;
     } else {
       console.log(
         `Ignoring email for ${mailboxId}: mailbox does not exist and no catch-all found for domain`,
@@ -666,9 +670,22 @@ async function receiveEmail(
       .catch((e) => console.error("Auto-draft trigger failed:", (e as Error).message)),
   );
 
-  // Catch-all mirror: if the recipient wasn't the admin mailbox itself, also store a copy in the admin mailbox
-  // so admin sees every inbound mail for its domain ("show in both").
-  if (adminMailboxId && adminMailboxId !== effectiveMailboxId) {
+  // Catch-all mirror: only mirror when routing actually occurred via catch-all AND the admin mailbox is explicitly configured.
+  // Prevent mirroring when resolveAdminMailboxId fell back to an ordinary mailbox.
+  const domain = mailboxId.split("@")[1]?.toLowerCase();
+  const isExplicitAdminMailbox =
+    adminMailboxId &&
+    domain &&
+    (adminMailboxId === `admin@${domain}` ||
+      adminMailboxId === `catchall@${domain}` ||
+      adminMailboxId === `catch-all@${domain}`);
+
+  if (
+    routedByCatchAll &&
+    adminMailboxId &&
+    adminMailboxId !== effectiveMailboxId &&
+    isExplicitAdminMailbox
+  ) {
     try {
       const adminMessageId = crypto.randomUUID();
       const adminStub = env.MAILBOX.get(env.MAILBOX.idFromName(adminMailboxId));

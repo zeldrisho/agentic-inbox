@@ -35,7 +35,11 @@ export default function HomeRoute() {
   const createMailbox = useCreateMailbox();
   const deleteMailbox = useDeleteMailbox();
 
-  const { data: configData, isLoading: isConfigLoading } = useQuery({
+  const {
+    data: configData,
+    isLoading: isConfigLoading,
+    error: configError,
+  } = useQuery({
     queryKey: queryKeys.config,
     queryFn: () => api.getConfig(),
     staleTime: Infinity, // config rarely changes
@@ -43,9 +47,20 @@ export default function HomeRoute() {
   });
 
   const rawDomains = configData?.domains ?? [];
-  // Local dev fallback: when config fails or returns empty (e.g. no backend in --mode test), default to example.com so the UI remains usable
-  const domains = rawDomains.length > 0 ? rawDomains : isConfigLoading ? [] : ["example.com"];
-  const isLocalDomainFallback = rawDomains.length === 0 && !isConfigLoading;
+  // Local dev fallback: when config succeeds but returns empty (e.g. no backend in --mode test), default to example.com so the UI remains usable
+  const isLocalDev =
+    globalThis.window !== undefined &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+  const domains =
+    rawDomains.length > 0
+      ? rawDomains
+      : isConfigLoading || configError
+        ? []
+        : isLocalDev
+          ? ["example.com"]
+          : [];
+  const isLocalDomainFallback =
+    rawDomains.length === 0 && !isConfigLoading && !configError && isLocalDev;
   const emailAddresses = configData?.emailAddresses ?? [];
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -101,6 +116,33 @@ export default function HomeRoute() {
       setCreateError("Please fill in all fields");
       return;
     }
+
+    // Validate domain when using local fallback
+    if (isLocalDomainFallback) {
+      const trimmedDomain = selectedDomain.trim();
+      if (!trimmedDomain) {
+        setCreateError("Domain cannot be empty");
+        return;
+      }
+      if (trimmedDomain !== selectedDomain) {
+        setCreateError("Domain cannot contain leading or trailing whitespace");
+        return;
+      }
+      if (trimmedDomain.includes("@")) {
+        setCreateError("Domain cannot contain @ symbol");
+        return;
+      }
+      // Basic domain validation: must contain at least one dot and valid characters
+      if (
+        !/^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*$/.test(
+          trimmedDomain,
+        )
+      ) {
+        setCreateError("Invalid domain format");
+        return;
+      }
+    }
+
     const email = `${newPrefix}@${selectedDomain}`;
     const name = newName || newPrefix;
     setIsCreating(true);

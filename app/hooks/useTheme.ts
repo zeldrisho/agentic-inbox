@@ -14,6 +14,27 @@ function getSystemTheme(): ResolvedTheme {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
+function safeGetStoredMode(): ThemeMode {
+  if (globalThis.window === undefined) return "system";
+  try {
+    // SAFETY: localStorage.getItem returns string | null; we validate against ThemeMode union on next line before using
+    const stored = localStorage.getItem(STORAGE_KEY) as ThemeMode | null;
+    if (stored === "light" || stored === "dark" || stored === "system") return stored;
+    return "system";
+  } catch {
+    return "system";
+  }
+}
+
+function safeSetStoredMode(mode: ThemeMode): void {
+  if (globalThis.window === undefined) return;
+  try {
+    localStorage.setItem(STORAGE_KEY, mode);
+  } catch {
+    // localStorage write failed; ignore
+  }
+}
+
 function resolveTheme(mode: ThemeMode): ResolvedTheme {
   if (mode === "system") return getSystemTheme();
   return mode;
@@ -30,19 +51,13 @@ function applyTheme(resolved: ResolvedTheme) {
  * Persists preference to localStorage and syncs data-mode attribute for Kumo tokens.
  */
 export function useTheme() {
-  const [mode, setModeState] = useState<ThemeMode>(() => {
-    if (globalThis.window === undefined) return "system";
-    // SAFETY: localStorage value is validated against ThemeMode union on next line, cast is narrowed by check
-    const stored = localStorage.getItem(STORAGE_KEY) as ThemeMode | null;
-    if (stored === "light" || stored === "dark" || stored === "system") return stored;
-    return "system";
-  });
+  const [mode, setModeState] = useState<ThemeMode>(() => safeGetStoredMode());
 
   const [resolved, setResolved] = useState<ResolvedTheme>(() => resolveTheme(mode));
 
   const setMode = useCallback((next: ThemeMode) => {
     setModeState(next);
-    localStorage.setItem(STORAGE_KEY, next);
+    safeSetStoredMode(next);
     const r = resolveTheme(next);
     setResolved(r);
     applyTheme(r);

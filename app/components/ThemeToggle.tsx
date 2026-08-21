@@ -34,12 +34,7 @@ export function ThemeToggle() {
 
   return (
     <Tooltip content={getLabel()} side="bottom" asChild>
-      <SquareButton
-        variant="ghost"
-        icon={getIcon()}
-        onClick={cycleMode}
-        aria-label="Toggle theme"
-      />
+      <SquareButton variant="ghost" icon={getIcon()} onClick={cycleMode} aria-label={getLabel()} />
     </Tooltip>
   );
 }
