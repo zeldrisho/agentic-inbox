@@ -81,15 +81,18 @@ const KumoLink = forwardRef<
  *
  * @param children - The application content rendered inside the document body
  */
+const themeInitScript = `(() => { try { const s = localStorage.getItem('kumo-theme-mode'); const m = s === 'light' || s === 'dark' ? s : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); document.documentElement.setAttribute('data-mode', m); } catch {} })();`;
+
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <meta charSet="UTF-8" />
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="48x48 32x32 16x16" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Agentic Inbox</title>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <Meta />
         <Links />
       </head>

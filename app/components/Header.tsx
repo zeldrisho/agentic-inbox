@@ -14,6 +14,7 @@ import {
 import { type KeyboardEvent, useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { useUIStore } from "~/hooks/useUIStore";
+import { ThemeToggle } from "~/components/ThemeToggle";
 
 /**
  * Renders the application header with responsive navigation, email search, agent-panel controls, and settings navigation.
@@ -129,6 +130,7 @@ export default function Header() {
       )}
 
       <div className="flex items-center gap-1 ml-auto shrink-0">
+        <ThemeToggle />
         <Tooltip
           content={isAgentPanelOpen ? "Hide agent panel" : "Show agent panel"}
           side="bottom"
