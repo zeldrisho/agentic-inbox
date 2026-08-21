@@ -99,9 +99,15 @@ describe("MailboxDO sort injection", () => {
     const mockDb = createMockDb();
     (instance as unknown as { db: unknown }).db = mockDb as unknown as typeof instance.db;
     // SAFETY: testing sort injection via untrusted string
-    await instance.getEmails({ sortColumn: "date; DROP TABLE emails; --" as unknown as "date" });
-    // Should still call orderBy with a valid column (date) not the injected string
+    const injectedValue = "date; DROP TABLE emails; --";
+    await instance.getEmails({ sortColumn: injectedValue as unknown as "date" });
+    // Should call orderBy, but never with the injected string
     expect(mockDb._mocks.orderByMock).toHaveBeenCalled();
+    const callArgs = mockDb._mocks.orderByMock.mock.calls[0];
+    // The resolved column should be "date" (fallback), not the injected value
+    expect(callArgs).toBeDefined();
+    // Verify the injected string was never passed
+    expect(JSON.stringify(callArgs)).not.toContain(injectedValue);
   });
 
   it("accepts allowed columns", async () => {
@@ -109,8 +115,11 @@ describe("MailboxDO sort injection", () => {
     const mockDb = createMockDb();
     (instance as unknown as { db: unknown }).db = mockDb as unknown as typeof instance.db;
     for (const col of ["id", "subject", "sender", "recipient", "date", "read", "starred"] as const) {
+      mockDb._mocks.orderByMock.mockClear();
       await instance.getEmails({ sortColumn: col, sortDirection: "ASC" });
       expect(mockDb._mocks.orderByMock).toHaveBeenCalled();
+      const callArgs = mockDb._mocks.orderByMock.mock.calls[0];
+      expect(callArgs).toBeDefined();
     }
   });
 
@@ -120,6 +129,7 @@ describe("MailboxDO sort injection", () => {
     (instance as unknown as { db: unknown }).db = mockDb as unknown as typeof instance.db;
     await instance.getEmails({ sortColumn: "date", sortDirection: "DESC" as const });
     expect(mockDb._mocks.orderByMock).toHaveBeenCalled();
+    mockDb._mocks.orderByMock.mockClear();
     await instance.getEmails({ sortColumn: "date", sortDirection: undefined });
     expect(mockDb._mocks.orderByMock).toHaveBeenCalled();
   });

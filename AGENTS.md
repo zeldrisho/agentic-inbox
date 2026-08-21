@@ -6,14 +6,14 @@
 
 ## Commands
 
-| Task                                   | Command             |
-| -------------------------------------- | ------------------- |
-| Dev server (Vite + Cloudflare)         | `vp run dev`        |
-| Production build                       | `vp run build`      |
-| Check (lint/format/typecheck)          | `vp check`          |
-| Generate Cloudflare/React Router types | `vp run cf-typegen` |
-| Build + deploy                         | `vp run deploy`     |
-| Tests                                  | `vp test`           |
+| Task                           | Command             |
+| ------------------------------ | ------------------- |
+| Dev server (Vite + Cloudflare) | `vp run dev`        |
+| Production build               | `vp run build`      |
+| Check (lint/format/typecheck)  | `vp check`          |
+| Generate Cloudflare types      | `vp run cf-typegen` |
+| Build + deploy                 | `vp run deploy`     |
+| Tests                          | `vp test`           |
 
 ## Project Layout
 

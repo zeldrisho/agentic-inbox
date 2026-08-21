@@ -5,7 +5,7 @@
 ## Behavior
 
 - System prompt `workers/agent/index.ts:DEFAULT_SYSTEM_PROMPT` is on-demand: `Only read/summarize/list when user asks. Ask before drafting. Never auto-draft.`
-- `workers/agent/index.ts:handleNewEmail` early-returns `{ skipped: "auto_draft_disabled" }` when `MailboxSettings.agentAutoDraft !== true`. Defense in depth: `workers/index.ts:receiveEmail` also gates `ctx.waitUntil(agentStub.fetch(/onNewEmail))` behind R2 `mailboxes/<id>.json:agentAutoDraft === true` (default off, 0 AI calls on inbound).
+- `workers/agent/index.ts:handleNewEmail` early-returns `{ status: "skipped", reason: "auto_draft_disabled" }` when `MailboxSettings.agentAutoDraft !== true`. Defense in depth: `workers/index.ts:receiveEmail` also gates `ctx.waitUntil(agentStub.fetch(/onNewEmail))` behind R2 `mailboxes/<id>.json:agentAutoDraft === true` (default off, 0 AI calls on inbound).
 - `isPromptInjection` + `verifyDraft` retained for manual drafts (`toolDraftReply(runVerifyDraft:true)`).
 
 ## Sidebar

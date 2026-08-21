@@ -274,13 +274,16 @@ describe("GET /api/v1/models cache/refresh", () => {
     const env = mockEnv(bucket);
     // Mock fetch for catalog - intercept global fetch
     const origFetch = globalThis.fetch;
-    globalThis.fetch = vi.fn(async () => new Response("no models here", { status: 200 })) as unknown as typeof fetch;
-    const { res } = await requestApp(env, "GET", "/api/v1/models");
-    expect(res.status).toBe(200);
-    const body = await res.json() as { models: unknown[]; source: string };
-    expect(Array.isArray(body.models)).toBe(true);
-    expect(body.models.length).toBeGreaterThan(0);
-    globalThis.fetch = origFetch;
+    try {
+      globalThis.fetch = vi.fn(async () => new Response("no models here", { status: 200 })) as unknown as typeof fetch;
+      const { res } = await requestApp(env, "GET", "/api/v1/models");
+      expect(res.status).toBe(200);
+      const body = await res.json() as { models: unknown[]; source: string };
+      expect(Array.isArray(body.models)).toBe(true);
+      expect(body.models.length).toBeGreaterThan(0);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
   });
 
   it("refresh=1 bypasses cache", async () => {
@@ -289,13 +292,16 @@ describe("GET /api/v1/models cache/refresh", () => {
     bucket._store.set("cache/models.json", JSON.stringify({ cachedAt: new Date().toISOString(), models: [{ id: "old" }], source: "fallback" }));
     const env = mockEnv(bucket);
     const origFetch = globalThis.fetch;
-    globalThis.fetch = vi.fn(async () => new Response("", { status: 500 })) as unknown as typeof fetch;
-    const { res } = await requestApp(env, "GET", "/api/v1/models?refresh=1");
-    expect(res.status).toBe(200);
-    const body = await res.json() as { source: string; models: unknown[] };
-    // refresh should still return something (fallback)
-    expect(body.models).toBeDefined();
-    globalThis.fetch = origFetch;
+    try {
+      globalThis.fetch = vi.fn(async () => new Response("", { status: 500 })) as unknown as typeof fetch;
+      const { res } = await requestApp(env, "GET", "/api/v1/models?refresh=1");
+      expect(res.status).toBe(200);
+      const body = await res.json() as { source: string; models: unknown[] };
+      // refresh should still return something (fallback)
+      expect(body.models).toBeDefined();
+    } finally {
+      globalThis.fetch = origFetch;
+    }
   });
 
   it("uses R2 cache when not expired", async () => {
@@ -303,11 +309,17 @@ describe("GET /api/v1/models cache/refresh", () => {
     const cached = { cachedAt: new Date().toISOString(), models: [{ id: "@cf/test/model", name: "test" }], source: "models/index.md" };
     bucket._store.set("cache/models.json", JSON.stringify(cached));
     const env = mockEnv(bucket);
-    const { res } = await requestApp(env, "GET", "/api/v1/models");
-    // Should return cached without needing fetch
-    expect(res.status).toBe(200);
-    const body = await res.json() as typeof cached;
-    expect(body.models[0].id).toBe("@cf/test/model");
+    const origFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = vi.fn(async () => { throw new Error("Should not fetch when cached"); }) as unknown as typeof fetch;
+      const { res } = await requestApp(env, "GET", "/api/v1/models");
+      // Should return cached without needing fetch
+      expect(res.status).toBe(200);
+      const body = await res.json() as typeof cached;
+      expect(body.models[0].id).toBe("@cf/test/model");
+    } finally {
+      globalThis.fetch = origFetch;
+    }
   });
 });
 

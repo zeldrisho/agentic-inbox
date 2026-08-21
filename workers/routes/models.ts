@@ -64,11 +64,8 @@ function parseLlmsTxt(text: string): CatalogModel[] | null {
       ids.add(slug);
     } else if (shortToFull.has(slug)) {
       ids.add(shortToFull.get(slug)!);
-    } else {
-      // Unknown slug — keep as short id prefixed so it is still selectable.
-      // Workers AI will reject it if it is not a real model; client fallback will retry.
-      ids.add(slug);
     }
+    // Omit unknown slugs that don't match any known model
   }
   if (ids.size === 0) return null;
   return [...ids].map((id) => ({

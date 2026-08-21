@@ -103,8 +103,14 @@ describe("E2E: send→draft flow", () => {
     const listRes = await (
       app as unknown as { fetch: (req: Request, env: unknown, ctx: unknown) => Promise<Response> }
     ).fetch(listReq, env, ctx);
-    // The route may return array or {emails,totalCount} depending on folder param
     expect(listRes.status).toBe(200);
+    const listBody = await listRes.json();
+    // Support both array and {emails, totalCount} shapes
+    const emails = Array.isArray(listBody) ? listBody : (listBody as { emails: unknown[] }).emails;
+    expect(emails).toBeDefined();
+    // Verify the created draft is in the list
+    const foundDraft = emails.find((e: unknown) => (e as { folder_id?: string }).folder_id === "draft");
+    expect(foundDraft).toBeDefined();
   });
 });
 

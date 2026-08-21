@@ -50,16 +50,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   composeOptions: { mode: "new", originalEmail: null },
   isComposeModalOpen: false,
   isSidebarOpen: false,
-  isAgentPanelOpen: (() => {
-    try {
-      // eslint-disable-next-line anti-slop/no-runtime-typeof
-      if (typeof localStorage === "undefined") return false;
-      const v = localStorage.getItem("agentPanelOpen");
-      return v ? JSON.parse(v) : false;
-    } catch {
-      return false;
-    }
-  })(),
+  isAgentPanelOpen: false,
 
   selectEmail: (id) => set({ selectedEmailId: id, isComposing: false }),
 
@@ -119,3 +110,16 @@ export const useUIStore = create<UIState>((set, get) => ({
       composeOptions: { mode: "new", originalEmail: null },
     }),
 }));
+
+// Hydrate isAgentPanelOpen from localStorage (SSR-safe via try/catch)
+try {
+  const stored = localStorage.getItem("agentPanelOpen");
+  if (stored !== null) {
+    const parsed = JSON.parse(stored);
+    if (parsed === true) {
+      useUIStore.setState({ isAgentPanelOpen: true });
+    }
+  }
+} catch {
+  // ignore in SSR environment or on parse errors
+}

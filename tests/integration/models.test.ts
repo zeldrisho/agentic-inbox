@@ -47,9 +47,16 @@ describe("parseLlmsTxtForTest", () => {
     const ids = result!.map((m) => m.id);
     // kimi-k2.5 maps to full fallback id
     expect(ids).toContain("@cf/moonshotai/kimi-k2.5");
-    // llama-3.1-8b-instruct is unknown slug -> kept as short id
-    expect(ids).toContain("llama-3.1-8b-instruct");
+    // llama-3.1-8b-instruct is unknown slug -> omitted (not in fallback list)
+    expect(ids).not.toContain("llama-3.1-8b-instruct");
     expect(ids).toContain("@cf/qwen/qwen3-30b-a3b-fp8");
+  });
+
+  it("omits unknown slugs and falls back when no resolvable models remain", () => {
+    const md = "- [Unknown](https://developers.cloudflare.com/workers-ai/models/unknown-model-slug/)";
+    const result = parseLlmsTxtForTest(md);
+    // Unknown slug is omitted, leaving zero models -> returns null
+    expect(result).toBeNull();
   });
 
   it("ignores index and non-model segments", () => {

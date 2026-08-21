@@ -158,12 +158,9 @@ describe("receiveEmail admin mirror + agentAutoDraft matrix", () => {
     return { bucket, ns, adminStore, primaryStore };
   }
 
-  it("catch-all routes unknown recipient to admin and mirrors once", async () => {
+  it("catch-all routes unknown recipient to admin", async () => {
     const { bucket, ns, adminStore } = setupMirror();
     // unknown@example.com does NOT exist, so head returns null; admin exists
-    // Need bucket.head to reflect that
-    const headSpy = bucket.head as unknown as ReturnType<typeof vi.fn>;
-    // Already default impl checks store: unknown not in store, admin is
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ status: "ok" })));
     const agentNs = {
       idFromName: vi.fn((name: string) => name),
@@ -182,7 +179,43 @@ describe("receiveEmail admin mirror + agentAutoDraft matrix", () => {
     const stream = makeStream(raw);
     const waitUntil = vi.fn((p: Promise<unknown>) => p.catch(() => {}));
     await receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: raw.length }, env as unknown as Env, { waitUntil: waitUntil as unknown as (p: Promise<unknown>) => void } as unknown as ExecutionContext);
-    // admin stub should have been called at least once for primary delivery (effectiveMailboxId is admin)
+    // admin stub should have been called for primary delivery (effectiveMailboxId is admin)
+    expect(adminStore.stub.createEmail).toHaveBeenCalled();
+    // When effectiveMailboxId === adminMailboxId, no separate mirror should be created
+    const createEmailCalls = (adminStore.stub.createEmail as ReturnType<typeof vi.fn>).mock.calls.length;
+    expect(createEmailCalls).toBe(1);
+  });
+
+  it("mirrors to admin when recipient is a known ordinary mailbox", async () => {
+    const bucket = createMockBucket({
+      "mailboxes/admin@example.com.json": { fromName: "Admin" },
+      "mailboxes/user@example.com.json": { fromName: "User" },
+    });
+    const adminStore = createMockMailboxStore();
+    const userStore = createMockMailboxStore();
+    const ns = {
+      idFromName: vi.fn((name: string) => name),
+      get: vi.fn((id: string) => {
+        if (id === "admin@example.com") return adminStore.stub;
+        if (id === "user@example.com") return userStore.stub;
+        return adminStore.stub;
+      }),
+    };
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ status: "ok" })));
+    const env = {
+      BUCKET: bucket,
+      MAILBOX: ns,
+      EMAIL_AGENT: { idFromName: vi.fn((n: string) => n), get: vi.fn(() => ({ fetch: fetchMock })) },
+      EMAIL_ADDRESSES: [],
+    } as unknown as Env;
+
+    const raw = buildRawEmail("From: sender@ex.com\r\nTo: user@example.com\r\nSubject: test", "body");
+    const stream = makeStream(raw);
+    const waitUntil = vi.fn((p: Promise<unknown>) => p.catch(() => {}));
+    await receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: raw.length }, env as unknown as Env, { waitUntil: waitUntil as unknown as (p: Promise<unknown>) => void } as unknown as ExecutionContext);
+    // user mailbox should receive the email
+    expect(userStore.stub.createEmail).toHaveBeenCalled();
+    // admin mailbox should also receive a mirror copy
     expect(adminStore.stub.createEmail).toHaveBeenCalled();
   });
 

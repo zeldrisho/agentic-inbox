@@ -30,8 +30,9 @@ describe("dates", () => {
     const now = new Date();
     const todayIso = now.toISOString();
     const todayResult = formatListDate(todayIso);
-    // Today should contain ":" (time)
-    expect(todayResult).toContain(":");
+    // Today should return a time string - compare against Intl output
+    const expectedTime = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    expect(todayResult).toBe(expectedTime);
 
     const oldIso = "2020-06-15T10:00:00.000Z";
     const oldResult = formatListDate(oldIso);
@@ -47,6 +48,9 @@ describe("dates", () => {
   it("formatShortDate returns time", () => {
     const iso = "2025-06-15T14:30:00.000Z";
     const result = formatShortDate(iso);
-    expect(result).toContain(":");
+    // Compare against Intl output instead of assuming ":"
+    const date = new Date(iso);
+    const expected = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    expect(result).toBe(expected);
   });
 });

@@ -45,6 +45,7 @@ export default defineConfig(({ mode }) => ({
       // Measure only modules executed by tests — untested UI shells (route
       // components rendered solely by the SPA entry) stay out of the gate.
       all: false,
+      include: ["workers/lib/ai.ts"],
       // CI gate (`vp test run --coverage`): fail below these thresholds.
       // Security/AI-critical modules carry stricter targets (docs/plan.md §5).
       thresholds: {

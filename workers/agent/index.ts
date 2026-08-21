@@ -92,9 +92,14 @@ Use discard_draft to delete drafts that the operator rejects or that are no long
  * Loads the mailbox-specific agent system prompt.
  *
  * @param mailboxId - The mailbox whose prompt should be loaded
+ * @param autoDraftMode - If true, returns an auto-draft variant of the prompt
  * @returns The configured prompt, or the default system prompt when no valid custom prompt is available
  */
-async function getSystemPrompt(env: Env, mailboxId: string): Promise<string> {
+async function getSystemPrompt(
+  env: Env,
+  mailboxId: string,
+  autoDraftMode = false,
+): Promise<string> {
   try {
     const key = `mailboxes/${mailboxId}.json`;
     const obj = await env.BUCKET.get(key);
@@ -102,11 +107,34 @@ async function getSystemPrompt(env: Env, mailboxId: string): Promise<string> {
       const settings = await obj.json<{ agentSystemPrompt?: string }>();
       const prompt = settings.agentSystemPrompt?.trim();
       if (prompt) {
+        // If custom prompt is set and we're in auto-draft mode, adapt it
+        if (autoDraftMode) {
+          return prompt
+            .replace(
+              /Never auto-draft\./g,
+              "You are in auto-draft mode. Draft a reply to new emails automatically.",
+            )
+            .replace(
+              /Ask before drafting\./g,
+              "Draft replies automatically when triggered by new emails.",
+            );
+        }
         return prompt;
       }
     }
   } catch {
     // Fall through to default
+  }
+
+  // Return appropriate default based on mode
+  if (autoDraftMode) {
+    return DEFAULT_SYSTEM_PROMPT.replace(
+      /Never auto-draft\./g,
+      "You are in auto-draft mode. Draft a reply to new emails automatically.",
+    ).replace(
+      /Ask before drafting\./g,
+      "Draft replies automatically when triggered by new emails.",
+    );
   }
   return DEFAULT_SYSTEM_PROMPT;
 }
@@ -369,7 +397,7 @@ export class EmailAgent extends AIChatAgent<any> {
     }
     const workersai = createWorkersAI({ binding: env.AI });
     const tools = createEmailTools(env, emailData.mailboxId);
-    const systemPrompt = await getSystemPrompt(env, emailData.mailboxId);
+    const systemPrompt = await getSystemPrompt(env, emailData.mailboxId, true);
 
     // Pre-read the email and thread so the agent has full context
     // without needing to waste tool calls discovering it
