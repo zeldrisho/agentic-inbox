@@ -2,6 +2,7 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
+import { z } from "zod";
 import type { Email, Folder, Mailbox, MailboxSettings, OutboundEmail } from "~/types";
 import type { JsonValue } from "shared/json";
 
@@ -12,8 +13,9 @@ export class ApiError extends Error {
   body: Record<string, JsonValue>;
 
   constructor(status: number, body: Record<string, JsonValue>) {
-    // SAFETY: `body` arrives unparsed from the upstream API; `error` is a string field when present.
-    super((body.error as string) || `Request failed: ${status}`);
+    const parsed = z.string().min(1).safeParse(body.error);
+    const message = parsed.success ? parsed.data : `Request failed: ${status}`;
+    super(message);
     this.name = "ApiError";
     this.status = status;
     this.body = body;

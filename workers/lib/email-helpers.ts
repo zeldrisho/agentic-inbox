@@ -193,12 +193,68 @@ export function textToHtml(text: string): string {
  */
 export function stripHtmlToText(html: string): string {
   if (!html) return "";
-  return html
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  // Use string operations (indexOf/slice) to remove style/script blocks
+  // together with their contents. This avoids CodeQL
+  // js/incomplete-multi-character-sanitization which flags multi-char regex
+  // replacements like /<style[^>]*>[\s\S]*?<\/style>/ as bypassable via
+  // <<style>. It also prevents prompt injection via <script>/<style> content
+  // being fed to the agent (coderabbit review).
+  let out = html;
+  let lower = out.toLowerCase();
+  // Remove <style>...</style> blocks
+  while (true) {
+    const start = lower.indexOf("<style");
+    if (start === -1) break;
+    const endTag = lower.indexOf("</style", start);
+    if (endTag === -1) {
+      out = `${out.slice(0, start)} `;
+      lower = out.toLowerCase();
+      break;
+    }
+    const endClose = out.indexOf(">", endTag);
+    if (endClose === -1) {
+      out = `${out.slice(0, start)} `;
+      lower = out.toLowerCase();
+      break;
+    }
+    out = `${out.slice(0, start)} ${out.slice(endClose + 1)}`;
+    lower = out.toLowerCase();
+  }
+  // Remove <script>...</script> blocks
+  lower = out.toLowerCase();
+  while (true) {
+    const start = lower.indexOf("<script");
+    if (start === -1) break;
+    const endTag = lower.indexOf("</script", start);
+    if (endTag === -1) {
+      out = `${out.slice(0, start)} `;
+      lower = out.toLowerCase();
+      break;
+    }
+    const endClose = out.indexOf(">", endTag);
+    if (endClose === -1) {
+      out = `${out.slice(0, start)} `;
+      lower = out.toLowerCase();
+      break;
+    }
+    out = `${out.slice(0, start)} ${out.slice(endClose + 1)}`;
+    lower = out.toLowerCase();
+  }
+  // Strip remaining HTML tags via single-char scan (CodeQL-safe; no multi-char regex).
+  let result = "";
+  let inTag = false;
+  for (const ch of out) {
+    if (ch === "<") {
+      inTag = true;
+      result += " ";
+    } else if (ch === ">") {
+      inTag = false;
+      result += " ";
+    } else if (!inTag) {
+      result += ch;
+    }
+  }
+  return result.replace(/\s+/g, " ").trim();
 }
 
 /**

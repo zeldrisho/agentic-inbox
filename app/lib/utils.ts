@@ -57,18 +57,17 @@ export function toEmailListValue(addresses: string[]): string | string[] | undef
  * @returns The converted plain-text content
  */
 export function htmlToPlainText(html: string): string {
-  // Sanitize with DOMPurify before DOM parsing to prevent XSS during innerHTML assignment.
-  // DOMPurify strips all dangerous content (scripts, event handlers, etc.)
-  // while preserving structural HTML for text extraction.
-  const sanitized = DOMPurify.sanitize(html);
-  const div = document.createElement("div");
-  div.innerHTML = sanitized
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+  // Convert block elements to line breaks before sanitizing so the sanitizer
+  // is the last step before innerHTML (CodeQL-recognized).
+  const withLineBreaks = html
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/p>/gi, "\n\n")
     .replace(/<p[^>]*>/gi, "")
     .replace(/<div[^>]*>/gi, "")
     .replace(/<\/div>/gi, "\n");
+  const sanitized = DOMPurify.sanitize(withLineBreaks, { FORBID_TAGS: ["style", "script"] });
+  const div = document.createElement("div");
+  div.innerHTML = sanitized;
   return (div.textContent || div.innerText || "").trim();
 }
 
@@ -76,10 +75,8 @@ export function htmlToPlainText(html: string): string {
  * Strip all HTML tags from a string.
  */
 export function stripHtml(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  const sanitized = DOMPurify.sanitize(html, { ALLOWED_TAGS: [] });
+  return sanitized.replace(/\s+/g, " ").trim();
 }
 
 /**
@@ -93,13 +90,13 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&#x([0-9a-f]+);/gi, (_match: string, hex: string) =>
       String.fromCharCode(Number.parseInt(hex, 16)),
     )
-    .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&apos;/g, "'")
-    .replace(/&nbsp;/g, " ");
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&");
 }
 
 /**
@@ -112,13 +109,9 @@ function decodeHtmlEntities(text: string): string {
 export function getSnippetText(snippet?: string | null, maxLength = 100): string {
   if (!snippet) return "";
 
-  const clean = decodeHtmlEntities(
-    snippet
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-      .replace(/<style[^>]*>[\s\S]*/gi, "")
-      .replace(/<[^>]*>/g, " ")
-      .replace(/<[^>]*$/g, ""),
-  )
+  // Sanitize with DOMPurify first (CodeQL-recognized), then fallback regex for stray brackets.
+  const sanitized = DOMPurify.sanitize(snippet, { ALLOWED_TAGS: [] });
+  const clean = decodeHtmlEntities(sanitized.replace(/<[^>]*>?/g, " "))
     .replace(/\s+/g, " ")
     .trim();
 

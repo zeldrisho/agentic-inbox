@@ -11,6 +11,7 @@ import EmailPanelHeader from "~/components/email-panel/EmailPanelHeader";
 import EmailPanelToolbar from "~/components/email-panel/EmailPanelToolbar";
 import SingleMessageView from "~/components/email-panel/SingleMessageView";
 import ThreadMessage from "~/components/email-panel/ThreadMessage";
+import DOMPurify from "dompurify";
 import { splitEmailList, toEmailListValue } from "~/lib/utils";
 import api from "~/services/api";
 import {
@@ -217,7 +218,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
         from,
         subject: target.subject || "(no subject)",
         html: target.body || "",
-        text: target.body ? target.body.replace(/<[^>]*>/g, "").trim() : "",
+        text: target.body ? DOMPurify.sanitize(target.body, { ALLOWED_TAGS: [] }).trim() : "",
       };
       if (originalEmail)
         await replyMut.mutateAsync({ mailboxId, emailId: originalEmail.id, email: emailData });
