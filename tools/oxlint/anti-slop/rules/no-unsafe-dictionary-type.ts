@@ -49,14 +49,32 @@ const typeNodeKinds: ReadonlySet<string> = new Set([
 	"TSVoidKeyword",
 ]);
 
+/**
+ * Determines whether a node represents a TypeScript type node.
+ *
+ * @param node - The syntax node to classify
+ * @returns `true` if the node is a TypeScript type node, `false` otherwise.
+ */
 function isTypeNode(node: ESTree.Node): node is ESTree.TSType {
 	return typeNodeKinds.has(node.type);
 }
 
+/**
+ * Extracts the name from an identifier-based type reference.
+ *
+ * @param type - The type reference to inspect
+ * @returns The referenced identifier name, or `null` for qualified references
+ */
 function typeReferenceName(type: ESTree.TSTypeReference): string | null {
 	return type.typeName.type === "Identifier" ? type.typeName.name : null;
 }
 
+/**
+ * Determines whether a node is nested within a TypeScript type-alias declaration.
+ *
+ * @param node - The node to inspect
+ * @returns `true` if the node is inside a type-alias declaration, `false` otherwise.
+ */
 function isInsideTypeAliasDeclaration(node: ESTree.Node): boolean {
 	let current: ESTree.Node | null = node.parent;
 	while (current !== null && current.type !== "Program") {
@@ -66,12 +84,26 @@ function isInsideTypeAliasDeclaration(node: ESTree.Node): boolean {
 	return false;
 }
 
+/**
+ * Determines whether a type node is an unparameterized reference to a known alias outside its declaration.
+ *
+ * @param node - The type node to inspect
+ * @param environment - The type environment containing known aliases
+ * @returns `true` if the node is a plain reference to a known alias outside its declaration, `false` otherwise.
+ */
 function isPlainAliasConsumerUse(node: ESTree.TSType, environment: TypeEnvironment): boolean {
 	if (node.type !== "TSTypeReference" || node.typeArguments?.params.length) return false;
 	const name = typeReferenceName(node);
 	return name !== null && environment.aliases.has(name) && !isInsideTypeAliasDeclaration(node);
 }
 
+/**
+ * Determines whether an unsafe dictionary type should be reported.
+ *
+ * @param node - The type node to evaluate
+ * @param environment - The shared type environment used for classification
+ * @returns `true` if the node represents a reportable unsafe dictionary type, `false` otherwise
+ */
 function shouldReportType(node: ESTree.TSType, environment: TypeEnvironment): boolean {
 	if (isPlainAliasConsumerUse(node, environment)) return false;
 	if (classifyUnsafeDictionary(node, environment) === null) return false;

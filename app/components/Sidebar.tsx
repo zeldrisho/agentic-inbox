@@ -46,6 +46,11 @@ interface FolderLinkProps {
   onClick?: () => void;
 }
 
+/**
+ * Renders a navigation link for a mailbox folder with optional unread-count badge.
+ *
+ * @param unreadCount - The number of unread items to display when greater than zero.
+ */
 function FolderLink({ to, icon, label, unreadCount, onClick }: FolderLinkProps) {
   return (
     <NavLink
@@ -66,6 +71,11 @@ function FolderLink({ to, icon, label, unreadCount, onClick }: FolderLinkProps) 
   );
 }
 
+/**
+ * Renders mailbox navigation, composition controls, folder links, and folder creation controls.
+ *
+ * @returns The mailbox sidebar interface.
+ */
 export default function Sidebar() {
   const { mailboxId } = useParams<{ mailboxId: string }>();
   const navigate = useNavigate();

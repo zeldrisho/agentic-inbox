@@ -8,6 +8,11 @@ import { CheckIcon, CopyIcon, PlugsIcon, WrenchIcon } from "@phosphor-icons/reac
 import { useState } from "react";
 import { useParams } from "react-router";
 
+/**
+ * Renders a button that copies the supplied text to the clipboard and briefly indicates success.
+ *
+ * @param text - The text to copy to the clipboard
+ */
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
 
@@ -54,6 +59,11 @@ const TOOLS = [
   { name: "move_email", desc: "Move email to a folder" },
 ];
 
+/**
+ * Renders a panel for connecting to the email agent through MCP.
+ *
+ * @returns The MCP connection panel with the server URL and available tools.
+ */
 export default function MCPPanel() {
   const { mailboxId: _mailboxId } = useParams<{ mailboxId: string }>();
   const baseUrl =

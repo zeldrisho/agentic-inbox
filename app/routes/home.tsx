@@ -12,10 +12,18 @@ import api from "~/services/api";
 import { useCreateMailbox, useDeleteMailbox, useMailboxes } from "~/queries/mailboxes";
 import { queryKeys } from "~/queries/keys";
 
+/**
+ * Defines the page metadata.
+ *
+ * @returns The page title metadata for the Agentic Inbox page.
+ */
 export function meta() {
   return [{ title: "Agentic Inbox" }];
 }
 
+/**
+ * Renders the mailbox listing page and manages mailbox creation and deletion.
+ */
 export default function HomeRoute() {
   const toastManager = useKumoToastManager();
   const {

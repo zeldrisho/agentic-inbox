@@ -14,6 +14,15 @@ import { useSearchEmails, SEARCH_PAGE_SIZE } from "~/queries/search";
 import { useUIStore } from "~/hooks/useUIStore";
 import type { Email } from "~/types";
 
+/**
+ * Highlights free-text search terms within text.
+ *
+ * Structured search operators are excluded from highlighting, and matching terms are wrapped in a `<mark>` element.
+ *
+ * @param text - The text in which to highlight matches
+ * @param query - The search query containing free-text terms and optional structured operators
+ * @returns The text with matching terms highlighted, or the original text when no free-text terms remain or highlighting cannot be applied
+ */
 function highlightTerms(text: string, query: string): React.ReactNode {
   if (!query || !text) return text;
   const freeText = query
@@ -43,6 +52,9 @@ function highlightTerms(text: string, query: string): React.ReactNode {
   }
 }
 
+/**
+ * Renders a paginated view of email search results for the current mailbox and query.
+ */
 export default function SearchResultsRoute() {
   const { mailboxId } = useParams<{ mailboxId: string }>();
   const [searchParams] = useSearchParams();

@@ -31,13 +31,23 @@ import { sendEmail } from "../email-sender";
 import { Folders } from "../../shared/folders";
 import type { Env } from "../types";
 
-// ── list_mailboxes ─────────────────────────────────────────────────
+/**
+ * Lists the mailboxes available in the configured bucket.
+ *
+ * @returns The available mailboxes
+ */
 
 export async function toolListMailboxes(env: Env) {
   return listMailboxes(env.BUCKET);
 }
 
-// ── list_emails ────────────────────────────────────────────────────
+/**
+ * Lists emails in a mailbox folder, ordered by date with the newest emails first.
+ *
+ * @param mailboxId - The mailbox identifier.
+ * @param params - The folder and pagination settings for the email listing.
+ * @returns The paginated email results.
+ */
 
 export async function toolListEmails(
   env: Env,
@@ -54,7 +64,13 @@ export async function toolListEmails(
   });
 }
 
-// ── get_email ──────────────────────────────────────────────────────
+/**
+ * Retrieves a complete email from a mailbox.
+ *
+ * @param mailboxId - The mailbox containing the email
+ * @param emailId - The identifier of the email to retrieve
+ * @returns The complete email, or an error object if the email is not found
+ */
 
 export async function toolGetEmail(env: Env, mailboxId: string, emailId: string) {
   const stub = getMailboxStub(env, mailboxId);
@@ -63,14 +79,26 @@ export async function toolGetEmail(env: Env, mailboxId: string, emailId: string)
   return email;
 }
 
-// ── get_thread ─────────────────────────────────────────────────────
+/**
+ * Retrieves all emails in a thread.
+ *
+ * @param mailboxId - The mailbox containing the thread
+ * @param threadId - The identifier of the thread to retrieve
+ * @returns The complete email thread
+ */
 
 export async function toolGetThread(env: Env, mailboxId: string, threadId: string) {
   const stub = getMailboxStub(env, mailboxId);
   return getFullThread(stub, threadId);
 }
 
-// ── search_emails ──────────────────────────────────────────────────
+/**
+ * Searches a mailbox for emails matching a query, optionally limited to a folder.
+ *
+ * @param mailboxId - The mailbox to search
+ * @param params - The search query and optional folder filter
+ * @returns The matching emails
+ */
 
 export async function toolSearchEmails(
   env: Env,
@@ -88,14 +116,18 @@ export async function toolSearchEmails(
 // ── draft_reply ────────────────────────────────────────────────────
 
 /**
- * Shared draft-reply logic.
+ * Creates a draft reply to an existing email.
  *
- * @param bodyInput - The reply body text. Can be plain text or HTML.
- * @param options.isPlainText - If true, body is treated as plain text and
- *   converted to HTML. If false, body is treated as HTML.
- * @param options.runVerifyDraft - If true, runs AI verifyDraft on the body.
- *   The agent and MCP both do this, but the agent does it on plain text
- *   while MCP does it on HTML.
+ * @param env - The application environment.
+ * @param mailboxId - The mailbox that owns the draft.
+ * @param params - Reply details and processing options.
+ * @param params.originalEmailId - The email being replied to.
+ * @param params.to - The reply recipient.
+ * @param params.subject - The draft subject.
+ * @param params.body - The reply body.
+ * @param params.isPlainText - Whether to convert the body from plain text to HTML.
+ * @param params.runVerifyDraft - Whether to verify the body before saving the draft.
+ * @returns Draft metadata when saved, or an error message when verification fails.
  */
 export async function toolDraftReply(
   env: Env,
@@ -175,7 +207,13 @@ export async function toolDraftReply(
   };
 }
 
-// ── draft_email (new email, not a reply) ───────────────────────────
+/**
+ * Creates and saves a new email draft.
+ *
+ * @param mailboxId - The mailbox that owns the draft
+ * @param params - The draft recipient, subject, body, and optional verification and threading options
+ * @returns Draft metadata when saved, or an error message when verification fails
+ */
 
 export async function toolDraftEmail(
   env: Env,
@@ -258,7 +296,13 @@ export async function toolDraftEmail(
   };
 }
 
-// ── update_draft ───────────────────────────────────────────────────
+/**
+ * Replaces an existing draft with updated content while preserving its threading information.
+ *
+ * @param mailboxId - The mailbox containing the draft
+ * @param params - The draft identifier and optional replacement fields
+ * @returns The new and replaced draft identifiers on success, or an error message if the draft cannot be updated
+ */
 
 export async function toolUpdateDraft(
   env: Env,
@@ -316,7 +360,13 @@ export async function toolUpdateDraft(
   };
 }
 
-// ── mark_email_read ────────────────────────────────────────────────
+/**
+ * Updates the read status of an email.
+ *
+ * @param emailId - The identifier of the email to update
+ * @param read - The new read status
+ * @returns The update status, email identifier, and resulting read status
+ */
 
 export async function toolMarkEmailRead(
   env: Env,
@@ -329,7 +379,14 @@ export async function toolMarkEmailRead(
   return { status: "updated", emailId, read };
 }
 
-// ── move_email ─────────────────────────────────────────────────────
+/**
+ * Moves an email to the specified folder.
+ *
+ * @param mailboxId - The mailbox containing the email
+ * @param emailId - The email to move
+ * @param folderId - The destination folder
+ * @returns A success result with the email and destination folder, or an error result if the move fails
+ */
 
 export async function toolMoveEmail(
   env: Env,
@@ -345,7 +402,12 @@ export async function toolMoveEmail(
   return { error: "Failed to move email" };
 }
 
-// ── discard_draft ──────────────────────────────────────────────────
+/**
+ * Discards an existing draft email.
+ *
+ * @param draftId - The identifier of the draft to discard
+ * @returns A discarded status with the draft identifier, or an error message if the email is missing or is not a draft
+ */
 
 export async function toolDiscardDraft(env: Env, mailboxId: string, draftId: string) {
   const stub = getMailboxStub(env, mailboxId);
@@ -361,7 +423,13 @@ export async function toolDiscardDraft(env: Env, mailboxId: string, draftId: str
   return { status: "discarded", draftId };
 }
 
-// ── delete_email ───────────────────────────────────────────────────
+/**
+ * Deletes an email from a mailbox.
+ *
+ * @param mailboxId - The mailbox containing the email
+ * @param emailId - The identifier of the email to delete
+ * @returns A deletion status, or an error if the email was not found
+ */
 
 export async function toolDeleteEmail(env: Env, mailboxId: string, emailId: string) {
   const stub = getMailboxStub(env, mailboxId);
@@ -372,7 +440,14 @@ export async function toolDeleteEmail(env: Env, mailboxId: string, emailId: stri
   return { status: "deleted", emailId };
 }
 
-// ── send_reply ─────────────────────────────────────────────────────
+/**
+ * Sends a reply to an existing email and records it in the Sent folder.
+ *
+ * @param mailboxId - The mailbox sending the reply
+ * @param params - The reply details, including the original email identifier, recipient, subject, and body
+ * @returns A sent status with the message identifier, or an error message
+ * @throws Error if the mailbox identifier does not contain a valid domain
+ */
 
 export async function toolSendReply(
   env: Env,
@@ -453,7 +528,14 @@ export async function toolSendReply(
   return { status: "sent", messageId, message: `Reply sent to ${params.to}` };
 }
 
-// ── send_email ─────────────────────────────────────────────────────
+/**
+ * Sends an email from the specified mailbox and records it in Sent.
+ *
+ * @param mailboxId - The sender mailbox address
+ * @param params - The recipient, subject, and HTML body of the email
+ * @returns A sent status with the message ID, or an error message
+ * @throws Error if `mailboxId` is not a valid email address
+ */
 
 export async function toolSendEmail(
   env: Env,

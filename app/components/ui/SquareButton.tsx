@@ -9,6 +9,11 @@ import { Button, type ButtonProps } from "@cloudflare/kumo";
 // call sites — icon buttons can use `<SquareButton>` directly.
 const SQUARE_PROPS = { ["shape"]: "square" } as const;
 
+/**
+ * Renders a button with a square shape.
+ *
+ * @param props - The button properties to apply.
+ */
 export function SquareButton(props: ButtonProps) {
   // SAFETY: ButtonProps is a discriminated union that TypeScript cannot resolve
   // through an object spread, so assert the merged props back to ButtonProps

@@ -18,6 +18,11 @@ import {
 import { ApiError } from "~/services/api";
 import "./index.css";
 
+/**
+ * Creates a configured query client with caching, retry, and mutation error handling defaults.
+ *
+ * @returns A configured query client
+ */
 function makeQueryClient() {
   return new QueryClient({
     defaultOptions: {
@@ -46,6 +51,11 @@ function makeQueryClient() {
 // Lazy singleton for the browser — avoids module-scope instantiation that
 // leaks cache across SSR requests.
 let browserQueryClient: QueryClient | undefined;
+/**
+ * Provides the query client for the current rendering environment.
+ *
+ * @returns A fresh query client during server-side rendering or a shared client in the browser.
+ */
 function getQueryClient() {
   if (globalThis.window === undefined) {
     // SSR: always create a fresh client per request to prevent cross-user cache leaks
@@ -66,6 +76,11 @@ const KumoLink = forwardRef<
   return <a href={href} ref={ref} {...props} />;
 });
 
+/**
+ * Renders the application’s HTML document shell with metadata, favicon links, routed content, and client-side scripts.
+ *
+ * @param children - The application content rendered inside the document body
+ */
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
@@ -87,6 +102,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Displays a centered loading indicator while route data is being hydrated.
+ */
 export function HydrateFallback() {
   return (
     <div className="flex items-center justify-center h-screen">
@@ -95,6 +113,9 @@ export function HydrateFallback() {
   );
 }
 
+/**
+ * Provides the query client and shared application services for the active route.
+ */
 export default function App() {
   // Use useState to ensure each SSR request gets a fresh client while the
   // browser reuses the same singleton across navigations.
@@ -112,6 +133,12 @@ export default function App() {
   );
 }
 
+/**
+ * Renders an error page with context-specific messaging and a link to the home page.
+ *
+ * @param error - The error to display, including an optional route response status.
+ * @returns The rendered error page.
+ */
 export function ErrorBoundary({ error }: { error: unknown }) {
   let title = "Something went wrong";
   let description = "An unexpected error occurred. Please try again.";

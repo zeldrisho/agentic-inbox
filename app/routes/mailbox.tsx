@@ -11,6 +11,11 @@ import Sidebar from "~/components/Sidebar";
 import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
 
+/**
+ * Renders the mailbox layout with navigation, nested content, and optional panels.
+ *
+ * @returns The mailbox route layout.
+ */
 export default function MailboxRoute() {
   const { mailboxId } = useParams<{ mailboxId: string }>();
   // Prefetch mailbox data for child components

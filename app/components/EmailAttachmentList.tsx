@@ -15,6 +15,13 @@ interface EmailAttachmentListProps {
   showHeading?: boolean;
 }
 
+/**
+ * Renders downloadable non-inline email attachments with optional image previews and a heading.
+ *
+ * @param attachments - The email attachments to display.
+ * @param onPreviewImage - Callback invoked with an image URL and filename when an image attachment is selected.
+ * @returns The attachment list, or `null` when no mailbox is provided or no non-inline attachments exist.
+ */
 export default function EmailAttachmentList({
   mailboxId,
   emailId,

@@ -65,6 +65,12 @@ const TOOL_LABELS = {
   },
 } satisfies Record<string, { label: string; icon: React.ReactNode }>;
 
+/**
+ * Renders a status badge for a tool call.
+ *
+ * @param toolName - The identifier of the tool call.
+ * @param state - The current state of the tool call.
+ */
 function ToolCallBadge({ toolName, state }: { toolName: string; state: string }) {
   // SAFETY: `toolName` is a dynamic tool identifier; it is a known key of TOOL_LABELS when recognized.
   const info = TOOL_LABELS[toolName as keyof typeof TOOL_LABELS] ?? {
@@ -86,6 +92,12 @@ function ToolCallBadge({ toolName, state }: { toolName: string; state: string })
   );
 }
 
+/**
+ * Extracts the tool name represented by a message part.
+ *
+ * @param part - The message part to inspect
+ * @returns The tool name, or `null` when the part does not represent a tool
+ */
 function getToolNameFromPart(part: UIMessage["parts"][number]): string | null {
   if (part.type === "dynamic-tool") {
     // SAFETY: dynamic-tool parts expose an unmodeled `toolName` field accessed via `as any`.
@@ -95,6 +107,12 @@ function getToolNameFromPart(part: UIMessage["parts"][number]): string | null {
   return null;
 }
 
+/**
+ * Determines whether a message contains a `draft_reply` tool invocation.
+ *
+ * @param message - The message to inspect
+ * @returns `true` if the message contains a `draft_reply` tool invocation, `false` otherwise.
+ */
 function hasDraftReplyTool(message: UIMessage): boolean {
   return message.parts.some((part) => {
     const toolName = getToolNameFromPart(part);
@@ -102,6 +120,12 @@ function hasDraftReplyTool(message: UIMessage): boolean {
   });
 }
 
+/**
+ * Renders an action for editing and sending a draft reply in the composer.
+ *
+ * @param onEdit - Called when the edit action is selected
+ * @param disabled - Whether the edit action is unavailable
+ */
 function DraftActions({ onEdit, disabled }: { onEdit: () => void; disabled: boolean }) {
   return (
     <div className="flex gap-1.5 mt-1">
@@ -118,6 +142,14 @@ function DraftActions({ onEdit, disabled }: { onEdit: () => void; disabled: bool
   );
 }
 
+/**
+ * Renders a chat message with formatted text, tool activity, and draft actions.
+ *
+ * @param message - The message and its content parts to display
+ * @param onAction - Callback invoked when a draft action is selected
+ * @param isStreaming - Whether the response is currently streaming
+ * @returns The rendered message bubble
+ */
 function MessageBubble({
   message,
   onAction,
@@ -247,6 +279,13 @@ function MessageBubble({
   );
 }
 
+/**
+ * Renders the connected email agent chat interface for a mailbox.
+ *
+ * @param mailboxId - The mailbox identifier used to create the email agent session.
+ * @param useAgent - Hook used to create the email agent.
+ * @param useAgentChat - Hook used to manage the agent conversation.
+ */
 function AgentChatConnected({
   mailboxId,
   useAgent,

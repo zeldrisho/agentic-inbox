@@ -18,6 +18,14 @@ interface EmailPanelDialogsProps {
   onClosePreview: () => void;
 }
 
+/**
+ * Extracts displayable email headers from a message.
+ *
+ * Uses the message's raw headers when they can be parsed; otherwise, builds
+ * headers from the message's available email fields.
+ *
+ * @returns Header entries containing a name and string value.
+ */
 function getSourceHeaders(msg: Email): { key: string; value: string }[] {
   if (msg.raw_headers) {
     try {
@@ -55,6 +63,14 @@ function getSourceHeaders(msg: Email): { key: string; value: string }[] {
   return headers;
 }
 
+/**
+ * Renders dialogs for viewing email source headers and previewing email images.
+ *
+ * @param sourceViewEmail - The email whose source headers are displayed, or `null` when closed
+ * @param previewImage - The image to preview, or `null` when closed
+ * @param onCloseSource - Called when the source headers dialog is dismissed
+ * @param onClosePreview - Called when the image preview dialog is dismissed
+ */
 export default function EmailPanelDialogs({
   sourceViewEmail,
   previewImage,

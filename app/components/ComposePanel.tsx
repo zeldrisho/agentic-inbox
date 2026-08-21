@@ -9,6 +9,9 @@ import { useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
 import RichTextEditor from "./RichTextEditor";
 
+/**
+ * Renders the email composition panel.
+ */
 export default function ComposePanel() {
   const { mailboxId, folder } = useParams<{
     mailboxId: string;

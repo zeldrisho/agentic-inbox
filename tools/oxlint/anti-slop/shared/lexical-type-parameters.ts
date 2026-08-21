@@ -2,6 +2,12 @@ import type { ESTree } from "@oxlint/plugins";
 
 type VisitorKeys = Readonly<Record<string, readonly string[]>>;
 
+/**
+ * Determines whether a value is an ESTree node.
+ *
+ * @param value - The value to inspect
+ * @returns `true` if the value is an object with a string `type` property, `false` otherwise.
+ */
 function isNode(value: unknown): value is ESTree.Node {
 	return (
 		typeof value === "object" &&
@@ -11,6 +17,13 @@ function isNode(value: unknown): value is ESTree.Node {
 	);
 }
 
+/**
+ * Collects names declared by `infer` type parameters within an AST subtree.
+ *
+ * @param node - The AST node whose subtree is traversed
+ * @param visitorKeys - Child-property names for each AST node type
+ * @param names - Set to which discovered type-parameter names are added
+ */
 function collectInferTypeParameterNames(
 	node: ESTree.Node,
 	visitorKeys: VisitorKeys,
@@ -31,7 +44,12 @@ function collectInferTypeParameterNames(
 	}
 }
 
-/** Collect type binders that are in scope at a node and can shadow module aliases. */
+/**
+ * Collects TypeScript type-parameter names visible at a node.
+ *
+ * @param node - The node whose lexical type-parameter scope is inspected
+ * @returns The names of type parameters and inferred binders in scope
+ */
 export function lexicalTypeParameterNames(
 	node: ESTree.Node,
 	visitorKeys: VisitorKeys,

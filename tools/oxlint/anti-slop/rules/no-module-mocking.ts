@@ -4,6 +4,13 @@ import type { ESTree, Scope, SourceCode, Variable } from "@oxlint/plugins";
 
 const moduleMockMethods = new Set(["doMock", "mock", "unstable_mockModule"]);
 
+/**
+ * Finds the variable declared for an identifier in its lexical scope chain.
+ *
+ * @param sourceCode - The source code context containing the identifier's scope
+ * @param identifier - The identifier whose declaration to locate
+ * @returns The matching variable, or `null` when no declaration is found
+ */
 function resolveVariable(
   sourceCode: SourceCode,
   identifier: ESTree.IdentifierReference,
@@ -17,11 +24,24 @@ function resolveVariable(
   return null;
 }
 
+/**
+ * Extracts the imported name from an import specifier.
+ *
+ * @param node - The node to inspect
+ * @returns The imported name, or `null` if the node is not an import specifier
+ */
 function importedName(node: ESTree.Node): string | null {
   if (node.type !== "ImportSpecifier") return null;
   return node.imported.type === "Identifier" ? node.imported.name : node.imported.value;
 }
 
+/**
+ * Determines whether an expression references a Vitest or Jest framework object.
+ *
+ * @param sourceCode - The source code context used to resolve references and imports
+ * @param expression - The expression to inspect
+ * @returns `true` if the expression references `vi` or `jest`, `false` otherwise
+ */
 function isTestFrameworkObject(
   sourceCode: SourceCode,
   expression: ESTree.Expression,
@@ -48,6 +68,13 @@ function isTestFrameworkObject(
   });
 }
 
+/**
+ * Determines whether a callee is a Vitest or Jest module-mocking method.
+ *
+ * @param sourceCode - The source code context used to identify test framework objects
+ * @param callee - The expression being called
+ * @returns `true` if the callee invokes a supported module-mocking method, `false` otherwise
+ */
 function moduleMockCall(sourceCode: SourceCode, callee: ESTree.Expression): boolean {
   if (!("property" in callee) || !("object" in callee) || !("computed" in callee)) return false;
   if (!isTestFrameworkObject(sourceCode, callee.object)) return false;

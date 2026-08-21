@@ -34,6 +34,13 @@ interface RichTextEditorProps {
   onChange: (value: string) => void;
 }
 
+/**
+ * Renders a rich-text editor with formatting controls and HTML content synchronization.
+ *
+ * @param value - The editor's HTML content.
+ * @param onChange - Called with the updated HTML content when the editor changes.
+ * @returns The rich-text editor, or `null` while the editor is initializing.
+ */
 export default function RichTextEditor({ value, onChange }: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [

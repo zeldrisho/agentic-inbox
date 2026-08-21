@@ -42,8 +42,13 @@ export async function listMailboxes(bucket: R2Bucket): Promise<{ id: string; ema
 // ── Sender Validation ──────────────────────────────────────────────
 
 /**
- * Normalise to/from addresses and validate the sender matches the mailbox.
- * Returns the normalised values or throws with a user-facing message.
+ * Normalizes recipient and sender addresses and verifies that the sender matches the mailbox.
+ *
+ * @param to - The recipient address or addresses
+ * @param from - The sender address or an object containing the sender email
+ * @param mailboxId - The mailbox email address the sender must match
+ * @returns The normalized recipient address, sender email, and sender domain
+ * @throws SenderValidationError If the sender does not match the mailbox or has no domain
  */
 export function validateSender(
   to: string | string[],
@@ -75,7 +80,10 @@ export class SenderValidationError extends Error {
 // ── Message ID ─────────────────────────────────────────────────────
 
 /**
- * Generate an internal UUID and a proper RFC 2822 Message-ID.
+ * Generates a unique internal identifier and an RFC 2822-style message ID.
+ *
+ * @param fromDomain - The domain to append to the message ID
+ * @returns The internal UUID and outgoing message ID
  */
 export function generateMessageId(fromDomain: string) {
   const messageId = crypto.randomUUID();
@@ -86,7 +94,10 @@ export function generateMessageId(fromDomain: string) {
 // ── Threading ──────────────────────────────────────────────────────
 
 /**
- * Build the References chain and In-Reply-To from an original email.
+ * Builds threading metadata from an original email.
+ *
+ * @param original - The email whose message and thread identifiers should be used.
+ * @returns The original message ID, accumulated references, and thread ID.
  */
 export function buildReferencesChain(original: EmailFull) {
   const originalMsgId = original.message_id || original.id;
@@ -112,7 +123,11 @@ export interface ThreadingHeaders {
 }
 
 /**
- * Build threading headers (In-Reply-To + References) for the email binding.
+ * Creates email headers that identify the original message and its thread.
+ *
+ * @param originalMsgId - The message ID of the original email
+ * @param references - Message IDs in the conversation history
+ * @returns Headers containing `In-Reply-To` and, when references are provided, `References`
  */
 export function buildThreadingHeaders(
   originalMsgId: string,
@@ -128,8 +143,9 @@ export function buildThreadingHeaders(
 // ── Draft-follows-in_reply_to ──────────────────────────────────────
 
 /**
- * If the given email is a draft with an in_reply_to, resolve the real original.
- * Used by reply/forward routes to avoid threading against the draft itself.
+ * Resolves a draft to its referenced original email when available.
+ *
+ * @returns The referenced original email, or the provided email when no matching original exists.
  */
 export async function resolveOriginalEmail(
   stub: DurableObjectStub<MailboxDO>,
@@ -192,7 +208,10 @@ export function stripHtmlToText(html: string): string {
 export const formatEmailDate = formatQuotedDate;
 
 /**
- * Build a quoted reply block HTML string from original email data.
+ * Builds an HTML blockquote containing a sanitized quoted email reply.
+ *
+ * @param original - The original email's optional sender, date, and body.
+ * @returns The quoted reply block, or an empty string when the email has no body.
  */
 export function buildQuotedReplyBlock(original: {
   date?: string;
@@ -218,8 +237,9 @@ export function buildQuotedReplyBlock(original: {
 // ── Tool Logic (getFullEmail / getFullThread) ──────────────────────
 
 /**
- * Fetch a single email and return it with both HTML and plain-text body.
- * Returns null if the email is not found.
+ * Retrieves a single email with plain-text and HTML body representations.
+ *
+ * @returns The email with `body_text` and `body_html` fields, or `null` if the email is not found.
  */
 export async function getFullEmail(stub: DurableObjectStub<MailboxDO>, emailId: string) {
   // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
@@ -231,9 +251,10 @@ export async function getFullEmail(stub: DurableObjectStub<MailboxDO>, emailId: 
 }
 
 /**
- * Fetch all emails in a thread with full bodies in a single DO call.
- * Uses `getThreadEmails` which runs 2 SQL queries (emails + attachments)
- * instead of the previous N+1 pattern (1 list query + N getEmail calls).
+ * Retrieves all messages in a thread with plain-text body representations, sorted chronologically.
+ *
+ * @param threadId - The identifier of the thread to retrieve
+ * @returns The thread identifier, message count, and chronologically sorted messages
  */
 export async function getFullThread(stub: DurableObjectStub<MailboxDO>, threadId: string) {
   // SAFETY: `getThreadEmails` is part of the DO's dynamic runtime API; the full DurableObjectStub<MailboxDO> type is too heavy to instantiate.

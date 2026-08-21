@@ -7,6 +7,11 @@ import api from "~/services/api";
 import type { Mailbox, MailboxSettings } from "~/types";
 import { queryKeys } from "./keys";
 
+/**
+ * Fetches all mailboxes.
+ *
+ * @returns The mailbox list query result
+ */
 export function useMailboxes() {
   return useQuery<Mailbox[]>({
     queryKey: queryKeys.mailboxes.all,
@@ -14,6 +19,12 @@ export function useMailboxes() {
   });
 }
 
+/**
+ * Fetches a mailbox by ID when an ID is provided.
+ *
+ * @param mailboxId - The ID of the mailbox to fetch
+ * @returns The mailbox query result
+ */
 export function useMailbox(mailboxId: string | undefined) {
   return useQuery<Mailbox>({
     queryKey: mailboxId ? queryKeys.mailboxes.detail(mailboxId) : ["mailboxes", "_disabled"],
@@ -22,6 +33,11 @@ export function useMailbox(mailboxId: string | undefined) {
   });
 }
 
+/**
+ * Provides a mutation for creating a mailbox.
+ *
+ * @returns A mailbox creation mutation that invalidates the mailbox list cache after success.
+ */
 export function useCreateMailbox() {
   const qc = useQueryClient();
   return useMutation({
@@ -33,6 +49,11 @@ export function useCreateMailbox() {
   });
 }
 
+/**
+ * Provides a mutation for updating mailbox settings.
+ *
+ * @returns A mailbox update mutation that refreshes the updated mailbox and mailbox list data after success.
+ */
 export function useUpdateMailbox() {
   const qc = useQueryClient();
   return useMutation({
@@ -45,6 +66,11 @@ export function useUpdateMailbox() {
   });
 }
 
+/**
+ * Provides a mutation for deleting a mailbox.
+ *
+ * @returns A mailbox deletion mutation.
+ */
 export function useDeleteMailbox() {
   const qc = useQueryClient();
   return useMutation({

@@ -19,7 +19,11 @@ export interface StoredAttachment {
 }
 
 /**
- * Store base64-encoded attachments to R2 and return metadata for the DO.
+ * Stores base64-encoded attachments and builds metadata for the stored objects.
+ *
+ * @param emailId - The email identifier used to organize attachment storage.
+ * @param attachments - The attachments to decode and store.
+ * @returns Metadata for each stored attachment, or an empty array when no attachments are provided.
  */
 export async function storeAttachments(
   bucket: Env["BUCKET"],

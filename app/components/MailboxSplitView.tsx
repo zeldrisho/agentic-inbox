@@ -12,6 +12,13 @@ interface MailboxSplitViewProps {
   children: ReactNode;
 }
 
+/**
+ * Renders mailbox content alongside an email or compose panel in a responsive split view.
+ *
+ * @param selectedEmailId - The ID of the email to display, or `null` when no email is selected
+ * @param isComposing - Whether the compose panel is active
+ * @param children - The mailbox content displayed in the side panel
+ */
 export default function MailboxSplitView({
   selectedEmailId,
   isComposing,

@@ -12,6 +12,12 @@ const commentOwnerKinds = new Set([
   "VariableDeclaration",
 ]);
 
+/**
+ * Determines whether a type assertion uses the `const` type annotation.
+ *
+ * @param node - The type assertion to inspect
+ * @returns `true` if the assertion uses `const`, `false` otherwise
+ */
 function isConstAssertion(node: TypeAssertion): boolean {
   return (
     node.typeAnnotation.type === "TSTypeReference" &&
@@ -20,6 +26,11 @@ function isConstAssertion(node: TypeAssertion): boolean {
   );
 }
 
+/**
+ * Determines whether a type assertion has a preceding comment containing `SAFETY:`.
+ *
+ * @returns `true` if a qualifying safety comment is found, `false` otherwise.
+ */
 function hasSafetyComment(sourceCode: SourceCode, node: TypeAssertion): boolean {
   let current: ESTree.Node = node;
   while (true) {

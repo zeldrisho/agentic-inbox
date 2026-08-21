@@ -20,6 +20,11 @@ import type { MailboxContext } from "../lib/mailbox";
 
 type AppContext = Context<MailboxContext>;
 
+/**
+ * Processes a reply to an existing email and queues it for delivery.
+ *
+ * @returns A `404` response when the original email is unavailable, a `400` response for sender validation errors, a `429` response when sending is rate-limited, or a `202` response containing the sent message ID.
+ */
 export async function handleReplyEmail(c: AppContext) {
   const mailboxId = c.req.param("mailboxId") ?? "";
   const id = c.req.param("id") ?? "";
@@ -115,6 +120,11 @@ export async function handleReplyEmail(c: AppContext) {
   return c.json({ id: messageId, status: "sent" }, 202);
 }
 
+/**
+ * Forwards an existing email to the specified recipients.
+ *
+ * @returns A `202` response containing the sent message ID, or an error response when the original email is missing, the sender is invalid, or sending is rate-limited.
+ */
 export async function handleForwardEmail(c: AppContext) {
   const mailboxId = c.req.param("mailboxId") ?? "";
   const id = c.req.param("id") ?? "";

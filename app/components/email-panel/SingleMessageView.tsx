@@ -13,6 +13,13 @@ interface SingleMessageViewProps {
   onPreviewImage: (url: string, filename: string) => void;
 }
 
+/**
+ * Displays an email message with its header, body, and attachments.
+ *
+ * @param email - The email message to display
+ * @param mailboxId - The mailbox identifier associated with the message
+ * @param onPreviewImage - Callback invoked when an attachment image is selected for preview
+ */
 export default function SingleMessageView({
   email,
   mailboxId,

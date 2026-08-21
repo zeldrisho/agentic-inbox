@@ -41,6 +41,12 @@ export type TypeEnvironment = {
 	readonly shadowedBuiltIns: ReadonlySet<string>;
 };
 
+/**
+ * Extracts the declaration from an export statement.
+ *
+ * @param statement - The statement to inspect
+ * @returns The exported declaration, the original statement when it is not an export, or `null` when the export has no declaration
+ */
 function declaredStatement(statement: ESTree.Statement): ESTree.Node | null {
 	return statement.type === "ExportNamedDeclaration" ||
 		statement.type === "ExportDefaultDeclaration"
@@ -48,6 +54,12 @@ function declaredStatement(statement: ESTree.Statement): ESTree.Node | null {
 		: statement;
 }
 
+/**
+ * Builds a type environment from declarations in a program.
+ *
+ * @param program - The program whose type aliases, interfaces, and shadowed built-in names are collected
+ * @returns The collected type aliases, interface declarations, and shadowed built-in names
+ */
 export function createTypeEnvironment(program: ESTree.Program): TypeEnvironment {
 	const aliases = new Map<string, ESTree.TSTypeAliasDeclaration>();
 	const interfaces = new Map<string, ESTree.TSInterfaceDeclaration[]>();
@@ -99,10 +111,24 @@ function typeReferenceName(type: ESTree.TSTypeReference): string | null {
 	return type.typeName.type === "Identifier" ? type.typeName.name : null;
 }
 
+/**
+ * Determines whether a name refers to an available built-in type.
+ *
+ * @param name - The name to check
+ * @param environment - The type environment used to account for shadowed built-ins
+ * @returns `true` if the name is a built-in that has not been shadowed, `false` otherwise
+ */
 function isBuiltIn(name: string, environment: TypeEnvironment): boolean {
 	return BUILT_INS.has(name) && !environment.shadowedBuiltIns.has(name);
 }
 
+/**
+ * Determines whether a type is an unapplied reference to a named type.
+ *
+ * @param type - The type to inspect
+ * @param name - The expected referenced type name
+ * @returns `true` if the type references `name` without type arguments, `false` otherwise
+ */
 function isUnappliedReferenceTo(type: ESTree.TSType, name: string): boolean {
 	const unwrapped = unwrapTransparentType(type);
 	return (
@@ -114,6 +140,12 @@ function isUnappliedReferenceTo(type: ESTree.TSType, name: string): boolean {
 	);
 }
 
+/**
+ * Removes parentheses and `readonly` operators from a type to expose its underlying type.
+ *
+ * @param type - The type to unwrap
+ * @returns The underlying type
+ */
 function unwrapTransparentType(type: ESTree.TSType): ESTree.TSType {
 	let current = type;
 	while (
@@ -125,10 +157,21 @@ function unwrapTransparentType(type: ESTree.TSType): ESTree.TSType {
 	return current;
 }
 
+/**
+ * Determines whether a type represents `never`.
+ *
+ * @returns `true` if the type represents `never`, `false` otherwise.
+ */
 function isNeverType(type: ESTree.TSType): boolean {
 	return unwrapTransparentType(type).type === "TSNeverKeyword";
 }
 
+/**
+ * Determines whether a type signature is an optional property explicitly typed as `never`.
+ *
+ * @param member - The type signature to inspect
+ * @returns `true` if the member is an optional property typed as `never`, `false` otherwise.
+ */
 function isEffectivelyEmptyMember(member: ESTree.TSSignature): boolean {
 	return (
 		member.type === "TSPropertySignature" &&
@@ -139,10 +182,21 @@ function isEffectivelyEmptyMember(member: ESTree.TSSignature): boolean {
 	);
 }
 
+/**
+ * Determines whether a type literal contains no meaningful members.
+ *
+ * @returns `true` if the type literal has no members or all members are effectively empty, `false` otherwise.
+ */
 function isEffectivelyEmptyTypeLiteral(type: ESTree.TSTypeLiteral): boolean {
 	return type.members.length === 0 || type.members.every(isEffectivelyEmptyMember);
 }
 
+/**
+ * Determines whether a single interface declaration has no effective members or extended interfaces.
+ *
+ * @param declarations - Interface declarations to evaluate
+ * @returns `true` if the declarations contain exactly one effectively empty interface, `false` otherwise.
+ */
 function isEffectivelyEmptyInterface(
 	declarations: readonly ESTree.TSInterfaceDeclaration[],
 ): boolean {
@@ -155,6 +209,13 @@ function isEffectivelyEmptyInterface(
 	);
 }
 
+/**
+ * Resolves a type through substitution mappings until reaching its final type.
+ *
+ * @param base - The substitution mappings to apply
+ * @param resolving - Names currently being resolved to prevent cycles
+ * @returns The resolved type, or the original type when no substitution applies or a cycle is detected
+ */
 function resolvedSubstitutionArgument(
 	type: ESTree.TSType,
 	base: TypeAliasEnvironment,
@@ -171,6 +232,14 @@ function resolvedSubstitutionArgument(
 	return resolvedSubstitutionArgument(substitution, base, nextResolving);
 }
 
+/**
+ * Creates a type alias environment by substituting a type reference's arguments for the alias parameters.
+ *
+ * @param alias - The generic type alias whose parameters are substituted
+ * @param type - The type reference providing arguments for the alias parameters
+ * @param base - The existing alias environment to extend
+ * @returns An extended environment, or `null` if a parameter has neither an argument nor a default
+ */
 function aliasSubstitution(
 	alias: ESTree.TSTypeAliasDeclaration,
 	type: ESTree.TSTypeReference,
@@ -187,6 +256,14 @@ function aliasSubstitution(
 	return next;
 }
 
+/**
+ * Classifies a type when it is used as a dictionary value.
+ *
+ * @param type - The type to classify
+ * @param substitutions - Type parameter substitutions applied during alias resolution
+ * @param resolvingAliases - Aliases currently being resolved, used to prevent recursive cycles
+ * @returns The unsafe dictionary value category, or `null` when the type is safe or cannot be classified
+ */
 function unsafeDirectValue(
 	type: ESTree.TSType,
 	environment: TypeEnvironment,
@@ -243,6 +320,12 @@ function unsafeDirectValue(
 	return unsafeDirectValue(alias.typeAnnotation, environment, nextSubstitutions, nextResolving);
 }
 
+/**
+ * Extracts value types from dictionary-like type declarations.
+ *
+ * @param type - The type to inspect
+ * @returns The resolved dictionary value types found in `type`
+ */
 function dictionaryValueTypes(
 	type: ESTree.TSType,
 	environment: TypeEnvironment,
@@ -304,6 +387,13 @@ function dictionaryValueTypes(
 	return dictionaryValueTypes(alias.typeAnnotation, environment, nextSubstitutions, nextResolving);
 }
 
+/**
+ * Classifies a dictionary value type when it contains an unsafe value.
+ *
+ * @param valueType - The type to classify as a dictionary value
+ * @param environment - The type environment used to resolve aliases and declarations
+ * @returns The unsafe dictionary classification, or `null` if the value type is safe
+ */
 export function classifyUnsafeDictionaryValue(
 	valueType: ESTree.TSType,
 	environment: TypeEnvironment,
@@ -312,6 +402,11 @@ export function classifyUnsafeDictionaryValue(
 	return unsafeValue === null ? null : { kind: "unsafe-dictionary", unsafeValue };
 }
 
+/**
+ * Classifies a dictionary type based on its first unsafe value type.
+ *
+ * @returns An unsafe dictionary classification containing the unsafe value classification, or `null` if all dictionary values are safe.
+ */
 export function classifyUnsafeDictionary(
 	type: ESTree.TSType,
 	environment: TypeEnvironment,
@@ -328,6 +423,11 @@ export function classifyUnsafeDictionary(
 	return null;
 }
 
+/**
+ * Determines whether a type resolves to a dictionary with at least one value type.
+ *
+ * @returns `true` if the type contains a dictionary value type, `false` otherwise.
+ */
 function resolvesToDictionary(
 	type: ESTree.TSType,
 	environment: TypeEnvironment,
@@ -337,6 +437,11 @@ function resolvesToDictionary(
 	return dictionaryValueTypes(type, environment, substitutions, resolvingAliases).length > 0;
 }
 
+/**
+ * Classifies a type that may widen into a broad or open dictionary target.
+ *
+ * @returns The widening target classification, or `null` when the type does not match a recognized target.
+ */
 export function classifyWideningTarget(
 	type: ESTree.TSType,
 	environment: TypeEnvironment,
@@ -380,6 +485,14 @@ export function classifyWideningTarget(
 	return resolved;
 }
 
+/**
+ * Determines whether a mapped type key covers a broad property-key domain.
+ *
+ * @param type - The mapped type key to classify
+ * @param environment - The type environment used to resolve built-in names
+ * @param substitutions - Type parameter substitutions used during classification
+ * @returns `true` if the key covers string, number, symbol, or `PropertyKey`, `false` otherwise
+ */
 function isBroadMappedKey(
 	type: ESTree.TSType,
 	environment: TypeEnvironment,
@@ -408,6 +521,11 @@ function isBroadMappedKey(
 	return name === "PropertyKey" && isBuiltIn(name, environment);
 }
 
+/**
+ * Classifies an alias target that may widen to an unknown, object, or open dictionary type.
+ *
+ * @returns The broadening target classification, or `null` when the type does not match one.
+ */
 function classifyAliasBroadTarget(
 	type: ESTree.TSType,
 	environment: TypeEnvironment,
@@ -464,6 +582,12 @@ function classifyAliasBroadTarget(
 	);
 }
 
+/**
+ * Determines whether an expression unwraps to an object literal with at least one property.
+ *
+ * @param expression - The expression to inspect.
+ * @returns `true` if the expression unwraps to a nonempty object literal, `false` otherwise.
+ */
 export function isPopulatedObjectExpression(expression: ESTree.Expression): boolean {
 	let current = expression;
 	while (
@@ -477,6 +601,12 @@ export function isPopulatedObjectExpression(expression: ESTree.Expression): bool
 	return current.type === "ObjectExpression" && current.properties.length > 0;
 }
 
+/**
+ * Determines whether an expression provides known runtime evidence.
+ *
+ * @param expression - The expression to classify.
+ * @returns `true` if the expression is an object, array, function, class, constructor, literal, template literal, or unary expression, `false` otherwise.
+ */
 export function isKnownEvidenceExpression(expression: ESTree.Expression): boolean {
 	let current = expression;
 	while (

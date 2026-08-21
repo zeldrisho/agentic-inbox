@@ -28,6 +28,12 @@ const requestHandler = createRequestHandler(
   import.meta.env.MODE,
 );
 
+/**
+ * Builds the Cloudflare Access issuer and certificate URLs for a team domain.
+ *
+ * @param teamDomain - The Cloudflare Access team domain, optionally including the certificate path
+ * @returns The issuer origin and certificate URL
+ */
 function getAccessUrls(teamDomain: string) {
   const certsPath = "/cdn-cgi/access/certs";
   const teamUrl = new URL(teamDomain);

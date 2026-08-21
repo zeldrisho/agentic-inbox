@@ -12,6 +12,12 @@ import type { ESTree, Scope, SourceCode, Variable } from "@oxlint/plugins";
 
 type FunctionExpression = ESTree.ArrowFunctionExpression | ESTree.Function;
 
+/**
+ * Removes parentheses and TypeScript expression wrappers from an expression.
+ *
+ * @param expression - The expression to unwrap
+ * @returns The underlying expression
+ */
 function unwrapExpression(expression: ESTree.Expression): ESTree.Expression {
 	let current = expression;
 	while (
@@ -26,6 +32,13 @@ function unwrapExpression(expression: ESTree.Expression): ESTree.Expression {
 	return current;
 }
 
+/**
+ * Resolves an identifier reference to its variable in the nearest enclosing scope.
+ *
+ * @param sourceCode - The source code context used to inspect lexical scopes
+ * @param identifier - The identifier reference to resolve
+ * @returns The resolved variable, or `null` when no matching variable exists
+ */
 function resolveVariable(
 	sourceCode: SourceCode,
 	identifier: ESTree.IdentifierReference,
@@ -39,6 +52,12 @@ function resolveVariable(
 	return null;
 }
 
+/**
+ * Gets the variable's sole standard variable declarator.
+ *
+ * @param variable - The variable whose definition to inspect
+ * @returns The variable declarator, or `null` when the variable does not have exactly one standard variable definition
+ */
 function variableDeclarator(variable: Variable): ESTree.VariableDeclarator | null {
 	if (variable.defs.length !== 1) return null;
 	const [definition] = variable.defs;
@@ -47,6 +66,13 @@ function variableDeclarator(variable: Variable): ESTree.VariableDeclarator | nul
 		: null;
 }
 
+/**
+ * Determines whether a variable is a `const` binding with no writes beyond initialization.
+ *
+ * @param variable - The variable binding to inspect
+ * @param declarator - The variable declarator that defines the binding
+ * @returns `true` if the binding is declared with `const` and has no non-initialization writes, `false` otherwise.
+ */
 function isStableConstVariable(variable: Variable, declarator: ESTree.VariableDeclarator): boolean {
 	return (
 		declarator.parent.type === "VariableDeclaration" &&
@@ -55,6 +81,12 @@ function isStableConstVariable(variable: Variable, declarator: ESTree.VariableDe
 	);
 }
 
+/**
+ * Determines whether an expression contains recognized known-value evidence, including through stable `const` aliases.
+ *
+ * @param expression - The expression to inspect
+ * @returns `true` if the expression contains known-value evidence, `false` otherwise
+ */
 function hasKnownEvidence(
 	sourceCode: SourceCode,
 	expression: ESTree.Expression,
@@ -77,6 +109,13 @@ function hasKnownEvidence(
 	return hasKnownEvidence(sourceCode, declarator.init, visitedVariables);
 }
 
+/**
+ * Classifies a type annotation as a potential widening target.
+ *
+ * @param annotation - The type annotation to classify
+ * @param environment - The type environment used for classification
+ * @returns The classified widening target, or `null` when no annotation is provided or the annotation is not a widening target
+ */
 function annotationTarget(
 	annotation: ESTree.TSTypeAnnotation | null | undefined,
 	environment: TypeEnvironment,
@@ -86,6 +125,12 @@ function annotationTarget(
 		: classifyWideningTarget(annotation.typeAnnotation, environment);
 }
 
+/**
+ * Finds the nearest enclosing function expression, function declaration, or arrow function.
+ *
+ * @param node - The node whose ancestors are searched
+ * @returns The nearest enclosing function, or `null` if none exists
+ */
 function enclosingFunction(node: ESTree.Node): FunctionExpression | null {
 	let current: ESTree.Node | null = node.parent;
 	while (current !== null && current.type !== "Program") {
@@ -101,12 +146,25 @@ function enclosingFunction(node: ESTree.Node): FunctionExpression | null {
 	return null;
 }
 
+/**
+ * Derives a property key name from an identifier, literal, or source text.
+ *
+ * @param sourceCode - The source code used to retrieve text for unsupported key types.
+ * @param key - The property key to name.
+ * @returns The key's identifier name, literal value, or source text.
+ */
 function sourceKeyName(sourceCode: SourceCode, key: ESTree.PropertyKey): string {
 	if (key.type === "Identifier" || key.type === "PrivateIdentifier") return key.name;
 	if (key.type === "Literal") return String(key.value);
 	return sourceCode.getText(key);
 }
 
+/**
+ * Determines a function's descriptive name from its declaration, binding, or method key.
+ *
+ * @param owner - The function expression to name, or `null` for an anonymous function.
+ * @returns The function's name, or `"anonymous function"` when no name can be determined.
+ */
 function functionName(sourceCode: SourceCode, owner: FunctionExpression | null): string {
 	if (owner === null) return "anonymous function";
 	if (owner.id !== null) return owner.id.name;
@@ -117,15 +175,31 @@ function functionName(sourceCode: SourceCode, owner: FunctionExpression | null):
 	return "anonymous function";
 }
 
+/**
+ * Determines whether an expression is an empty object literal.
+ *
+ * @returns `true` if the expression unwraps to an object literal with no properties, `false` otherwise.
+ */
 function isEmptyObjectExpression(expression: ESTree.Expression): boolean {
 	const unwrapped = unwrapExpression(expression);
 	return unwrapped.type === "ObjectExpression" && unwrapped.properties.length === 0;
 }
 
+/**
+ * Determines whether a widening target accepts dictionary-like accumulated values.
+ *
+ * @param destination - The target to classify
+ * @returns `true` if the target is an open dictionary or generic container, `false` otherwise
+ */
 function isDictionaryAccumulatorTarget(destination: WideningTarget): boolean {
 	return destination.kind === "open dictionary" || destination.kind === "generic container";
 }
 
+/**
+ * Determines whether a node is directly nested within a TypeScript assertion.
+ *
+ * @returns `true` if the node's parent is a TypeScript `as` expression or type assertion, `false` otherwise.
+ */
 function hasParentAssertion(node: ESTree.Node): boolean {
 	return node.parent?.type === "TSAsExpression" || node.parent?.type === "TSTypeAssertion";
 }
