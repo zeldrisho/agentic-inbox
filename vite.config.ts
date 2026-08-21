@@ -34,6 +34,10 @@ export default defineConfig(({ mode }) => ({
     include: ["tests/**/*.test.{ts,tsx}"],
     globals: true,
     environment: "node",
+    environmentMatchGlobs: [
+      ["tests/components/**", "jsdom"],
+      ["tests/e2e/**", "jsdom"],
+    ],
   },
   lint: {
     ignorePatterns: [

@@ -22,8 +22,40 @@ import { Folders } from "../shared/folders";
 import type { JsonValue } from "../shared/json";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
+import type { MailboxDO } from "./durableObject";
 
 type AppContext = Context<MailboxContext>;
+
+type ExtendedMailboxStub = DurableObjectStub & {
+  getThreadedEmails: (opts: {
+    folder: string;
+    page?: number;
+    limit?: number;
+  }) => Promise<unknown[]>;
+  countThreadedEmails: (folder: string) => Promise<number>;
+  checkSendRateLimit: () => Promise<string | null>;
+  getThreadEmails: (threadId: string) => Promise<unknown[]>;
+  findThreadBySubject: (subject: string, sender?: string) => Promise<string | null>;
+  searchEmails: (
+    opts: Record<string, import("../shared/json").JsonValue | undefined>,
+  ) => Promise<unknown[]>;
+  countSearchResults: (
+    opts: Record<string, import("../shared/json").JsonValue | undefined>,
+  ) => Promise<number>;
+};
+
+function asExtended(stub: DurableObjectStub): ExtendedMailboxStub {
+  // SAFETY: MailboxDO exposes these dynamic methods at runtime; typed stub is narrower.
+  // eslint-disable-next-line anti-slop/no-chained-type-assertions
+  return stub as unknown as ExtendedMailboxStub;
+}
+
+// eslint-disable-next-line anti-slop/no-unknown-parameters
+function asAnyContent(value: unknown): Uint8Array | ArrayBuffer {
+  // SAFETY: PostalMime attachment content is ArrayBuffer|Uint8Array; R2 put accepts either.
+  // eslint-disable-next-line anti-slop/no-unknown-parameters, anti-slop/no-chained-type-assertions
+  return value as unknown as Uint8Array | ArrayBuffer;
+}
 
 // -- Request body schemas (kept for validation) ---------------------
 
@@ -115,6 +147,13 @@ app.use(
 );
 app.use("/api/v1/mailboxes/:mailboxId/*", requireMailbox);
 
+app.onError((err, c) => {
+  if (err instanceof z.ZodError) {
+    return c.json({ error: err.message, issues: err.issues }, 400);
+  }
+  throw err;
+});
+
 // -- Config ---------------------------------------------------------
 
 app.get("/api/v1/config", (c) => {
@@ -195,17 +234,19 @@ app.get("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
   const threaded = boolQuery(c, "threaded");
   const page = intQuery(c, "page");
   const limit = intQuery(c, "limit");
-  // SAFETY: query params are untyped strings; sortColumn is forwarded verbatim to the DO.
-  const sortColumn = c.req.query("sortColumn") as any;
+  // SAFETY: query params are untyped strings; sortColumn is validated inside MailboxDO via allowlist.
+  // eslint-disable-next-line anti-slop/no-chained-type-assertions
+  const sortColumn = c.req.query("sortColumn") as unknown as NonNullable<
+    Parameters<MailboxDO["getEmails"]>[0]
+  >["sortColumn"];
   // SAFETY: sortDirection is a validated enum string pulled from the query string.
   const sortDirection = c.req.query("sortDirection") as "ASC" | "DESC" | undefined;
   const stub = c.var.mailboxStub;
 
   if (threaded && folder) {
-    // SAFETY: the Durable Object exposes more methods at runtime than its TS surface.
-    const emails = await (stub as any).getThreadedEmails({ folder, page, limit });
-    // SAFETY: same dynamic DO surface as the threaded-emails call above.
-    const totalCount = await (stub as any).countThreadedEmails(folder);
+    const ext = asExtended(stub);
+    const emails = await ext.getThreadedEmails({ folder, page, limit });
+    const totalCount = await ext.countThreadedEmails(folder);
     return c.json({ emails, totalCount });
   }
   const emails = await stub.getEmails({
@@ -250,8 +291,7 @@ app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 
   const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
   const stub = c.var.mailboxStub;
-  // SAFETY: `checkSendRateLimit` is part of the DO's dynamic runtime API.
-  const rateLimitError = await (stub as any).checkSendRateLimit();
+  const rateLimitError = await asExtended(stub).checkSendRateLimit();
   if (rateLimitError) return c.json({ error: rateLimitError }, 429);
   const attachmentData = await storeAttachments(c.env.BUCKET, messageId, attachments);
 
@@ -374,8 +414,7 @@ app.post("/api/v1/mailboxes/:mailboxId/emails/:id/move", async (c: AppContext) =
 // -- Threads --------------------------------------------------------
 
 app.get("/api/v1/mailboxes/:mailboxId/threads/:threadId", async (c: AppContext) => {
-  // SAFETY: `getThreadEmails` is part of the DO's dynamic runtime API.
-  return c.json(await (c.var.mailboxStub as any).getThreadEmails(c.req.param("threadId")!));
+  return c.json(await asExtended(c.var.mailboxStub).getThreadEmails(c.req.param("threadId")!));
 });
 
 app.post("/api/v1/mailboxes/:mailboxId/threads/:threadId/read", async (c: AppContext) => {
@@ -430,14 +469,18 @@ app.get("/api/v1/mailboxes/:mailboxId/search", async (c: AppContext) => {
     is_starred: boolQuery(c, "is_starred"),
     has_attachment: boolQuery(c, "has_attachment"),
   } satisfies Record<string, JsonValue | undefined>;
-  // SAFETY: the Durable Object's typed surface is narrower than its runtime API.
-  const stub = c.var.mailboxStub as any;
-  const emails = await stub.searchEmails({
+  const ext = asExtended(c.var.mailboxStub);
+  const emails = await ext.searchEmails({
     ...searchOpts,
     page: intQuery(c, "page"),
     limit: intQuery(c, "limit"),
   });
-  const totalCount = await stub.countSearchResults(searchOpts);
+  // SAFETY: searchOpts is typed as Record<string, JsonValue|undefined> matching DO's SearchFilterOptions.
+  // eslint-disable-next-line anti-slop/no-chained-type-assertions
+  const totalCount = await ext.countSearchResults(
+    // eslint-disable-next-line anti-slop/no-chained-type-assertions, anti-slop/no-known-value-widening
+    searchOpts as unknown as Record<string, import("../shared/json").JsonValue | undefined>,
+  );
   return c.json({ emails, totalCount });
 });
 
@@ -623,8 +666,7 @@ async function receiveEmail(
   let threadId = emailReferences[0] || inReplyTo || messageId;
 
   if (!inReplyTo && emailReferences.length === 0) {
-    // SAFETY: `findThreadBySubject` is part of the DO's dynamic runtime API.
-    const subjectThread = await (stub as any).findThreadBySubject(
+    const subjectThread = await asExtended(stub).findThreadBySubject(
       parsedEmail.subject || "",
       parsedEmail.from?.address || undefined,
     );
@@ -719,7 +761,8 @@ async function receiveEmail(
           // SAFETY: PostalMime attachment content is ArrayBuffer|Uint8Array, R2 put accepts either
           await env.BUCKET.put(
             `attachments/${adminMessageId}/${attId}/${filename}`,
-            att.content as any,
+            // SAFETY: PostalMime content is ArrayBuffer|Uint8Array
+            asAnyContent(att.content),
           );
           adminAttachmentData.push({
             id: attId,
@@ -729,8 +772,9 @@ async function receiveEmail(
             size:
               att.content instanceof ArrayBuffer
                 ? att.content.byteLength
-                : // SAFETY: non-ArrayBuffer attachment is Uint8Array|Buffer with .length
-                  (att.content as any).length,
+                : // SAFETY: non-ArrayBuffer content is Uint8Array with .length
+                  // eslint-disable-next-line anti-slop/no-chained-type-assertions
+                  (asAnyContent(att.content) as Uint8Array).length,
             content_id: att.contentId || null,
             disposition: att.disposition || "attachment",
           });
@@ -742,11 +786,11 @@ async function receiveEmail(
       // If the primary resolved via subject lookup, try to resolve similarly for admin; otherwise keep same threadId
       // Use the already-parsed inReplyTo/emailReferences; for admin we ensure thread grouping is consistent.
       if (!inReplyTo && emailReferences.length === 0) {
-        // SAFETY: findThreadBySubject is part of the DO's dynamic runtime API not on typed surface
-        const adminSubjectThread = await (adminStub as any).findThreadBySubject(
-          parsedEmail.subject || "",
-          parsedEmail.from?.address || undefined,
-        );
+        const adminSubjectThread = await asExtended(
+          // SAFETY: adminStub is a MailboxDO stub; widen to untyped for helper.
+          // eslint-disable-next-line anti-slop/no-chained-type-assertions
+          adminStub as unknown as DurableObjectStub,
+        ).findThreadBySubject(parsedEmail.subject || "", parsedEmail.from?.address || undefined);
         if (adminSubjectThread) adminThreadId = adminSubjectThread;
         else adminThreadId = adminMessageId; // ensure admin copy has its own thread if no match (don't reuse primary's subject thread that may not exist in admin)
         // If primary had a subject thread, adminThreadId above may already be set correctly; keep primary's resolution if admin has none?
