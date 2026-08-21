@@ -18,6 +18,11 @@ type CatalogModel = {
   functionCalling?: boolean;
 };
 
+/**
+ * Creates catalog entries from the configured fallback model identifiers.
+ *
+ * @returns Fallback model entries with derived names, a text-generation task, and function-calling support enabled.
+ */
 function fallbackCatalog(): CatalogModel[] {
   return FALLBACK_MODELS.map((id) => ({
     id,
@@ -27,6 +32,12 @@ function fallbackCatalog(): CatalogModel[] {
   }));
 }
 
+/**
+ * Parses Workers AI model links from a catalog document.
+ *
+ * @param text - Markdown text containing Workers AI model links
+ * @returns Normalized catalog entries, or `null` if no model links are found
+ */
 function parseLlmsTxt(text: string): CatalogModel[] | null {
   // Extract slug from every ".../workers-ai/models/<slug>/" link in the markdown.
   // The markdown catalog uses short slugs like "kimi-k2.5", "llama-3.1-8b-instruct".
@@ -79,6 +90,11 @@ function parseLlmsTxt(text: string): CatalogModel[] | null {
   }));
 }
 
+/**
+ * Retrieves the Workers AI model catalog, using cached data when available and falling back to a static catalog when the live catalog cannot be loaded.
+ *
+ * @returns The catalog payload containing models, cache timestamp, source, and an optional warning.
+ */
 export async function handleGetModels(c: Context<{ Bindings: Env }>) {
   const url = new URL(c.req.url);
   const refresh = url.searchParams.get("refresh") === "1";

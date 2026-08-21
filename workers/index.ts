@@ -44,13 +44,24 @@ type ExtendedMailboxStub = DurableObjectStub & {
   ) => Promise<number>;
 };
 
+/**
+ * Treats a Durable Object stub as a mailbox stub with its extended runtime methods.
+ *
+ * @param stub - The Durable Object stub to widen
+ * @returns The stub typed as an `ExtendedMailboxStub`
+ */
 function asExtended(stub: DurableObjectStub): ExtendedMailboxStub {
   // SAFETY: MailboxDO exposes these dynamic methods at runtime; typed stub is narrower.
   // eslint-disable-next-line anti-slop/no-chained-type-assertions
   return stub as unknown as ExtendedMailboxStub;
 }
 
-// eslint-disable-next-line anti-slop/no-unknown-parameters
+/**
+ * Adapts attachment content to a byte-compatible value for object storage.
+ *
+ * @param value - Attachment content supplied by PostalMime
+ * @returns The attachment content as a `Uint8Array` or `ArrayBuffer`
+ */
 function asAnyContent(value: unknown): Uint8Array | ArrayBuffer {
   // SAFETY: PostalMime attachment content is ArrayBuffer|Uint8Array; R2 put accepts either.
   // eslint-disable-next-line anti-slop/no-unknown-parameters, anti-slop/no-chained-type-assertions
@@ -544,13 +555,13 @@ async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
 }
 
 /**
- * Processes an inbound email, stores it in the matching mailbox, and triggers automatic drafting.
+ * Processes an inbound email, stores it in the appropriate mailbox, and preserves its attachments and threading metadata.
  *
- * Emails without a valid recipient or matching mailbox are rejected or ignored. Attachments and
- * threading metadata are preserved when the message is stored.
+ * Messages for unavailable mailboxes may be routed to a configured domain catch-all mailbox or ignored. Automatic drafting
+ * is triggered only when enabled for the effective mailbox.
  *
  * @param event - The inbound email stream and its declared size
- * @throws Error If the email has no valid recipient or its content fails stream validation
+ * @throws Error If the message has no valid recipient or fails stream validation
  */
 async function receiveEmail(
   event: { raw: ReadableStream; rawSize: number },

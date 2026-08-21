@@ -292,6 +292,13 @@ function MessageBubble({
  */
 type ModelOption = { id: string; name: string; task?: string; functionCalling?: boolean };
 
+/**
+ * Renders the mailbox-specific email agent chat interface.
+ *
+ * @param mailboxId - The mailbox identifier used to load settings and connect the agent session.
+ * @param useAgent - Agent connection hook used to create the email agent session.
+ * @param useAgentChat - Chat hook used to manage messages and generation state.
+ */
 function AgentChatConnected({
   mailboxId,
   useAgent,
