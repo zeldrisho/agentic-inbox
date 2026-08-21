@@ -81,7 +81,9 @@ export default defineConfig(({ mode }) => ({
     // The Cloudflare `ssr` Vite environment makes the plugin set `resolve.external`,
     // which Vitest's config validation rejects. Skip the plugin under `vp test`
     // (mode === "test"); dev/build keep the SSR environment.
-    ...(mode === "test" ? [] : [cloudflare({ viteEnvironment: { name: "ssr" } })]),
+    ...(mode === "test"
+      ? []
+      : [cloudflare({ viteEnvironment: { name: "ssr" }, remoteBindings: false })]),
     tailwindcss(),
     reactRouter(),
     tsconfigPaths(),

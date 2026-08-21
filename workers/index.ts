@@ -545,12 +545,47 @@ async function receiveEmail(
   if (!mailboxId) throw new Error("received email with no valid recipient address");
 
   const messageId = crypto.randomUUID();
+
+  // Catch-all: if the exact recipient mailbox does not exist, route to the admin mailbox for that domain
+  let effectiveMailboxId = mailboxId;
+  let adminMailboxId: string | undefined;
+  let routedByCatchAll = false;
+
   if (!(await env.BUCKET.head(`mailboxes/${mailboxId}.json`))) {
-    console.log(`Ignoring email for ${mailboxId}: mailbox does not exist`);
-    return;
+    // Helper: resolve the admin (catch-all) mailbox for a domain.
+    // Prefers admin@, catchall@, catch-all@, otherwise first mailbox on that domain.
+    async function resolveAdminMailboxId(domain: string | undefined): Promise<string | undefined> {
+      if (!domain) return undefined;
+      const preferred = [`admin@${domain}`, `catchall@${domain}`, `catch-all@${domain}`];
+      for (const cand of preferred) {
+        if (await env.BUCKET.head(`mailboxes/${cand}.json`)) return cand;
+      }
+      const all = await listMailboxes(env.BUCKET);
+      const sameDomain = all
+        .filter((m) => m.email.toLowerCase().endsWith(`@${domain}`))
+        .sort((a, b) => a.email.localeCompare(b.email));
+      if (sameDomain.length > 0) return sameDomain[0].email.toLowerCase();
+      return undefined;
+    }
+
+    const domain = mailboxId.split("@")[1]?.toLowerCase();
+    adminMailboxId = await resolveAdminMailboxId(domain);
+
+    if (adminMailboxId) {
+      console.log(
+        `Catch-all: ${mailboxId} -> ${adminMailboxId} (mailbox ${mailboxId} does not exist)`,
+      );
+      effectiveMailboxId = adminMailboxId;
+      routedByCatchAll = true;
+    } else {
+      console.log(
+        `Ignoring email for ${mailboxId}: mailbox does not exist and no catch-all found for domain`,
+      );
+      return;
+    }
   }
 
-  const stub = env.MAILBOX.get(env.MAILBOX.idFromName(mailboxId));
+  const stub = env.MAILBOX.get(env.MAILBOX.idFromName(effectiveMailboxId));
 
   const attachmentData: StoredAttachment[] = [];
   if (parsedEmail.attachments) {
@@ -615,7 +650,7 @@ async function receiveEmail(
     attachmentData,
   );
 
-  const agentStub = env.EMAIL_AGENT.get(env.EMAIL_AGENT.idFromName(mailboxId));
+  const agentStub = env.EMAIL_AGENT.get(env.EMAIL_AGENT.idFromName(effectiveMailboxId));
   // SAFETY: the catch handler's error is an unknown thrown value; we assert Error to read `.message`.
   ctx.waitUntil(
     agentStub
@@ -624,7 +659,7 @@ async function receiveEmail(
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            mailboxId,
+            mailboxId: effectiveMailboxId,
             emailId: messageId,
             sender: (parsedEmail.from?.address || "").toLowerCase(),
             subject: parsedEmail.subject || "",
@@ -634,6 +669,105 @@ async function receiveEmail(
       )
       .catch((e) => console.error("Auto-draft trigger failed:", (e as Error).message)),
   );
+
+  // Catch-all mirror: only mirror when routing actually occurred via catch-all AND the admin mailbox is explicitly configured.
+  // Prevent mirroring when resolveAdminMailboxId fell back to an ordinary mailbox.
+  const domain = mailboxId.split("@")[1]?.toLowerCase();
+  const isExplicitAdminMailbox =
+    adminMailboxId &&
+    domain &&
+    (adminMailboxId === `admin@${domain}` ||
+      adminMailboxId === `catchall@${domain}` ||
+      adminMailboxId === `catch-all@${domain}`);
+
+  if (
+    routedByCatchAll &&
+    adminMailboxId &&
+    adminMailboxId !== effectiveMailboxId &&
+    isExplicitAdminMailbox
+  ) {
+    try {
+      const adminMessageId = crypto.randomUUID();
+      const adminStub = env.MAILBOX.get(env.MAILBOX.idFromName(adminMailboxId));
+
+      // Duplicate attachments under the admin's messageId so R2 keys remain per-email
+      const adminAttachmentData: StoredAttachment[] = [];
+      if (parsedEmail.attachments) {
+        for (const att of parsedEmail.attachments) {
+          const attId = crypto.randomUUID();
+          const filename = (att.filename || "untitled")
+            .split("")
+            .filter((ch) => ch.charCodeAt(0) > 31)
+            .join("")
+            .replace(/[/\\:*?"<>|]/g, "_");
+          // SAFETY: PostalMime attachment content is ArrayBuffer|Uint8Array, R2 put accepts either
+          await env.BUCKET.put(
+            `attachments/${adminMessageId}/${attId}/${filename}`,
+            att.content as any,
+          );
+          adminAttachmentData.push({
+            id: attId,
+            email_id: adminMessageId,
+            filename,
+            mimetype: att.mimeType,
+            size:
+              att.content instanceof ArrayBuffer
+                ? att.content.byteLength
+                : // SAFETY: non-ArrayBuffer attachment is Uint8Array|Buffer with .length
+                  (att.content as any).length,
+            content_id: att.contentId || null,
+            disposition: att.disposition || "attachment",
+          });
+        }
+      }
+
+      // Reuse same threading logic but resolve against the admin mailbox's existing threads
+      let adminThreadId = threadId;
+      // If the primary resolved via subject lookup, try to resolve similarly for admin; otherwise keep same threadId
+      // Use the already-parsed inReplyTo/emailReferences; for admin we ensure thread grouping is consistent.
+      if (!inReplyTo && emailReferences.length === 0) {
+        // SAFETY: findThreadBySubject is part of the DO's dynamic runtime API not on typed surface
+        const adminSubjectThread = await (adminStub as any).findThreadBySubject(
+          parsedEmail.subject || "",
+          parsedEmail.from?.address || undefined,
+        );
+        if (adminSubjectThread) adminThreadId = adminSubjectThread;
+        else adminThreadId = adminMessageId; // ensure admin copy has its own thread if no match (don't reuse primary's subject thread that may not exist in admin)
+        // If primary had a subject thread, adminThreadId above may already be set correctly; keep primary's resolution if admin has none?
+        // Prefer primary's threadId when it matched a real thread, fallback to admin's own resolution
+        if (adminThreadId === adminMessageId && threadId !== messageId) adminThreadId = threadId;
+      }
+
+      await adminStub.createEmail(
+        Folders.INBOX,
+        {
+          id: adminMessageId,
+          subject: parsedEmail.subject || "",
+          sender: (parsedEmail.from?.address || "").toLowerCase(),
+          recipient: allRecipients.join(", "),
+          cc: ccRecipients.join(", ") || null,
+          bcc: bccRecipients.join(", ") || null,
+          date: new Date().toISOString(),
+          body: parsedEmail.html || parsedEmail.text || "",
+          in_reply_to: inReplyTo,
+          email_references: emailReferences.length > 0 ? JSON.stringify(emailReferences) : null,
+          thread_id: adminThreadId,
+          message_id: originalMessageId,
+          raw_headers: JSON.stringify(parsedEmail.headers),
+        },
+        adminAttachmentData,
+      );
+      console.log(
+        `Catch-all mirror: ${mailboxId} -> ${adminMailboxId} (copy ${adminMessageId}) - agent suppressed for mirror`,
+      );
+      // Intentionally do NOT trigger EmailAgent for mirrored copies.
+      // Admin agent only runs when email was directly addressed to admin (handled by the primary waitUntil above where effectiveMailboxId === adminMailboxId).
+      // This prevents duplicate drafts/cost for mirrored mail while preserving direct-to-admin auto-draft.
+    } catch (e) {
+      // SAFETY: caught error is unknown, assert Error to read message
+      console.error("Catch-all mirror to admin failed:", (e as Error).message);
+    }
+  }
 }
 
 export { app, receiveEmail };

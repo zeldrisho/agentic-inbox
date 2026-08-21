@@ -4,7 +4,8 @@
 
 import { Button, Dialog, Input, Loader, Select, Text, useKumoToastManager } from "@cloudflare/kumo";
 import { SquareButton } from "~/components/ui/SquareButton";
-import { EnvelopeIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
+import { EnvelopeIcon, PlusIcon, TrashIcon, ShuffleIcon, SparkleIcon } from "@phosphor-icons/react";
+import { ThemeToggle } from "~/components/ThemeToggle";
 import { useQuery } from "@tanstack/react-query";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Link as RouterLink } from "react-router";
@@ -34,13 +35,32 @@ export default function HomeRoute() {
   const createMailbox = useCreateMailbox();
   const deleteMailbox = useDeleteMailbox();
 
-  const { data: configData } = useQuery({
+  const {
+    data: configData,
+    isLoading: isConfigLoading,
+    error: configError,
+  } = useQuery({
     queryKey: queryKeys.config,
     queryFn: () => api.getConfig(),
     staleTime: Infinity, // config rarely changes
+    retry: false,
   });
 
-  const domains = configData?.domains ?? [];
+  const rawDomains = configData?.domains ?? [];
+  // Local dev fallback: when config succeeds but returns empty (e.g. no backend in --mode test), default to example.com so the UI remains usable
+  const isLocalDev =
+    globalThis.window !== undefined &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+  const domains =
+    rawDomains.length > 0
+      ? rawDomains
+      : isConfigLoading || configError
+        ? []
+        : isLocalDev
+          ? ["example.com"]
+          : [];
+  const isLocalDomainFallback =
+    rawDomains.length === 0 && !isConfigLoading && !configError && isLocalDev;
   const emailAddresses = configData?.emailAddresses ?? [];
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -96,6 +116,33 @@ export default function HomeRoute() {
       setCreateError("Please fill in all fields");
       return;
     }
+
+    // Validate domain when using local fallback
+    if (isLocalDomainFallback) {
+      const trimmedDomain = selectedDomain.trim();
+      if (!trimmedDomain) {
+        setCreateError("Domain cannot be empty");
+        return;
+      }
+      if (trimmedDomain !== selectedDomain) {
+        setCreateError("Domain cannot contain leading or trailing whitespace");
+        return;
+      }
+      if (trimmedDomain.includes("@")) {
+        setCreateError("Domain cannot contain @ symbol");
+        return;
+      }
+      // Basic domain validation: must contain at least one dot and valid characters
+      if (
+        !/^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*$/.test(
+          trimmedDomain,
+        )
+      ) {
+        setCreateError("Invalid domain format");
+        return;
+      }
+    }
+
     const email = `${newPrefix}@${selectedDomain}`;
     const name = newName || newPrefix;
     setIsCreating(true);
@@ -137,7 +184,51 @@ export default function HomeRoute() {
       }))
     : mailboxes;
 
-  const isLoading = !configData;
+  const isLoading = isConfigLoading && !configData;
+
+  const handleGenerateRandom = (domainOverride?: string) => {
+    const adjectives = [
+      "bright",
+      "swift",
+      "calm",
+      "bold",
+      "smart",
+      "quick",
+      "happy",
+      "keen",
+      "cool",
+      "warm",
+      "clever",
+      "brave",
+      "crisp",
+      "lively",
+    ];
+    const nouns = [
+      "fox",
+      "wave",
+      "star",
+      "cloud",
+      "river",
+      "forest",
+      "stone",
+      "light",
+      "field",
+      "crest",
+      "harbor",
+      "peak",
+      "bloom",
+      "spark",
+    ];
+    const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+    const noun = nouns[Math.floor(Math.random() * nouns.length)];
+    const num = Math.floor(100 + Math.random() * 900);
+    const prefix = `${adj}-${noun}-${num}`;
+    const name = `${adj.charAt(0).toUpperCase() + adj.slice(1)} ${noun.charAt(0).toUpperCase() + noun.slice(1)}`;
+    setNewPrefix(prefix);
+    setNewName(name);
+    if (domainOverride) setSelectedDomain(domainOverride);
+    else if (!selectedDomain && domains.length > 0) setSelectedDomain(domains[0]);
+  };
 
   return (
     <div className="min-h-screen bg-kumo-recessed">
@@ -145,15 +236,18 @@ export default function HomeRoute() {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-kumo-default">Mailboxes</h1>
-            {!isConfigured && (
-              <Button
-                variant="primary"
-                icon={<PlusIcon size={16} />}
-                onClick={() => setIsCreateOpen(true)}
-              >
-                New Mailbox
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              {!isConfigured && (
+                <Button
+                  variant="primary"
+                  icon={<PlusIcon size={16} />}
+                  onClick={() => setIsCreateOpen(true)}
+                >
+                  New Mailbox
+                </Button>
+              )}
+            </div>
           </div>
           {domains.length > 0 && (
             <p className="text-sm text-kumo-subtle mt-1">{domains.join(", ")}</p>
@@ -233,7 +327,18 @@ export default function HomeRoute() {
       {/* Create Dialog */}
       <Dialog.Root open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <Dialog size="sm" className="p-6">
-          <Dialog.Title className="text-base font-semibold mb-5">Create New Mailbox</Dialog.Title>
+          <div className="flex items-start justify-between mb-5 gap-2">
+            <Dialog.Title className="text-base font-semibold">Create New Mailbox</Dialog.Title>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<ShuffleIcon size={14} />}
+              onClick={() => handleGenerateRandom()}
+              type="button"
+            >
+              Random
+            </Button>
+          </div>
           <form onSubmit={handleCreate} className="space-y-4">
             {createError && (
               <Text variant="error" size="sm">
@@ -272,8 +377,21 @@ export default function HomeRoute() {
                       ))}
                     </Select>
                   </div>
+                ) : isLocalDomainFallback ? (
+                  <div className="flex-1">
+                    <Input
+                      aria-label="Domain"
+                      placeholder="example.com"
+                      size="sm"
+                      value={selectedDomain}
+                      onChange={(e) => setSelectedDomain(e.target.value)}
+                      required
+                    />
+                  </div>
                 ) : (
-                  <span className="text-sm text-kumo-subtle">{selectedDomain || "no domain"}</span>
+                  <span className="text-sm text-kumo-subtle">
+                    {selectedDomain || domains[0] || "example.com"}
+                  </span>
                 )}
               </div>
             </div>
@@ -284,6 +402,27 @@ export default function HomeRoute() {
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
             />
+            {domains.length > 1 && (
+              <div>
+                <span className="text-xs font-medium text-kumo-subtle mb-1.5 block">
+                  Quick generate for domain
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {domains.map((d) => (
+                    <Button
+                      key={d}
+                      variant="secondary"
+                      size="sm"
+                      icon={<SparkleIcon size={12} />}
+                      onClick={() => handleGenerateRandom(d)}
+                      type="button"
+                    >
+                      {d}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="flex justify-end gap-2 pt-2">
               <Dialog.Close
                 render={(props) => (
