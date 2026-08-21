@@ -22,6 +22,19 @@ function createMockSql(execImpl?: (query: string, ...params: unknown[]) => unkno
   return { exec, calls };
 }
 
+// Drizzle column/SQL objects hold a circular reference back to their table,
+// so JSON.stringify needs a replacer to avoid "Converting circular structure to JSON".
+function safeStringify(value: unknown): string {
+  const seen = new WeakSet();
+  return JSON.stringify(value, (_key, val) => {
+    if (typeof val === "object" && val !== null) {
+      if (seen.has(val)) return "[Circular]";
+      seen.add(val);
+    }
+    return val;
+  });
+}
+
 function createMockStorage(sqlExec: ReturnType<typeof createMockSql>["exec"]) {
   return {
     sql: { exec: sqlExec },
@@ -107,7 +120,7 @@ describe("MailboxDO sort injection", () => {
     // The resolved column should be "date" (fallback), not the injected value
     expect(callArgs).toBeDefined();
     // Verify the injected string was never passed
-    expect(JSON.stringify(callArgs)).not.toContain(injectedValue);
+    expect(safeStringify(callArgs)).not.toContain(injectedValue);
   });
 
   it("accepts allowed columns", async () => {

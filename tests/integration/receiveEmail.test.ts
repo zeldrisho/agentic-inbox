@@ -186,7 +186,9 @@ describe("receiveEmail admin mirror + agentAutoDraft matrix", () => {
     expect(createEmailCalls).toBe(1);
   });
 
-  it("mirrors to admin when recipient is a known ordinary mailbox", async () => {
+  it("does not mirror to admin when recipient is a known ordinary mailbox", async () => {
+    // No catch-all routing occurs here because the recipient mailbox already exists,
+    // so the admin mirror (which only fires when `routedByCatchAll` is true) must not run.
     const bucket = createMockBucket({
       "mailboxes/admin@example.com.json": { fromName: "Admin" },
       "mailboxes/user@example.com.json": { fromName: "User" },
@@ -213,10 +215,10 @@ describe("receiveEmail admin mirror + agentAutoDraft matrix", () => {
     const stream = makeStream(raw);
     const waitUntil = vi.fn((p: Promise<unknown>) => p.catch(() => {}));
     await receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: raw.length }, env as unknown as Env, { waitUntil: waitUntil as unknown as (p: Promise<unknown>) => void } as unknown as ExecutionContext);
-    // user mailbox should receive the email
+    // user mailbox should receive the email directly (recipient mailbox exists)
     expect(userStore.stub.createEmail).toHaveBeenCalled();
-    // admin mailbox should also receive a mirror copy
-    expect(adminStore.stub.createEmail).toHaveBeenCalled();
+    // no catch-all routing occurred, so no mirror copy should be created for admin
+    expect(adminStore.stub.createEmail).not.toHaveBeenCalled();
   });
 
   it("does not trigger agent when agentAutoDraft is false", async () => {
