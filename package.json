@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "react-router build",
-    "cf-typegen": "wrangler types",
-    "deploy": "vp run build && wrangler deploy",
+    "cf-typegen": "pnpm exec wrangler types",
+    "deploy": "pnpm run build && pnpm exec wrangler deploy",
     "dev": "react-router dev",
     "preview": "vp run build && vp preview",
     "typecheck": "vp run cf-typegen && react-router typegen && tsc -b",
