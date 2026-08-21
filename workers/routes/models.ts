@@ -42,7 +42,8 @@ function parseLlmsTxt(text: string): CatalogModel[] | null {
         slugs.add(slug);
         continue;
       }
-      if (!slug) continue;
+      // Skip empty slugs, the catalog "index" page, and bare "@..." segments.
+      continue;
     }
     // ignore non-model segments like "index"
     if (slug.includes("/")) continue;
