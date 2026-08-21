@@ -7,12 +7,21 @@ import { ServerRouter } from "react-router";
 import { isbot } from "isbot";
 import { renderToReadableStream } from "react-dom/server";
 
+/**
+ * Renders the router context into an HTML response.
+ *
+ * @param request - The incoming request used to determine the user agent and request URL.
+ * @param responseStatusCode - The initial HTTP status code for the response.
+ * @param responseHeaders - The headers to include in the response.
+ * @param routerContext - The routing context used to render the application.
+ * @returns An HTML response containing the rendered application.
+ */
 export default async function handleRequest(
   request: Request,
   responseStatusCode: number,
   responseHeaders: Headers,
   routerContext: EntryContext,
-  _loadContext: AppLoadContext
+  _loadContext: AppLoadContext,
 ) {
   let shellRendered = false;
   const userAgent = request.headers.get("user-agent");
@@ -20,7 +29,7 @@ export default async function handleRequest(
   const body = await renderToReadableStream(
     <ServerRouter context={routerContext} url={request.url} />,
     {
-      onError(error: unknown) {
+      onError(error) {
         responseStatusCode = 500;
         // Log streaming rendering errors from inside the shell.  Don't log
         // errors encountered during initial shell rendering since they'll
@@ -29,7 +38,7 @@ export default async function handleRequest(
           console.error(error);
         }
       },
-    }
+    },
   );
   shellRendered = true;
 

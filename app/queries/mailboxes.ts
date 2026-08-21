@@ -4,58 +4,79 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "~/services/api";
-import type { Mailbox } from "~/types";
+import type { Mailbox, MailboxSettings } from "~/types";
 import { queryKeys } from "./keys";
 
+/**
+ * Fetches all mailboxes.
+ *
+ * @returns The mailbox list query result
+ */
 export function useMailboxes() {
-	return useQuery<Mailbox[]>({
-		queryKey: queryKeys.mailboxes.all,
-		queryFn: () => api.listMailboxes() as Promise<Mailbox[]>,
-	});
+  return useQuery<Mailbox[]>({
+    queryKey: queryKeys.mailboxes.all,
+    queryFn: () => api.listMailboxes(),
+  });
 }
 
+/**
+ * Fetches a mailbox by ID when an ID is provided.
+ *
+ * @param mailboxId - The ID of the mailbox to fetch
+ * @returns The mailbox query result
+ */
 export function useMailbox(mailboxId: string | undefined) {
-	return useQuery<Mailbox>({
-		queryKey: mailboxId
-			? queryKeys.mailboxes.detail(mailboxId)
-			: ["mailboxes", "_disabled"],
-		queryFn: () => api.getMailbox(mailboxId!) as Promise<Mailbox>,
-		enabled: !!mailboxId,
-	});
+  return useQuery<Mailbox>({
+    queryKey: mailboxId ? queryKeys.mailboxes.detail(mailboxId) : ["mailboxes", "_disabled"],
+    queryFn: () => api.getMailbox(mailboxId!),
+    enabled: !!mailboxId,
+  });
 }
 
+/**
+ * Provides a mutation for creating a mailbox.
+ *
+ * @returns A mailbox creation mutation that invalidates the mailbox list cache after success.
+ */
 export function useCreateMailbox() {
-	const qc = useQueryClient();
-	return useMutation({
-		mutationFn: ({ email, name }: { email: string; name: string }) =>
-			api.createMailbox(email, name),
-		onSuccess: () => {
-			qc.invalidateQueries({ queryKey: queryKeys.mailboxes.all });
-		},
-	});
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ email, name }: { email: string; name: string }) =>
+      api.createMailbox(email, name),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.mailboxes.all });
+    },
+  });
 }
 
+/**
+ * Provides a mutation for updating mailbox settings.
+ *
+ * @returns A mailbox update mutation that refreshes the updated mailbox and mailbox list data after success.
+ */
 export function useUpdateMailbox() {
-	const qc = useQueryClient();
-	return useMutation({
-		mutationFn: ({
-			mailboxId,
-			settings,
-		}: { mailboxId: string; settings: unknown }) =>
-			api.updateMailbox(mailboxId, settings),
-		onSuccess: (_data, { mailboxId }) => {
-			qc.invalidateQueries({ queryKey: queryKeys.mailboxes.detail(mailboxId) });
-			qc.invalidateQueries({ queryKey: queryKeys.mailboxes.all });
-		},
-	});
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ mailboxId, settings }: { mailboxId: string; settings: MailboxSettings }) =>
+      api.updateMailbox(mailboxId, settings),
+    onSuccess: (_data, { mailboxId }) => {
+      void qc.invalidateQueries({ queryKey: queryKeys.mailboxes.detail(mailboxId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.mailboxes.all });
+    },
+  });
 }
 
+/**
+ * Provides a mutation for deleting a mailbox.
+ *
+ * @returns A mailbox deletion mutation.
+ */
 export function useDeleteMailbox() {
-	const qc = useQueryClient();
-	return useMutation({
-		mutationFn: (mailboxId: string) => api.deleteMailbox(mailboxId),
-		onSuccess: () => {
-			qc.invalidateQueries({ queryKey: queryKeys.mailboxes.all });
-		},
-	});
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (mailboxId: string) => api.deleteMailbox(mailboxId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.mailboxes.all });
+    },
+  });
 }
