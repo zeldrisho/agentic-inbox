@@ -3,6 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { Banner, Button, Input } from "@cloudflare/kumo";
+import { SquareButton } from "~/components/ui/SquareButton";
 import { FloppyDiskIcon, PaperPlaneTiltIcon, XIcon } from "@phosphor-icons/react";
 import { useParams } from "react-router";
 import { useComposeForm } from "~/hooks/useComposeForm";
@@ -42,9 +43,9 @@ export default function ComposePanel() {
       <div className="flex items-center justify-between px-4 py-3 border-b border-kumo-line shrink-0 md:px-6">
         <h2 className="text-base font-semibold text-kumo-default">{formTitle}</h2>
         <div className="flex items-center gap-1">
-          <Button
+          <SquareButton
             variant="ghost"
-            shape="square"
+
             size="sm"
             icon={<XIcon size={18} />}
             onClick={closeCompose}

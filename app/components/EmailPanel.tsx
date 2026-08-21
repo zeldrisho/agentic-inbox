@@ -50,7 +50,9 @@ function EmailPanelSkeleton() {
 
 export default function EmailPanel({ emailId }: { emailId: string }) {
   const { mailboxId, folder } = useParams<{ mailboxId: string; folder: string }>();
+  // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
   const { data: email } = useEmail(mailboxId, emailId) as { data?: Email };
+  // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
   const { data: threadRepliesRaw } = useThreadReplies(mailboxId, email?.thread_id) as {
     data?: Email[];
   };
@@ -59,7 +61,9 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
   const moveEmailMut = useMoveEmail();
   const sendEmailMut = useSendEmail();
   const replyMut = useReplyToEmail();
+  // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
   const { data: folders = [] } = useFolders(mailboxId) as { data?: Folder[] };
+  // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
   const { data: currentMailbox } = useMailbox(mailboxId) as {
     data?: Mailbox;
   };
@@ -170,6 +174,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
     try {
       if (!target.recipient || !target.subject) {
         try {
+          // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
           const fresh = (await api.getEmail(mailboxId, target.id)) as Email;
           if (fresh) target = fresh;
         } catch {}

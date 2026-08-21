@@ -2,19 +2,19 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-export interface SignatureSettings {
+export type SignatureSettings = {
   enabled: boolean;
   text: string;
   html?: string;
-}
+};
 
-export interface MailboxSettings {
+export type MailboxSettings = {
   fromName?: string;
   forwarding?: { enabled: boolean; email: string };
   signature?: SignatureSettings;
   autoReply?: { enabled: boolean; subject: string; message: string };
   agentSystemPrompt?: string;
-}
+};
 
 export interface Mailbox {
   id: string;
@@ -23,7 +23,7 @@ export interface Mailbox {
   settings?: MailboxSettings;
 }
 
-export interface Email {
+export type Email = {
   id: string;
   thread_id?: string | null;
   folder_id?: string | null;
@@ -48,19 +48,34 @@ export interface Email {
   participants?: string;
   needs_reply?: boolean;
   has_draft?: boolean;
-}
+};
 
-export interface Attachment {
+export type Attachment = {
   id: string;
   filename: string;
   mimetype: string;
   size: number;
   content_id?: string;
   disposition?: string;
-}
+};
 
 export interface Folder {
   id: string;
   name: string;
   unreadCount: number;
 }
+
+/** Outbound email payload sent to the API for send/reply/forward. */
+export type OutboundEmail = {
+  to?: string | string[];
+  cc?: string | string[];
+  bcc?: string | string[];
+  from: string | { email: string; name: string };
+  subject?: string;
+  body?: string;
+  html?: string;
+  text?: string;
+  in_reply_to?: string;
+  thread_id?: string;
+  draft_id?: string;
+};

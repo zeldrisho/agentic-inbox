@@ -2,7 +2,8 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { Button, Input, Tooltip } from "@cloudflare/kumo";
+import { Input, Tooltip } from "@cloudflare/kumo";
+import { SquareButton } from "~/components/ui/SquareButton";
 import {
   GearSixIcon,
   ListIcon,
@@ -34,7 +35,7 @@ export default function Header() {
   const performSearch = () => {
     if (mailboxId && searchQuery.trim()) {
       const q = searchQuery.trim();
-      navigate(`/mailbox/${mailboxId}/search?q=${encodeURIComponent(q)}`);
+      void navigate(`/mailbox/${mailboxId}/search?q=${encodeURIComponent(q)}`);
       setIsSearchExpanded(false);
     }
   };
@@ -42,7 +43,7 @@ export default function Header() {
   const clearSearch = () => {
     setSearchQuery("");
     if (location.pathname.includes("/search") && mailboxId) {
-      navigate(`/mailbox/${mailboxId}/emails/inbox`);
+      void navigate(`/mailbox/${mailboxId}/emails/inbox`);
     }
   };
 
@@ -64,9 +65,9 @@ export default function Header() {
   return (
     <header className="flex items-center gap-2 px-3 py-2.5 bg-kumo-base border-b border-kumo-line sticky top-0 z-10 md:px-5 md:gap-4">
       {/* Hamburger menu - mobile only */}
-      <Button
+      <SquareButton
         variant="ghost"
-        shape="square"
+
         size="sm"
         icon={<ListIcon size={20} />}
         onClick={toggleSidebar}
@@ -101,9 +102,9 @@ export default function Header() {
           )}
         </div>
         <Tooltip content="Search" side="bottom" asChild>
-          <Button
+          <SquareButton
             variant="ghost"
-            shape="square"
+
             icon={<MagnifyingGlassIcon size={20} />}
             onClick={performSearch}
             aria-label="Search"
@@ -113,9 +114,9 @@ export default function Header() {
 
       {/* Search toggle button - mobile only, hidden when search is expanded */}
       {!isSearchExpanded && (
-        <Button
+        <SquareButton
           variant="ghost"
-          shape="square"
+
           size="sm"
           icon={<MagnifyingGlassIcon size={20} />}
           onClick={() => setIsSearchExpanded(true)}
@@ -130,9 +131,9 @@ export default function Header() {
           side="bottom"
           asChild
         >
-          <Button
+          <SquareButton
             variant={isAgentPanelOpen ? "secondary" : "ghost"}
-            shape="square"
+
             icon={<RobotIcon size={20} />}
             onClick={toggleAgentPanel}
             aria-label="Toggle agent panel"
@@ -140,9 +141,9 @@ export default function Header() {
           />
         </Tooltip>
         <Tooltip content="Settings" side="bottom" asChild>
-          <Button
+          <SquareButton
             variant={isSettingsActive ? "secondary" : "ghost"}
-            shape="square"
+
             icon={<GearSixIcon size={20} />}
             onClick={() =>
               navigate(

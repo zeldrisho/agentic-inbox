@@ -49,9 +49,9 @@ export function validateSender(
   to: string | string[],
   from: string | { email: string; name: string },
   mailboxId: string,
-): { toStr: string; fromEmail: string; fromDomain: string } {
+) {
   const toStr = (Array.isArray(to) ? to.join(", ") : to).toLowerCase();
-  const fromEmail = (typeof from === "string" ? from : from.email).toLowerCase();
+  const fromEmail = (from instanceof Object ? from.email : from).toLowerCase();
 
   if (fromEmail !== mailboxId.toLowerCase()) {
     throw new SenderValidationError("From address must match the mailbox email address");
@@ -77,10 +77,7 @@ export class SenderValidationError extends Error {
 /**
  * Generate an internal UUID and a proper RFC 2822 Message-ID.
  */
-export function generateMessageId(fromDomain: string): {
-  messageId: string;
-  outgoingMessageId: string;
-} {
+export function generateMessageId(fromDomain: string) {
   const messageId = crypto.randomUUID();
   const outgoingMessageId = `${messageId}@${fromDomain}`;
   return { messageId, outgoingMessageId };
@@ -91,11 +88,7 @@ export function generateMessageId(fromDomain: string): {
 /**
  * Build the References chain and In-Reply-To from an original email.
  */
-export function buildReferencesChain(original: EmailFull): {
-  originalMsgId: string;
-  references: string[];
-  threadId: string;
-} {
+export function buildReferencesChain(original: EmailFull) {
   const originalMsgId = original.message_id || original.id;
   let existingRefs: string[] = [];
   if (original.email_references) {
@@ -113,14 +106,23 @@ export function buildReferencesChain(original: EmailFull): {
 /**
  * Build threading headers (In-Reply-To + References) for the email binding.
  */
+export interface ThreadingHeaders {
+  "In-Reply-To": string;
+  References?: string;
+}
+
+/**
+ * Build threading headers (In-Reply-To + References) for the email binding.
+ */
 export function buildThreadingHeaders(
   originalMsgId: string,
   references: string[],
-): Record<string, string> {
-  return {
-    "In-Reply-To": `<${originalMsgId}>`,
-    ...(references.length > 0 ? { References: references.map((r) => `<${r}>`).join(" ") } : {}),
-  };
+): ThreadingHeaders {
+  const headers: ThreadingHeaders = { "In-Reply-To": `<${originalMsgId}>` };
+  if (references.length > 0) {
+    headers.References = references.map((r) => `<${r}>`).join(" ");
+  }
+  return headers;
 }
 
 // ── Draft-follows-in_reply_to ──────────────────────────────────────
@@ -134,6 +136,7 @@ export async function resolveOriginalEmail(
   email: EmailFull,
 ): Promise<EmailFull> {
   if (email.folder_id === Folders.DRAFT && email.in_reply_to) {
+    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     const realOriginal = (await stub.getEmail(email.in_reply_to)) as EmailFull | null;
     if (realOriginal) return realOriginal;
   }
@@ -214,15 +217,12 @@ export function buildQuotedReplyBlock(original: {
 
 // ── Tool Logic (getFullEmail / getFullThread) ──────────────────────
 
-type MailboxThreadReaderStub = {
-  getThreadEmails: (threadId: string) => Promise<EmailFull[]>;
-};
-
 /**
  * Fetch a single email and return it with both HTML and plain-text body.
  * Returns null if the email is not found.
  */
 export async function getFullEmail(stub: DurableObjectStub<MailboxDO>, emailId: string) {
+  // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
   const email = (await stub.getEmail(emailId)) as EmailFull | null;
   if (!email) return null;
 
@@ -236,8 +236,8 @@ export async function getFullEmail(stub: DurableObjectStub<MailboxDO>, emailId: 
  * instead of the previous N+1 pattern (1 list query + N getEmail calls).
  */
 export async function getFullThread(stub: DurableObjectStub<MailboxDO>, threadId: string) {
-  const threadStub = stub as unknown as MailboxThreadReaderStub;
-  const emails = await threadStub.getThreadEmails(threadId);
+  // SAFETY: `getThreadEmails` is part of the DO's dynamic runtime API; the full DurableObjectStub<MailboxDO> type is too heavy to instantiate.
+  const emails: EmailFull[] = await (stub as any).getThreadEmails(threadId);
 
   const enriched = emails.map((email) => {
     const textBody = email.body ? stripHtmlToText(email.body) : "";

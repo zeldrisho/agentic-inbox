@@ -2,15 +2,17 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import type { Email, Folder, Mailbox } from "~/types";
+import type { Email, Folder, Mailbox, MailboxSettings, OutboundEmail } from "~/types";
+import type { JsonValue } from "shared/json";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 
 export class ApiError extends Error {
   status: number;
-  body: Record<string, unknown>;
+  body: Record<string, JsonValue>;
 
-  constructor(status: number, body: Record<string, unknown>) {
+  constructor(status: number, body: Record<string, JsonValue>) {
+    // SAFETY: `body` arrives unparsed from the upstream API; `error` is a string field when present.
     super((body.error as string) || `Request failed: ${status}`);
     this.name = "ApiError";
     this.status = status;
@@ -33,22 +35,31 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
       signal,
       headers: {
         "Content-Type": "application/json",
+        // SAFETY: only string-valued headers are ever passed; widen from RequestInit's looser type.
         ...(options.headers as Record<string, string>),
       },
     });
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      throw new ApiError(res.status, body as Record<string, unknown>);
+      // SAFETY: `res.json()` yields arbitrary API JSON; `ApiError` models it as JsonValue.
+      throw new ApiError(res.status, body as Record<string, JsonValue>);
     }
 
-    if (res.status === 204) return undefined as T;
+    if (res.status === 204) {
+      // SAFETY: a 204 response has no body; `undefined` is the resolved `T` by contract.
+      return undefined as T;
+    }
 
     const contentType = res.headers.get("content-type") ?? "";
     if (contentType.includes("application/json")) {
+      // SAFETY: the JSON envelope matches the caller's expected `T` shape.
       return res.json() as Promise<T>;
     }
-    return res.blob() as unknown as T;
+    // SAFETY: a non-JSON response is returned verbatim and cast to the caller's `T`.
+    const blob = res.blob() as unknown;
+    // SAFETY: `blob` is the verbatim response; cast it to the caller's `T`.
+    return blob as T;
   } finally {
     clearTimeout(timeout);
   }
@@ -59,14 +70,14 @@ function get<T>(
   opts?: { params?: Record<string, string>; responseType?: string; signal?: AbortSignal },
 ) {
   const query = opts?.params ? `?${new URLSearchParams(opts.params)}` : "";
-  return request<T>(`${url}${query}`, {
-    method: "GET",
-    signal: opts?.signal,
-    ...(opts?.responseType === "blob" ? { headers: { Accept: "*/*" } } : {}),
-  });
+  const requestOptions: RequestInit = { method: "GET", signal: opts?.signal };
+  if (opts?.responseType === "blob") {
+    requestOptions.headers = { Accept: "*/*" };
+  }
+  return request<T>(`${url}${query}`, requestOptions);
 }
 
-function post<T>(url: string, body?: unknown, opts?: { signal?: AbortSignal }) {
+function post<T>(url: string, body?: JsonValue, opts?: { signal?: AbortSignal }) {
   return request<T>(url, {
     method: "POST",
     signal: opts?.signal,
@@ -74,7 +85,7 @@ function post<T>(url: string, body?: unknown, opts?: { signal?: AbortSignal }) {
   });
 }
 
-function put<T>(url: string, body?: unknown) {
+function put<T>(url: string, body?: JsonValue) {
   return request<T>(url, {
     method: "PUT",
     body: body != null ? JSON.stringify(body) : undefined,
@@ -100,10 +111,13 @@ const api = {
 
   // Mailboxes
   listMailboxes: () => get<Mailbox[]>("/api/v1/mailboxes"),
-  createMailbox: (email: string, name: string, settings?: unknown) =>
-    post<Mailbox>("/api/v1/mailboxes", { email, name, settings }),
+  createMailbox: (email: string, name: string, settings?: MailboxSettings) =>
+    post<Mailbox>(
+      "/api/v1/mailboxes",
+      settings === undefined ? { email, name } : { email, name, settings },
+    ),
   getMailbox: (mailboxId: string) => get<Mailbox>(`/api/v1/mailboxes/${mailboxId}`),
-  updateMailbox: (mailboxId: string, settings: unknown) =>
+  updateMailbox: (mailboxId: string, settings: MailboxSettings) =>
     put<Mailbox>(`/api/v1/mailboxes/${mailboxId}`, { settings }),
   deleteMailbox: (mailboxId: string) => del<void>(`/api/v1/mailboxes/${mailboxId}`),
 
@@ -117,11 +131,11 @@ const api = {
       params,
       signal: opts?.signal,
     }),
-  sendEmail: (mailboxId: string, email: unknown) =>
+  sendEmail: (mailboxId: string, email: OutboundEmail) =>
     post<void>(`/api/v1/mailboxes/${mailboxId}/emails`, email),
   getEmail: (mailboxId: string, id: string, opts?: { signal?: AbortSignal }) =>
     get<Email>(`/api/v1/mailboxes/${mailboxId}/emails/${id}`, { signal: opts?.signal }),
-  updateEmail: (mailboxId: string, id: string, data: unknown) =>
+  updateEmail: (mailboxId: string, id: string, data: Partial<Email>) =>
     put<Email>(`/api/v1/mailboxes/${mailboxId}/emails/${id}`, data),
   deleteEmail: (mailboxId: string, id: string) =>
     del<void>(`/api/v1/mailboxes/${mailboxId}/emails/${id}`),
@@ -148,9 +162,9 @@ const api = {
       draft_id?: string;
     },
   ) => post<{ draft_id: string }>(`/api/v1/mailboxes/${mailboxId}/drafts`, draft),
-  replyToEmail: (mailboxId: string, emailId: string, email: unknown) =>
+  replyToEmail: (mailboxId: string, emailId: string, email: OutboundEmail) =>
     post<void>(`/api/v1/mailboxes/${mailboxId}/emails/${emailId}/reply`, email),
-  forwardEmail: (mailboxId: string, emailId: string, email: unknown) =>
+  forwardEmail: (mailboxId: string, emailId: string, email: OutboundEmail) =>
     post<void>(`/api/v1/mailboxes/${mailboxId}/emails/${emailId}/forward`, email),
 
   // Folders

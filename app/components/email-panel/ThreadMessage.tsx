@@ -3,6 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { Badge, Button, Tooltip } from "@cloudflare/kumo";
+import { SquareButton } from "~/components/ui/SquareButton";
 import {
   CaretDownIcon,
   CaretUpIcon,
@@ -130,9 +131,9 @@ export default function ThreadMessage({
             <span className="text-xs text-kumo-subtle">{formatShortDate(email.date)}</span>
             {onViewSource && (
               <Tooltip content="View source" side="bottom" asChild>
-                <Button
+                <SquareButton
                   variant="ghost"
-                  shape="square"
+
                   size="sm"
                   icon={<CodeIcon size={14} />}
                   onClick={onViewSource}

@@ -4,7 +4,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "~/services/api";
-import type { Email } from "~/types";
+import type { Email, OutboundEmail } from "~/types";
 import { queryKeys } from "./keys";
 
 // ---------- Types ----------
@@ -26,11 +26,11 @@ export function useEmails(
   return useQuery<EmailListResponse>({
     queryKey: mailboxId ? queryKeys.emails.list(mailboxId, queryParams) : ["emails", "_disabled"],
     queryFn: async () => {
-      const data = (await api.listEmails(mailboxId!, queryParams)) as EmailListResponse | Email[];
-      if (data && typeof data === "object" && "emails" in data) {
+      const data = await api.listEmails(mailboxId!, queryParams);
+      if (data && "emails" in data) {
         return {
-          emails: (data as EmailListResponse).emails ?? [],
-          totalCount: (data as EmailListResponse).totalCount ?? 0,
+          emails: data.emails ?? [],
+          totalCount: data.totalCount ?? 0,
         };
       }
       const arr = Array.isArray(data) ? data : [];
@@ -47,7 +47,7 @@ export function useEmail(mailboxId: string | undefined, emailId: string | undefi
       mailboxId && emailId
         ? queryKeys.emails.detail(mailboxId, emailId)
         : ["emails", "_disabled_detail"],
-    queryFn: () => api.getEmail(mailboxId!, emailId!) as Promise<Email>,
+    queryFn: () => api.getEmail(mailboxId!, emailId!),
     enabled: !!mailboxId && !!emailId,
   });
 }
@@ -67,7 +67,7 @@ export function useThreadReplies(
       // Single request returns all thread emails with full bodies +
       // attachments. Eliminates the previous N+1 pattern that fired
       // a separate getEmail call per thread message.
-      const emails = (await api.getThread(mailboxId!, threadId!, { signal })) as Email[];
+      const emails = await api.getThread(mailboxId!, threadId!, { signal });
 
       // Populate individual email detail caches so clicking a thread
       // message in the panel doesn't re-fetch.
@@ -87,8 +87,8 @@ export function useThreadReplies(
 function useInvalidateEmailData() {
   const qc = useQueryClient();
   return (mailboxId: string) => {
-    qc.invalidateQueries({ queryKey: ["emails", mailboxId] });
-    qc.invalidateQueries({
+    void qc.invalidateQueries({ queryKey: ["emails", mailboxId] });
+    void qc.invalidateQueries({
       queryKey: queryKeys.folders.list(mailboxId),
     });
   };
@@ -97,7 +97,7 @@ function useInvalidateEmailData() {
 export function useSendEmail() {
   const invalidate = useInvalidateEmailData();
   return useMutation({
-    mutationFn: ({ mailboxId, email }: { mailboxId: string; email: unknown }) =>
+    mutationFn: ({ mailboxId, email }: { mailboxId: string; email: OutboundEmail }) =>
       api.sendEmail(mailboxId, email),
     onSuccess: (_data, { mailboxId }) => invalidate(mailboxId),
   });
@@ -106,16 +106,22 @@ export function useSendEmail() {
 export function useUpdateEmail() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ mailboxId, id, data }: { mailboxId: string; id: string; data: unknown }) =>
-      api.updateEmail(mailboxId, id, data),
+    mutationFn: ({
+      mailboxId,
+      id,
+      data,
+    }: {
+      mailboxId: string;
+      id: string;
+      data: Partial<Email>;
+    }) => api.updateEmail(mailboxId, id, data),
     onMutate: async ({ mailboxId, id, data }) => {
       // Only target list queries (3rd key element is an object = params),
       // NOT detail queries (string = emailId) or thread queries.
       const isListQuery = (query: { queryKey: readonly unknown[] }) =>
         query.queryKey[0] === "emails" &&
         query.queryKey[1] === mailboxId &&
-        typeof query.queryKey[2] === "object" &&
-        query.queryKey[2] !== null;
+        query.queryKey[2] instanceof Object;
 
       // Cancel in-flight list queries so they don't overwrite our optimistic update
       await qc.cancelQueries({
@@ -134,9 +140,7 @@ export function useUpdateEmail() {
         if (!cached?.emails) continue;
         qc.setQueryData(key, {
           ...cached,
-          emails: cached.emails.map((e) =>
-            e.id === id ? { ...e, ...(data as Partial<Email>) } : e,
-          ),
+          emails: cached.emails.map((e) => (e.id === id ? { ...e, ...data } : e)),
         });
       }
 
@@ -144,7 +148,7 @@ export function useUpdateEmail() {
       const detailKey = queryKeys.emails.detail(mailboxId, id);
       const prevDetail = qc.getQueryData<Email>(detailKey);
       if (prevDetail) {
-        qc.setQueryData(detailKey, { ...prevDetail, ...(data as Partial<Email>) });
+        qc.setQueryData(detailKey, { ...prevDetail, ...data });
       }
 
       return { listQueries, prevDetail, detailKey };
@@ -162,8 +166,8 @@ export function useUpdateEmail() {
     },
     onSettled: (_data, _err, { mailboxId }) => {
       // Always refetch to ensure server truth
-      qc.invalidateQueries({ queryKey: ["emails", mailboxId] });
-      qc.invalidateQueries({
+      void qc.invalidateQueries({ queryKey: ["emails", mailboxId] });
+      void qc.invalidateQueries({
         queryKey: queryKeys.folders.list(mailboxId),
       });
     },
@@ -176,8 +180,8 @@ export function useMarkThreadRead() {
     mutationFn: ({ mailboxId, threadId }: { mailboxId: string; threadId: string }) =>
       api.markThreadRead(mailboxId, threadId),
     onSuccess: (_data, { mailboxId }) => {
-      qc.invalidateQueries({ queryKey: ["emails", mailboxId] });
-      qc.invalidateQueries({
+      void qc.invalidateQueries({ queryKey: ["emails", mailboxId] });
+      void qc.invalidateQueries({
         queryKey: queryKeys.folders.list(mailboxId),
       });
     },
@@ -242,7 +246,7 @@ export function useReplyToEmail() {
     }: {
       mailboxId: string;
       emailId: string;
-      email: unknown;
+      email: OutboundEmail;
     }) => api.replyToEmail(mailboxId, emailId, email),
     onSuccess: (_data, { mailboxId }) => invalidate(mailboxId),
   });
@@ -258,7 +262,7 @@ export function useForwardEmail() {
     }: {
       mailboxId: string;
       emailId: string;
-      email: unknown;
+      email: OutboundEmail;
     }) => api.forwardEmail(mailboxId, emailId, email),
     onSuccess: (_data, { mailboxId }) => invalidate(mailboxId),
   });

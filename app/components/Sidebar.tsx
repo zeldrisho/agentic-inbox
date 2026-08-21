@@ -3,6 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { Badge, Button, Dialog, Input, Tooltip } from "@cloudflare/kumo";
+import { SquareButton } from "~/components/ui/SquareButton";
 import {
   ArchiveIcon,
   CaretLeftIcon,
@@ -21,13 +22,13 @@ import { useCreateFolder, useFolders } from "~/queries/folders";
 import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
 
-const FOLDER_ICONS: Record<string, React.ReactNode> = {
+const FOLDER_ICONS = {
   [Folders.INBOX]: <TrayIcon size={18} weight="regular" />,
   [Folders.SENT]: <PaperPlaneTiltIcon size={18} weight="regular" />,
   [Folders.DRAFT]: <FileIcon size={18} weight="regular" />,
   [Folders.ARCHIVE]: <ArchiveIcon size={18} weight="regular" />,
   [Folders.TRASH]: <TrashIcon size={18} weight="regular" />,
-};
+} satisfies Record<string, React.ReactNode>;
 
 const SYSTEM_FOLDER_LINKS = [
   { id: Folders.INBOX, label: "Inbox" },
@@ -76,6 +77,7 @@ export default function Sidebar() {
   const [newFolderName, setNewFolderName] = useState("");
 
   const customFolders = useMemo(
+    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     () => folders.filter((f) => !(SYSTEM_FOLDER_IDS as readonly string[]).includes(f.id)),
     [folders],
   );
@@ -118,7 +120,7 @@ export default function Sidebar() {
         <button
           type="button"
           onClick={() => {
-            navigate("/");
+            void navigate("/");
             closeSidebar();
           }}
           className="flex items-center gap-1.5 text-kumo-subtle text-sm hover:text-kumo-default transition-colors mb-2.5 cursor-pointer bg-transparent border-0 p-0"
@@ -167,9 +169,9 @@ export default function Sidebar() {
                 Folders
               </span>
               <Tooltip content="New folder" asChild>
-                <Button
+                <SquareButton
                   variant="ghost"
-                  shape="square"
+
                   size="sm"
                   icon={<PlusIcon size={16} />}
                   onClick={() => setIsCreateFolderOpen(true)}
@@ -198,9 +200,9 @@ export default function Sidebar() {
                 Folders
               </span>
               <Tooltip content="New folder" asChild>
-                <Button
+                <SquareButton
                   variant="ghost"
-                  shape="square"
+
                   size="sm"
                   icon={<PlusIcon size={16} />}
                   onClick={() => setIsCreateFolderOpen(true)}

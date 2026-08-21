@@ -2,7 +2,8 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { Badge, Button, Loader, Pagination, Tooltip } from "@cloudflare/kumo";
+import { Badge, Loader, Pagination, Tooltip } from "@cloudflare/kumo";
+import { SquareButton } from "~/components/ui/SquareButton";
 import { ArrowLeftIcon, MagnifyingGlassIcon } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
@@ -77,14 +78,15 @@ export default function SearchResultsRoute() {
   };
   const folderDisplayName = (name: string | null | undefined): string => {
     if (!name) return "";
-    const map: Record<string, string> = {
+    const map = {
       inbox: "Inbox",
       sent: "Sent",
       draft: "Drafts",
       archive: "Archive",
       trash: "Trash",
-    };
-    return map[name.toLowerCase()] || name;
+    } satisfies Record<string, string>;
+    // SAFETY: `name` is a dynamic folder identifier; it is a known key of `map` when recognized.
+    return map[name.toLowerCase() as keyof typeof map] ?? name;
   };
 
   return (
@@ -92,9 +94,9 @@ export default function SearchResultsRoute() {
       <>
         <div className="flex items-center gap-2 px-4 py-3.5 border-b border-kumo-line shrink-0 md:px-5">
           <Tooltip content="Back to inbox" side="bottom" asChild>
-            <Button
+            <SquareButton
               variant="ghost"
-              shape="square"
+
               size="sm"
               icon={<ArrowLeftIcon size={18} />}
               onClick={() => navigate(`/mailbox/${mailboxId}/emails/inbox`)}
@@ -142,6 +144,7 @@ export default function SearchResultsRoute() {
               {results.map((email) => {
                 const isSelected = selectedEmailId === email.id;
                 const snippet = getSnippetText(email.snippet, 120);
+                // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
                 const folderName = (email as Email & { folder_name?: string }).folder_name;
                 return (
                   <div

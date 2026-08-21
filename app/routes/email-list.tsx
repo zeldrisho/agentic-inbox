@@ -3,6 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { Button, Pagination, Tooltip } from "@cloudflare/kumo";
+import { SquareButton } from "~/components/ui/SquareButton";
 import {
   ArchiveIcon,
   ArrowBendUpLeftIcon,
@@ -31,15 +32,7 @@ import type { Email } from "~/types";
 
 const PAGE_SIZE = 25;
 
-const FOLDER_EMPTY_STATES: Record<
-  string,
-  {
-    icon: React.ReactNode;
-    title: string;
-    description: string;
-    showCompose?: boolean;
-  }
-> = {
+const FOLDER_EMPTY_STATES = {
   [Folders.INBOX]: {
     icon: <TrayIcon size={48} weight="thin" className="text-kumo-subtle" />,
     title: "Your inbox is empty",
@@ -70,7 +63,15 @@ const FOLDER_EMPTY_STATES: Record<
     description:
       "Deleted emails will appear here. You can restore them or permanently delete them.",
   },
-};
+} satisfies Record<
+  string,
+  {
+    icon: React.ReactNode;
+    title: string;
+    description: string;
+    showCompose?: boolean;
+  }
+>;
 
 function EmailListSkeleton() {
   return (
@@ -95,7 +96,8 @@ function EmailListSkeleton() {
 }
 
 function FolderEmptyState({ folder, onCompose }: { folder?: string; onCompose: () => void }) {
-  const config = (folder && FOLDER_EMPTY_STATES[folder]) || {
+  // SAFETY: `folder` is a dynamic folder identifier; it is a known key of FOLDER_EMPTY_STATES when set.
+  const config = FOLDER_EMPTY_STATES[folder as keyof typeof FOLDER_EMPTY_STATES] ?? {
     icon: <EnvelopeSimpleIcon size={48} weight="thin" className="text-kumo-subtle" />,
     title: "No emails",
     description: "This folder is empty.",
@@ -196,8 +198,8 @@ export default function EmailListRoute() {
 
   const handleRefresh = () => {
     if (mailboxId) {
-      queryClient.invalidateQueries({ queryKey: ["emails", mailboxId] });
-      queryClient.invalidateQueries({
+      void queryClient.invalidateQueries({ queryKey: ["emails", mailboxId] });
+      void queryClient.invalidateQueries({
         queryKey: queryKeys.folders.list(mailboxId),
       });
     }
@@ -253,9 +255,9 @@ export default function EmailListRoute() {
             </span>
           )}
           <Tooltip content={isRefreshing ? "Refreshing..." : "Refresh"} side="bottom" asChild>
-            <Button
+            <SquareButton
               variant="ghost"
-              shape="square"
+
               size="sm"
               icon={
                 <ArrowsClockwiseIcon size={18} className={isRefreshing ? "animate-spin" : ""} />
@@ -364,9 +366,9 @@ export default function EmailListRoute() {
                   {/* Hover actions */}
                   <div className="hidden group-hover:flex items-center shrink-0">
                     <Tooltip content={email.read ? "Mark unread" : "Mark read"} asChild>
-                      <Button
+                      <SquareButton
                         variant="ghost"
-                        shape="square"
+
                         size="sm"
                         icon={
                           email.read ? (
@@ -388,9 +390,9 @@ export default function EmailListRoute() {
                       />
                     </Tooltip>
                     <Tooltip content="Delete" asChild>
-                      <Button
+                      <SquareButton
                         variant="ghost"
-                        shape="square"
+
                         size="sm"
                         icon={<TrashIcon size={14} />}
                         onClick={(e) => handleDelete(e, email.id)}

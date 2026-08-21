@@ -47,7 +47,7 @@ function makeQueryClient() {
 // leaks cache across SSR requests.
 let browserQueryClient: QueryClient | undefined;
 function getQueryClient() {
-  if (typeof window === "undefined") {
+  if (globalThis.window === undefined) {
     // SSR: always create a fresh client per request to prevent cross-user cache leaks
     return makeQueryClient();
   }
@@ -61,7 +61,7 @@ const KumoLink = forwardRef<
   React.AnchorHTMLAttributes<HTMLAnchorElement> & { href?: string }
 >(function KumoLink({ href, ...props }, ref) {
   if (href && !href.startsWith("http")) {
-    return <RouterLink to={href} ref={ref} {...(props as Record<string, unknown>)} />;
+    return <RouterLink to={href} ref={ref} {...props} />;
   }
   return <a href={href} ref={ref} {...props} />;
 });

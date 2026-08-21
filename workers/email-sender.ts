@@ -10,6 +10,8 @@
  * See: https://developers.cloudflare.com/email-service/api/send-emails/workers-api/
  */
 
+import type { ThreadingHeaders } from "./lib/email-helpers";
+
 export interface SendEmailParams {
   to: string | string[];
   from: string | { email: string; name: string };
@@ -26,7 +28,7 @@ export interface SendEmailParams {
     disposition: "attachment" | "inline";
     contentId?: string;
   }[];
-  headers?: Record<string, string>;
+  headers?: ThreadingHeaders;
 }
 
 /**
@@ -41,7 +43,7 @@ export async function sendEmail(
   binding: SendEmail,
   params: SendEmailParams,
 ): Promise<{ messageId: string }> {
-  const message: Record<string, unknown> = {
+  const message: SendEmailParams = {
     to: params.to,
     from: params.from,
     subject: params.subject,
@@ -63,10 +65,11 @@ export async function sendEmail(
       filename: att.filename,
       type: att.type,
       disposition: att.disposition,
-      ...(att.contentId ? { contentId: att.contentId } : {}),
+      contentId: att.contentId,
     }));
   }
 
+  // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
   const result = await binding.send(message as any);
   return { messageId: result.messageId };
 }

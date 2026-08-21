@@ -2,7 +2,8 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { Button, Tooltip } from "@cloudflare/kumo";
+import { Tooltip } from "@cloudflare/kumo";
+import { SquareButton } from "~/components/ui/SquareButton";
 import {
   ArrowClockwiseIcon,
   ArrowCounterClockwiseIcon,
@@ -90,9 +91,9 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
       <div className="flex flex-wrap items-center gap-0.5 bg-kumo-recessed px-2 py-1.5 border-b border-kumo-line shrink-0">
         {/* Text formatting */}
         <Tooltip content="Bold" side="bottom" asChild>
-          <Button
+          <SquareButton
             variant={editor.isActive("bold") ? "secondary" : "ghost"}
-            shape="square"
+
             size="sm"
             icon={<TextBIcon size={16} />}
             onClick={() => editor.chain().focus().toggleBold().run()}
@@ -100,9 +101,9 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
           />
         </Tooltip>
         <Tooltip content="Italic" side="bottom" asChild>
-          <Button
+          <SquareButton
             variant={editor.isActive("italic") ? "secondary" : "ghost"}
-            shape="square"
+
             size="sm"
             icon={<TextItalicIcon size={16} />}
             onClick={() => editor.chain().focus().toggleItalic().run()}
@@ -110,9 +111,9 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
           />
         </Tooltip>
         <Tooltip content="Underline" side="bottom" asChild>
-          <Button
+          <SquareButton
             variant={editor.isActive("underline") ? "secondary" : "ghost"}
-            shape="square"
+
             size="sm"
             icon={<TextUnderlineIcon size={16} />}
             onClick={() => editor.chain().focus().toggleUnderline().run()}
@@ -120,9 +121,9 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
           />
         </Tooltip>
         <Tooltip content="Strikethrough" side="bottom" asChild>
-          <Button
+          <SquareButton
             variant={editor.isActive("strike") ? "secondary" : "ghost"}
-            shape="square"
+
             size="sm"
             icon={<TextStrikethroughIcon size={16} />}
             onClick={() => editor.chain().focus().toggleStrike().run()}
@@ -134,9 +135,9 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
 
         {/* Lists */}
         <Tooltip content="Bullet list" side="bottom" asChild>
-          <Button
+          <SquareButton
             variant={editor.isActive("bulletList") ? "secondary" : "ghost"}
-            shape="square"
+
             size="sm"
             icon={<ListBulletsIcon size={16} />}
             onClick={() => editor.chain().focus().toggleBulletList().run()}
@@ -144,9 +145,9 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
           />
         </Tooltip>
         <Tooltip content="Numbered list" side="bottom" asChild>
-          <Button
+          <SquareButton
             variant={editor.isActive("orderedList") ? "secondary" : "ghost"}
-            shape="square"
+
             size="sm"
             icon={<ListNumbersIcon size={16} />}
             onClick={() => editor.chain().focus().toggleOrderedList().run()}
@@ -158,9 +159,9 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
 
         {/* Block formatting */}
         <Tooltip content="Blockquote" side="bottom" asChild>
-          <Button
+          <SquareButton
             variant={editor.isActive("blockquote") ? "secondary" : "ghost"}
-            shape="square"
+
             size="sm"
             icon={<QuotesIcon size={16} />}
             onClick={() => editor.chain().focus().toggleBlockquote().run()}
@@ -168,9 +169,9 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
           />
         </Tooltip>
         <Tooltip content="Link" side="bottom" asChild>
-          <Button
+          <SquareButton
             variant={editor.isActive("link") ? "secondary" : "ghost"}
-            shape="square"
+
             size="sm"
             icon={<LinkSimpleIcon size={16} />}
             onClick={setLink}
@@ -179,9 +180,9 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
         </Tooltip>
         {editor.isActive("link") && (
           <Tooltip content="Remove link" side="bottom" asChild>
-            <Button
+            <SquareButton
               variant="ghost"
-              shape="square"
+
               size="sm"
               icon={<LinkBreakIcon size={16} />}
               onClick={() => editor.chain().focus().unsetLink().run()}
@@ -190,9 +191,9 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
           </Tooltip>
         )}
         <Tooltip content="Horizontal rule" side="bottom" asChild>
-          <Button
+          <SquareButton
             variant="ghost"
-            shape="square"
+
             size="sm"
             icon={<MinusIcon size={16} />}
             onClick={() => editor.chain().focus().setHorizontalRule().run()}
@@ -204,9 +205,9 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
 
         {/* Undo/Redo */}
         <Tooltip content="Undo" side="bottom" asChild>
-          <Button
+          <SquareButton
             variant="ghost"
-            shape="square"
+
             size="sm"
             icon={<ArrowCounterClockwiseIcon size={16} />}
             onClick={() => editor.chain().focus().undo().run()}
@@ -215,9 +216,9 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
           />
         </Tooltip>
         <Tooltip content="Redo" side="bottom" asChild>
-          <Button
+          <SquareButton
             variant="ghost"
-            shape="square"
+
             size="sm"
             icon={<ArrowClockwiseIcon size={16} />}
             onClick={() => editor.chain().focus().redo().run()}

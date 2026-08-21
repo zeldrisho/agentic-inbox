@@ -82,9 +82,11 @@ app.use("*", async (c, next) => {
 // Must be before API routes and React Router catch-all
 const mcpHandler = EmailMCP.serve("/mcp", { binding: "EMAIL_MCP" });
 app.all("/mcp", async (c) => {
+  // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
   return mcpHandler.fetch(c.req.raw, c.env, c.executionCtx as ExecutionContext);
 });
 app.all("/mcp/*", async (c) => {
+  // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
   return mcpHandler.fetch(c.req.raw, c.env, c.executionCtx as ExecutionContext);
 });
 
@@ -101,6 +103,7 @@ app.all("/agents/*", async (c) => {
 // React Router catch-all: serves the SPA for all non-API routes
 app.all("*", (c) => {
   return requestHandler(c.req.raw, {
+    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     cloudflare: { env: c.env, ctx: c.executionCtx as ExecutionContext },
   });
 });
@@ -112,6 +115,7 @@ export default {
     try {
       await receiveEmail(event, env, ctx);
     } catch (e) {
+      // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
       console.error("Failed to process incoming email:", (e as Error).message, (e as Error).stack);
       // Re-throw so Cloudflare's email routing can retry delivery or bounce the message.
       // Swallowing the error would silently drop the email.

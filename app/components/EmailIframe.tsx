@@ -37,14 +37,9 @@ export default function EmailIframe({ body, autoSize }: EmailIframeProps) {
       if (!autoSize) return;
       // Only accept messages from our own iframe
       if (event.source !== iframeRef.current?.contentWindow) return;
-      if (
-        event.data &&
-        typeof event.data === "object" &&
-        event.data.__emailIframeHeight &&
-        typeof event.data.height === "number" &&
-        event.data.height > 0
-      ) {
-        setHeight(event.data.height);
+      const data = event.data;
+      if (data && data.__emailIframeHeight && Number.isFinite(data.height) && data.height > 0) {
+        setHeight(data.height);
       }
     },
     [autoSize],

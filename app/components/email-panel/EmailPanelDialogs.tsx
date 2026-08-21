@@ -28,7 +28,7 @@ function getSourceHeaders(msg: Email): { key: string; value: string }[] {
           value: String(header.value || ""),
         }));
       }
-      if (typeof parsed === "object" && parsed !== null) {
+      if (parsed instanceof Object) {
         return Object.entries(parsed).map(([key, value]) => ({
           key,
           value: String(value),

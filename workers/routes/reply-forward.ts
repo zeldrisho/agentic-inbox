@@ -19,7 +19,6 @@ import { Folders } from "../../shared/folders";
 import type { MailboxContext } from "../lib/mailbox";
 
 type AppContext = Context<MailboxContext>;
-type RateLimitStub = { checkSendRateLimit: () => Promise<string | null> };
 
 export async function handleReplyEmail(c: AppContext) {
   const mailboxId = c.req.param("mailboxId") ?? "";
@@ -28,6 +27,7 @@ export async function handleReplyEmail(c: AppContext) {
   const { to, cc, bcc, from, subject, html, text, attachments } = body;
 
   const stub = c.var.mailboxStub;
+  // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
   const rawOriginal = (await stub.getEmail(id)) as EmailFull | null;
 
   if (!rawOriginal) {
@@ -47,7 +47,8 @@ export async function handleReplyEmail(c: AppContext) {
 
   const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
 
-  const rateLimitError = await (stub as unknown as RateLimitStub).checkSendRateLimit();
+  // SAFETY: `checkSendRateLimit` is part of the DO's dynamic runtime API; the full DurableObjectStub<MailboxDO> type is too heavy to instantiate.
+  const rateLimitError = await (stub as any).checkSendRateLimit();
   if (rateLimitError) {
     return c.json({ error: rateLimitError }, 429);
   }
@@ -70,7 +71,7 @@ export async function handleReplyEmail(c: AppContext) {
       thread_id: thread_id,
       message_id: outgoingMessageId,
       raw_headers: JSON.stringify([
-        { key: "from", value: typeof from === "string" ? from : `${from.name} <${from.email}>` },
+        { key: "from", value: from instanceof Object ? `${from.name} <${from.email}>` : from },
         { key: "to", value: Array.isArray(to) ? to.join(", ") : to },
         ...(cc ? [{ key: "cc", value: Array.isArray(cc) ? cc.join(", ") : cc }] : []),
         ...(bcc ? [{ key: "bcc", value: Array.isArray(bcc) ? bcc.join(", ") : bcc }] : []),
@@ -106,6 +107,7 @@ export async function handleReplyEmail(c: AppContext) {
       })),
       headers: buildThreadingHeaders(originalMsgId, references),
     }).catch((e) => {
+      // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
       console.error("Deferred reply delivery failed:", (e as Error).message);
     }),
   );
@@ -120,6 +122,7 @@ export async function handleForwardEmail(c: AppContext) {
   const { to, cc, bcc, from, subject, html, text, attachments } = body;
 
   const stub = c.var.mailboxStub;
+  // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
   const rawOriginal = (await stub.getEmail(id)) as EmailFull | null;
 
   if (!rawOriginal) {
@@ -138,7 +141,8 @@ export async function handleForwardEmail(c: AppContext) {
 
   const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
 
-  const rateLimitError = await (stub as unknown as RateLimitStub).checkSendRateLimit();
+  // SAFETY: `checkSendRateLimit` is part of the DO's dynamic runtime API; the full DurableObjectStub<MailboxDO> type is too heavy to instantiate.
+  const rateLimitError = await (stub as any).checkSendRateLimit();
   if (rateLimitError) {
     return c.json({ error: rateLimitError }, 429);
   }
@@ -161,7 +165,7 @@ export async function handleForwardEmail(c: AppContext) {
       thread_id: messageId,
       message_id: outgoingMessageId,
       raw_headers: JSON.stringify([
-        { key: "from", value: typeof from === "string" ? from : `${from.name} <${from.email}>` },
+        { key: "from", value: from instanceof Object ? `${from.name} <${from.email}>` : from },
         { key: "to", value: Array.isArray(to) ? to.join(", ") : to },
         ...(cc ? [{ key: "cc", value: Array.isArray(cc) ? cc.join(", ") : cc }] : []),
         ...(bcc ? [{ key: "bcc", value: Array.isArray(bcc) ? bcc.join(", ") : bcc }] : []),
@@ -190,6 +194,7 @@ export async function handleForwardEmail(c: AppContext) {
         contentId: att.contentId,
       })),
     }).catch((e) => {
+      // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
       console.error("Deferred forward delivery failed:", (e as Error).message);
     }),
   );

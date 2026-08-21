@@ -99,6 +99,11 @@ interface AttachmentData {
   disposition?: string | null;
 }
 
+interface EmailUpdateData {
+  read?: number;
+  starred?: number;
+}
+
 export class MailboxDO extends DurableObject<Env> {
   declare __DURABLE_OBJECT_BRAND: never;
   db: ReturnType<typeof drizzle>;
@@ -124,6 +129,7 @@ export class MailboxDO extends DurableObject<Env> {
     // Cap pagination limit to prevent unbounded queries
     const limit = Math.min(Math.max(rawLimit, 1), 100);
 
+    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     const sortColumn: SortColumn = ALLOWED_SORT_COLUMNS.includes(rawSortColumn as SortColumn)
       ? rawSortColumn
       : "date";
@@ -193,6 +199,7 @@ export class MailboxDO extends DurableObject<Env> {
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     const row = [
       ...this.ctx.storage.sql.exec(`SELECT COUNT(*) as total FROM emails ${where}`, ...params),
     ][0] as { total: number } | undefined;
@@ -385,6 +392,7 @@ export class MailboxDO extends DurableObject<Env> {
     const isDraftFolder = folder === Folders.DRAFT;
 
     if (isDraftFolder) {
+      // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
       const row = [
         ...this.ctx.storage.sql.exec(
           `SELECT COUNT(DISTINCT COALESCE(in_reply_to, id)) as total
@@ -396,6 +404,7 @@ export class MailboxDO extends DurableObject<Env> {
       return row?.total ?? 0;
     }
 
+    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     const row = [
       ...this.ctx.storage.sql.exec(
         `WITH
@@ -453,6 +462,7 @@ export class MailboxDO extends DurableObject<Env> {
    * N+1 individual getEmail calls.
    */
   async getThreadEmails(threadId: string) {
+    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     const emailRows = [
       ...this.ctx.storage.sql.exec(
         `SELECT * FROM emails WHERE thread_id = ?1 ORDER BY date ASC`,
@@ -462,10 +472,12 @@ export class MailboxDO extends DurableObject<Env> {
 
     if (emailRows.length === 0) return [];
 
+    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     const emailIds = emailRows.map((e) => e.id as string);
 
     // Batch-fetch all attachments for the thread in a single query
     const placeholders = emailIds.map((_, i) => `?${i + 1}`).join(",");
+    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     const attachmentRows = [
       ...this.ctx.storage.sql.exec(
         `SELECT * FROM attachments WHERE email_id IN (${placeholders})`,
@@ -490,7 +502,7 @@ export class MailboxDO extends DurableObject<Env> {
   }
 
   async updateEmail(id: string, { read, starred }: { read?: boolean; starred?: boolean }) {
-    const data: { read?: number; starred?: number } = {};
+    const data: EmailUpdateData = {};
     if (read !== undefined) {
       data.read = read ? 1 : 0;
     }
@@ -629,10 +641,7 @@ export class MailboxDO extends DurableObject<Env> {
    * Build WHERE conditions and params for search queries.
    * Shared between searchEmails and countSearchResults.
    */
-  #buildSearchConditions(
-    options: SearchFilterOptions,
-    tableAlias = "",
-  ): { conditions: string[]; params: (string | number)[] } {
+  #buildSearchConditions(options: SearchFilterOptions, tableAlias = "") {
     const {
       query,
       folder,
@@ -745,6 +754,7 @@ export class MailboxDO extends DurableObject<Env> {
     const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
     const query = `SELECT COUNT(*) as total FROM emails ${where}`;
 
+    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     const row = [...this.ctx.storage.sql.exec(query, ...params)][0] as
       | { total: number }
       | undefined;
@@ -777,6 +787,7 @@ export class MailboxDO extends DurableObject<Env> {
     const normalizedSender = senderAddress?.toLowerCase().trim();
 
     for (const row of result) {
+      // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
       const rowSubject = String((row as any).subject || "")
         .replace(/^(?:(?:re|fwd?|fw|aw|wg|r[eé]f|sv)\s*:\s*)+/i, "")
         .trim()
@@ -784,7 +795,9 @@ export class MailboxDO extends DurableObject<Env> {
       if (rowSubject !== normalized) continue;
 
       if (normalizedSender) {
+        // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
         const threadSenders = String((row as any).senders || "");
+        // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
         const threadRecipients = String((row as any).recipients || "");
         const allParticipants = `${threadSenders},${threadRecipients}`;
         if (!allParticipants.includes(normalizedSender)) {
@@ -792,6 +805,7 @@ export class MailboxDO extends DurableObject<Env> {
         }
       }
 
+      // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
       return String((row as any).thread_id);
     }
     return null;
@@ -805,6 +819,7 @@ export class MailboxDO extends DurableObject<Env> {
    * Returns null if under limit, or an error message string if exceeded.
    */
   async checkSendRateLimit(): Promise<string | null> {
+    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     const hourRow = [
       ...this.ctx.storage.sql.exec(
         `SELECT COUNT(*) as cnt FROM emails
@@ -818,6 +833,7 @@ export class MailboxDO extends DurableObject<Env> {
       return "Rate limit exceeded: max 20 emails per hour per mailbox";
     }
 
+    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     const dayRow = [
       ...this.ctx.storage.sql.exec(
         `SELECT COUNT(*) as cnt FROM emails

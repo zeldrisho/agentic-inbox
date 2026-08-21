@@ -3,6 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { Button, Tooltip } from "@cloudflare/kumo";
+import { SquareButton } from "~/components/ui/SquareButton";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowBendUpLeftIcon,
@@ -43,7 +44,7 @@ interface EmailPanelToolbarProps {
 
 export default function EmailPanelToolbar({
   email,
-  mailboxId,
+  mailboxId: _mailboxId,
   isDraftFolder,
   isSending,
   moveToFolders,
@@ -61,9 +62,9 @@ export default function EmailPanelToolbar({
 }: EmailPanelToolbarProps) {
   return (
     <div className="flex items-center gap-1 px-3 py-2 border-b border-kumo-line shrink-0 md:px-4">
-      <Button
+      <SquareButton
         variant="ghost"
-        shape="square"
+
         size="sm"
         icon={<ArrowLeftIcon size={18} />}
         onClick={onBack}
@@ -94,9 +95,9 @@ export default function EmailPanelToolbar({
       ) : (
         <>
           <Tooltip content="Reply" side="bottom" asChild>
-            <Button
+            <SquareButton
               variant="ghost"
-              shape="square"
+
               size="sm"
               icon={<ArrowBendUpLeftIcon size={18} />}
               onClick={onReply}
@@ -104,9 +105,9 @@ export default function EmailPanelToolbar({
             />
           </Tooltip>
           <Tooltip content="Reply All" side="bottom" asChild>
-            <Button
+            <SquareButton
               variant="ghost"
-              shape="square"
+
               size="sm"
               icon={<ChatCircleIcon size={18} />}
               onClick={onReplyAll}
@@ -114,9 +115,9 @@ export default function EmailPanelToolbar({
             />
           </Tooltip>
           <Tooltip content="Forward" side="bottom" asChild>
-            <Button
+            <SquareButton
               variant="ghost"
-              shape="square"
+
               size="sm"
               icon={<ArrowBendUpRightIcon size={18} />}
               onClick={onForward}
@@ -129,9 +130,9 @@ export default function EmailPanelToolbar({
       <div className="h-5 w-px bg-kumo-fill mx-0.5" />
 
       <Tooltip content={email.starred ? "Unstar" : "Star"} side="bottom" asChild>
-        <Button
+        <SquareButton
           variant="ghost"
-          shape="square"
+
           size="sm"
           icon={
             <StarIcon
@@ -146,9 +147,9 @@ export default function EmailPanelToolbar({
       </Tooltip>
 
       <Tooltip content={email.read ? "Mark as unread" : "Mark as read"} side="bottom" asChild>
-        <Button
+        <SquareButton
           variant="ghost"
-          shape="square"
+
           size="sm"
           icon={email.read ? <EnvelopeSimpleIcon size={18} /> : <EnvelopeOpenIcon size={18} />}
           onClick={onToggleRead}
@@ -160,9 +161,9 @@ export default function EmailPanelToolbar({
 
       <div className="ml-auto flex items-center gap-0.5">
         <Tooltip content="View source" side="bottom" asChild>
-          <Button
+          <SquareButton
             variant="ghost"
-            shape="square"
+
             size="sm"
             icon={<CodeIcon size={18} />}
             onClick={onViewSource}
@@ -170,9 +171,9 @@ export default function EmailPanelToolbar({
           />
         </Tooltip>
         <Tooltip content="Delete" side="bottom" asChild>
-          <Button
+          <SquareButton
             variant="ghost"
-            shape="square"
+
             size="sm"
             icon={<TrashIcon size={18} />}
             onClick={onDelete}
@@ -180,9 +181,9 @@ export default function EmailPanelToolbar({
           />
         </Tooltip>
         <Tooltip content="Close" side="bottom" asChild>
-          <Button
+          <SquareButton
             variant="ghost"
-            shape="square"
+
             size="sm"
             icon={<XIcon size={18} />}
             onClick={onBack}
@@ -208,6 +209,7 @@ function MoveToFolderMenu({
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
+      // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener("mousedown", handler);
@@ -217,9 +219,9 @@ function MoveToFolderMenu({
   return (
     <div ref={ref} className="relative">
       <Tooltip content="Move to folder" side="bottom" asChild>
-        <Button
+        <SquareButton
           variant="ghost"
-          shape="square"
+
           size="sm"
           icon={<FolderSimpleIcon size={18} />}
           onClick={() => setOpen((o) => !o)}

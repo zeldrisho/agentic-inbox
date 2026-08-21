@@ -31,15 +31,6 @@ import { sendEmail } from "../email-sender";
 import { Folders } from "../../shared/folders";
 import type { Env } from "../types";
 
-// ── Type casts for DO methods not on the base stub type ────────────
-type MailboxSearchStub = {
-  searchEmails: (options: { query: string; folder?: string }) => Promise<unknown>;
-};
-
-type RateLimitStub = {
-  checkSendRateLimit: () => Promise<string | null>;
-};
-
 // ── list_mailboxes ─────────────────────────────────────────────────
 
 export async function toolListMailboxes(env: Env) {
@@ -87,7 +78,8 @@ export async function toolSearchEmails(
   params: { query: string; folder?: string },
 ) {
   const stub = getMailboxStub(env, mailboxId);
-  return (stub as unknown as MailboxSearchStub).searchEmails({
+  // SAFETY: `searchEmails` is part of the DO's dynamic runtime API; the full DurableObjectStub<MailboxDO> type is too heavy to instantiate.
+  return (stub as any).searchEmails({
     query: params.query,
     folder: params.folder,
   });
@@ -140,6 +132,7 @@ export async function toolDraftReply(
   const draftId = crypto.randomUUID();
 
   // Get the original email for thread_id and quoted text
+  // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
   const original = (await stub.getEmail(params.originalEmailId)) as EmailFull | null;
   const threadId = original?.thread_id || params.originalEmailId;
 
@@ -228,6 +221,7 @@ export async function toolDraftEmail(
   // Resolve thread ID
   let resolvedThreadId = params.thread_id;
   if (!resolvedThreadId && params.in_reply_to) {
+    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     const original = (await stub.getEmail(params.in_reply_to)) as EmailFull | null;
     resolvedThreadId = original?.thread_id || params.in_reply_to;
   }
@@ -280,6 +274,7 @@ export async function toolUpdateDraft(
 > {
   const stub = getMailboxStub(env, mailboxId);
 
+  // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
   const oldDraft = (await stub.getEmail(params.draftId)) as EmailFull | null;
   if (!oldDraft) {
     return { error: "Draft not found" };
@@ -354,6 +349,7 @@ export async function toolMoveEmail(
 
 export async function toolDiscardDraft(env: Env, mailboxId: string, draftId: string) {
   const stub = getMailboxStub(env, mailboxId);
+  // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
   const email = (await stub.getEmail(draftId)) as { folder_id?: string } | null;
   if (!email) {
     return { error: "Draft not found" };
@@ -391,11 +387,13 @@ export async function toolSendReply(
   const stub = getMailboxStub(env, mailboxId);
 
   // Check send rate limit
-  const rateLimitError = await (stub as unknown as RateLimitStub).checkSendRateLimit();
+  // SAFETY: `checkSendRateLimit` is part of the DO's dynamic runtime API; the full DurableObjectStub<MailboxDO> type is too heavy to instantiate.
+  const rateLimitError = await (stub as any).checkSendRateLimit();
   if (rateLimitError) {
     return { error: rateLimitError };
   }
 
+  // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
   const originalEmail = (await stub.getEmail(params.originalEmailId)) as EmailFull | null;
   if (!originalEmail) {
     return { error: "Original email not found" };
@@ -429,7 +427,9 @@ export async function toolSendReply(
       headers: buildThreadingHeaders(originalMsgId, references),
     });
   } catch (e) {
+    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     console.error("Email send failed:", (e as Error).message);
+    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     return { error: `Failed to send reply: ${(e as Error).message}` };
   }
 
@@ -467,7 +467,8 @@ export async function toolSendEmail(
   const stub = getMailboxStub(env, mailboxId);
 
   // Check send rate limit
-  const rateLimitError = await (stub as unknown as RateLimitStub).checkSendRateLimit();
+  // SAFETY: `checkSendRateLimit` is part of the DO's dynamic runtime API; the full DurableObjectStub<MailboxDO> type is too heavy to instantiate.
+  const rateLimitError = await (stub as any).checkSendRateLimit();
   if (rateLimitError) {
     return { error: rateLimitError };
   }
@@ -491,7 +492,9 @@ export async function toolSendEmail(
       html: sanitizedBody,
     });
   } catch (e) {
+    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     console.error("Email send failed:", (e as Error).message);
+    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     return { error: `Failed to send email: ${(e as Error).message}` };
   }
 

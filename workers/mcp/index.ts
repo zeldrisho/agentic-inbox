@@ -28,7 +28,7 @@ import {
 import type { Env } from "../types";
 
 /** Wrap a plain result object into MCP content format. */
-function mcpText(result: unknown) {
+function mcpText<T>(result: T) {
   return {
     content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
   };
@@ -46,8 +46,9 @@ function mcpError(message: string) {
  * Wrap a result that may contain an `error` field into MCP format,
  * automatically setting isError when appropriate.
  */
-function mcpResult(result: Record<string, unknown>) {
-  if ("error" in result) {
+function mcpResult<T>(result: T) {
+  // SAFETY: tool payloads may carry an `error` field; narrow it at this boundary before deciding isError.
+  if ((result as { error?: string }).error) {
     return {
       content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       isError: true as const,
@@ -302,7 +303,7 @@ export class EmailMCP extends McpAgent<Env> {
         });
         if ("error" in result) {
           // Preserve the original MCP error format for send failures
-          if (typeof result.error === "string" && result.error.startsWith("Failed to send")) {
+          if (result.error?.startsWith("Failed to send")) {
             return {
               content: [{ type: "text" as const, text: result.error }],
               isError: true,
@@ -339,7 +340,7 @@ export class EmailMCP extends McpAgent<Env> {
           bodyHtml,
         });
         if ("error" in result) {
-          if (typeof result.error === "string" && result.error.startsWith("Failed to send")) {
+          if (result.error?.startsWith("Failed to send")) {
             return {
               content: [{ type: "text" as const, text: result.error }],
               isError: true,

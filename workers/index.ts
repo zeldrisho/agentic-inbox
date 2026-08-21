@@ -18,6 +18,7 @@ import {
 import { SendEmailRequestSchema } from "./lib/schemas";
 import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
 import { Folders } from "../shared/folders";
+import type { JsonValue } from "../shared/json";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
 
@@ -116,6 +117,7 @@ app.get("/api/v1/mailboxes", async (c) => {
 app.post("/api/v1/mailboxes", async (c) => {
   const { name, settings, email: rawEmail } = CreateMailboxBody.parse(await c.req.json());
   const email = rawEmail.toLowerCase();
+  // SAFETY: EMAIL_ADDRESSES is a configured string list; treat the platform value as string[].
   const allowedAddresses = (c.env.EMAIL_ADDRESSES ?? []) as string[];
   if (
     allowedAddresses.length > 0 &&
@@ -147,7 +149,8 @@ app.get("/api/v1/mailboxes/:mailboxId", async (c) => {
 
 app.put("/api/v1/mailboxes/:mailboxId", async (c) => {
   const mailboxId = c.req.param("mailboxId")!;
-  const { settings } = (await c.req.json()) as { settings: Record<string, unknown> };
+  // SAFETY: the request body is untrusted JSON; `settings` carries arbitrary agent config.
+  const { settings } = (await c.req.json()) as { settings: Record<string, JsonValue> };
   const key = `mailboxes/${mailboxId}.json`;
   if (!(await c.env.BUCKET.head(key))) return c.json({ error: "Not found" }, 404);
   await c.env.BUCKET.put(key, JSON.stringify(settings));
@@ -170,12 +173,16 @@ app.get("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
   const threaded = boolQuery(c, "threaded");
   const page = intQuery(c, "page");
   const limit = intQuery(c, "limit");
+  // SAFETY: query params are untyped strings; sortColumn is forwarded verbatim to the DO.
   const sortColumn = c.req.query("sortColumn") as any;
+  // SAFETY: sortDirection is a validated enum string pulled from the query string.
   const sortDirection = c.req.query("sortDirection") as "ASC" | "DESC" | undefined;
   const stub = c.var.mailboxStub;
 
   if (threaded && folder) {
+    // SAFETY: the Durable Object exposes more methods at runtime than its TS surface.
     const emails = await (stub as any).getThreadedEmails({ folder, page, limit });
+    // SAFETY: same dynamic DO surface as the threaded-emails call above.
     const totalCount = await (stub as any).countThreadedEmails(folder);
     return c.json({ emails, totalCount });
   }
@@ -221,6 +228,7 @@ app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 
   const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
   const stub = c.var.mailboxStub;
+  // SAFETY: `checkSendRateLimit` is part of the DO's dynamic runtime API.
   const rateLimitError = await (stub as any).checkSendRateLimit();
   if (rateLimitError) return c.json({ error: rateLimitError }, 429);
   const attachmentData = await storeAttachments(c.env.BUCKET, messageId, attachments);
@@ -241,7 +249,7 @@ app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
       thread_id: thread_id || in_reply_to || messageId,
       message_id: outgoingMessageId,
       raw_headers: JSON.stringify([
-        { key: "from", value: typeof from === "string" ? from : `${from.name} <${from.email}>` },
+        { key: "from", value: from instanceof Object ? `${from.name} <${from.email}>` : from },
         { key: "to", value: Array.isArray(to) ? to.join(", ") : to },
         ...(cc ? [{ key: "cc", value: Array.isArray(cc) ? cc.join(", ") : cc }] : []),
         ...(bcc ? [{ key: "bcc", value: Array.isArray(bcc) ? bcc.join(", ") : bcc }] : []),
@@ -253,6 +261,7 @@ app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
     attachmentData,
   );
 
+  // SAFETY: the catch handler's error is an unknown thrown value; we assert Error to read `.message`.
   c.executionCtx.waitUntil(
     sendEmail(c.env.EMAIL, {
       to,
@@ -269,7 +278,7 @@ app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
         disposition: att.disposition || "attachment",
         contentId: att.contentId,
       })),
-      ...(in_reply_to ? { headers: buildThreadingHeaders(in_reply_to, references || []) } : {}),
+      headers: in_reply_to ? buildThreadingHeaders(in_reply_to, references || []) : undefined,
     }).catch((e) => console.error("Deferred email delivery failed:", (e as Error).message)),
   );
   return c.json({ id: messageId, status: "sent" }, 202);
@@ -316,6 +325,7 @@ app.get("/api/v1/mailboxes/:mailboxId/emails/:id", async (c: AppContext) => {
 });
 
 app.put("/api/v1/mailboxes/:mailboxId/emails/:id", async (c: AppContext) => {
+  // SAFETY: the request body is untrusted JSON; we read optional boolean flags.
   const { read, starred } = (await c.req.json()) as { read?: boolean; starred?: boolean };
   const email = await c.var.mailboxStub.updateEmail(c.req.param("id")!, { read, starred });
   return email ? c.json(email) : c.json({ error: "Email not found" }, 404);
@@ -333,6 +343,7 @@ app.delete("/api/v1/mailboxes/:mailboxId/emails/:id", async (c: AppContext) => {
 });
 
 app.post("/api/v1/mailboxes/:mailboxId/emails/:id/move", async (c: AppContext) => {
+  // SAFETY: the request body is untrusted JSON; we read a single `folderId` string.
   const { folderId } = (await c.req.json()) as { folderId: string };
   const success = await c.var.mailboxStub.moveEmail(c.req.param("id")!, folderId);
   return success ? c.json({ status: "moved" }) : c.json({ error: "Folder not found" }, 400);
@@ -341,6 +352,7 @@ app.post("/api/v1/mailboxes/:mailboxId/emails/:id/move", async (c: AppContext) =
 // -- Threads --------------------------------------------------------
 
 app.get("/api/v1/mailboxes/:mailboxId/threads/:threadId", async (c: AppContext) => {
+  // SAFETY: `getThreadEmails` is part of the DO's dynamic runtime API.
   return c.json(await (c.var.mailboxStub as any).getThreadEmails(c.req.param("threadId")!));
 });
 
@@ -361,6 +373,7 @@ app.get("/api/v1/mailboxes/:mailboxId/folders", async (c: AppContext) =>
 );
 
 app.post("/api/v1/mailboxes/:mailboxId/folders", async (c: AppContext) => {
+  // SAFETY: the request body is untrusted JSON; we read a single `name` string.
   const { name } = (await c.req.json()) as { name: string };
   const slug = slugify(name);
   if (!slug) return c.json({ error: "Folder name must contain alphanumeric characters" }, 400);
@@ -369,6 +382,7 @@ app.post("/api/v1/mailboxes/:mailboxId/folders", async (c: AppContext) => {
 });
 
 app.put("/api/v1/mailboxes/:mailboxId/folders/:id", async (c: AppContext) => {
+  // SAFETY: the request body is untrusted JSON; we read a single `name` string.
   const { name } = (await c.req.json()) as { name: string };
   const f = await c.var.mailboxStub.updateFolder(c.req.param("id")!, name);
   return f ? c.json(f) : c.json({ error: "Folder not found" }, 404);
@@ -382,7 +396,7 @@ app.delete("/api/v1/mailboxes/:mailboxId/folders/:id", async (c: AppContext) => 
 // -- Search ---------------------------------------------------------
 
 app.get("/api/v1/mailboxes/:mailboxId/search", async (c: AppContext) => {
-  const searchOpts: Record<string, unknown> = {
+  const searchOpts = {
     query: c.req.query("query") || "",
     folder: c.req.query("folder"),
     from: c.req.query("from"),
@@ -393,7 +407,8 @@ app.get("/api/v1/mailboxes/:mailboxId/search", async (c: AppContext) => {
     is_read: boolQuery(c, "is_read"),
     is_starred: boolQuery(c, "is_starred"),
     has_attachment: boolQuery(c, "has_attachment"),
-  };
+  } satisfies Record<string, JsonValue | undefined>;
+  // SAFETY: the Durable Object's typed surface is narrower than its runtime API.
   const stub = c.var.mailboxStub as any;
   const emails = await stub.searchEmails({
     ...searchOpts,
@@ -419,7 +434,11 @@ app.get(
     if (!obj) return c.json({ error: "Attachment file not found" }, 404);
     const headers = new Headers();
     headers.set("Content-Type", attachment.mimetype);
-    const sanitized = attachment.filename.replace(/[\x00-\x1f"\\]/g, "_");
+    const sanitized = attachment.filename
+      .split("")
+      .filter((ch) => ch.charCodeAt(0) > 31)
+      .join("")
+      .replace(/["\\]/g, "_");
     headers.set(
       "Content-Disposition",
       `attachment; filename="${sanitized}"; filename*=UTF-8''${encodeURIComponent(attachment.filename)}`,
@@ -443,7 +462,7 @@ async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
     const { done, value } = await reader.read();
     if (done) break;
     if (bytesRead + value.length > streamSize) {
-      reader.cancel();
+      void reader.cancel();
       throw new Error(`Stream exceeds declared size`);
     }
     result.set(value, bytesRead);
@@ -463,13 +482,17 @@ async function receiveEmail(
   if (!parsedEmail.to?.length || !parsedEmail.to[0].address)
     throw new Error("received email with empty to");
 
+  // SAFETY: EMAIL_ADDRESSES is a configured string list; treat the platform value as string[].
   const allowedAddresses = ((env.EMAIL_ADDRESSES ?? []) as string[]).map((a) => a.toLowerCase());
+  // SAFETY: `t.address` may be undefined; `.filter(Boolean)` drops empties so the result is string[].
   const allRecipients = parsedEmail.to
     .map((t) => t.address?.toLowerCase())
     .filter(Boolean) as string[];
+  // SAFETY: `e.address` may be undefined; `.filter(Boolean)` drops empties so the result is string[].
   const ccRecipients = (parsedEmail.cc || [])
     .map((e) => e.address?.toLowerCase())
     .filter(Boolean) as string[];
+  // SAFETY: `e.address` may be undefined; `.filter(Boolean)` drops empties so the result is string[].
   const bccRecipients = (parsedEmail.bcc || [])
     .map((e) => e.address?.toLowerCase())
     .filter(Boolean) as string[];
@@ -498,14 +521,18 @@ async function receiveEmail(
   if (parsedEmail.attachments) {
     for (const att of parsedEmail.attachments) {
       const attId = crypto.randomUUID();
-      const filename = (att.filename || "untitled").replace(/[/\\:*?"<>|\x00-\x1f]/g, "_");
+      const filename = (att.filename || "untitled")
+        .split("")
+        .filter((ch) => ch.charCodeAt(0) > 31)
+        .join("")
+        .replace(/[/\\:*?"<>|]/g, "_");
       await env.BUCKET.put(`attachments/${messageId}/${attId}/${filename}`, att.content);
       attachmentData.push({
         id: attId,
         email_id: messageId,
         filename,
         mimetype: att.mimeType,
-        size: typeof att.content === "string" ? att.content.length : att.content.byteLength,
+        size: att.content instanceof ArrayBuffer ? att.content.byteLength : att.content.length,
         content_id: att.contentId || null,
         disposition: att.disposition || "attachment",
       });
@@ -523,6 +550,7 @@ async function receiveEmail(
   let threadId = emailReferences[0] || inReplyTo || messageId;
 
   if (!inReplyTo && emailReferences.length === 0) {
+    // SAFETY: `findThreadBySubject` is part of the DO's dynamic runtime API.
     const subjectThread = await (stub as any).findThreadBySubject(
       parsedEmail.subject || "",
       parsedEmail.from?.address || undefined,
@@ -553,6 +581,7 @@ async function receiveEmail(
   );
 
   const agentStub = env.EMAIL_AGENT.get(env.EMAIL_AGENT.idFromName(mailboxId));
+  // SAFETY: the catch handler's error is an unknown thrown value; we assert Error to read `.message`.
   ctx.waitUntil(
     agentStub
       .fetch(

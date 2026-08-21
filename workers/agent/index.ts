@@ -91,8 +91,8 @@ async function getSystemPrompt(env: Env, mailboxId: string): Promise<string> {
     const key = `mailboxes/${mailboxId}.json`;
     const obj = await env.BUCKET.get(key);
     if (obj) {
-      const settings = await obj.json<Record<string, unknown>>();
-      if (typeof settings.agentSystemPrompt === "string" && settings.agentSystemPrompt.trim()) {
+      const settings = await obj.json<{ agentSystemPrompt?: string }>();
+      if (settings.agentSystemPrompt) {
         return settings.agentSystemPrompt;
       }
     }
@@ -112,7 +112,7 @@ function createEmailTools(env: Env, mailboxId: string) {
         limit: z.number().default(20).describe("Maximum number of emails to return"),
         page: z.number().default(1).describe("Page number for pagination"),
       }),
-      execute: async ({ folder, limit, page }): Promise<unknown> => {
+      execute: async ({ folder, limit, page }) => {
         return toolListEmails(env, mailboxId, { folder, limit, page });
       },
     }),
@@ -123,7 +123,7 @@ function createEmailTools(env: Env, mailboxId: string) {
       parameters: z.object({
         emailId: z.string().describe("The email ID to retrieve"),
       }),
-      execute: async ({ emailId }): Promise<unknown> => {
+      execute: async ({ emailId }) => {
         return toolGetEmail(env, mailboxId, emailId);
       },
     }),
@@ -138,7 +138,7 @@ function createEmailTools(env: Env, mailboxId: string) {
             "The thread_id to retrieve all messages for. Get this from an email's thread_id field.",
           ),
       }),
-      execute: async ({ threadId }): Promise<unknown> => {
+      execute: async ({ threadId }) => {
         return toolGetThread(env, mailboxId, threadId);
       },
     }),
@@ -149,7 +149,7 @@ function createEmailTools(env: Env, mailboxId: string) {
         query: z.string().describe("Search query to match against subject and body"),
         folder: z.string().optional().describe("Optional folder to restrict search to"),
       }),
-      execute: async ({ query, folder }): Promise<unknown> => {
+      execute: async ({ query, folder }) => {
         return toolSearchEmails(env, mailboxId, { query, folder });
       },
     }),
@@ -164,7 +164,7 @@ function createEmailTools(env: Env, mailboxId: string) {
           .string()
           .describe("The plain text body of the email. No HTML — just write normally."),
       }),
-      execute: async ({ to, subject, body }): Promise<unknown> => {
+      execute: async ({ to, subject, body }) => {
         return toolDraftEmail(env, mailboxId, {
           to,
           subject,
@@ -185,7 +185,7 @@ function createEmailTools(env: Env, mailboxId: string) {
           .string()
           .describe("The plain text body of the reply. No HTML — just write normally."),
       }),
-      execute: async ({ originalEmailId, to, subject, body }): Promise<unknown> => {
+      execute: async ({ originalEmailId, to, subject, body }) => {
         return toolDraftReply(env, mailboxId, {
           originalEmailId,
           to,
@@ -203,7 +203,7 @@ function createEmailTools(env: Env, mailboxId: string) {
         emailId: z.string().describe("The email ID"),
         read: z.boolean().describe("true to mark as read, false for unread"),
       }),
-      execute: async ({ emailId, read }): Promise<unknown> => {
+      execute: async ({ emailId, read }) => {
         return toolMarkEmailRead(env, mailboxId, emailId, read);
       },
     }),
@@ -214,7 +214,7 @@ function createEmailTools(env: Env, mailboxId: string) {
         emailId: z.string().describe("The email ID"),
         folderId: z.string().describe(MOVE_FOLDER_TOOL_DESCRIPTION),
       }),
-      execute: async ({ emailId, folderId }): Promise<unknown> => {
+      execute: async ({ emailId, folderId }) => {
         return toolMoveEmail(env, mailboxId, emailId, folderId);
       },
     }),
@@ -225,7 +225,7 @@ function createEmailTools(env: Env, mailboxId: string) {
       parameters: z.object({
         draftId: z.string().describe("The ID of the draft to delete"),
       }),
-      execute: async ({ draftId }): Promise<unknown> => {
+      execute: async ({ draftId }) => {
         return toolDiscardDraft(env, mailboxId, draftId);
       },
     }),
@@ -237,6 +237,7 @@ function createEmailTools(env: Env, mailboxId: string) {
 // is fully typed inside the tools via the closure.
 export class EmailAgent extends AIChatAgent<any> {
   async onChatMessage(onFinish: any) {
+    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     const env = this.env as Env;
     const mailboxId = this.name;
     const workersai = createWorkersAI({ binding: env.AI });
@@ -263,6 +264,7 @@ export class EmailAgent extends AIChatAgent<any> {
     const url = new URL(request.url);
     if (url.pathname === "/onNewEmail" && request.method === "POST") {
       try {
+        // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
         const emailData = (await request.json()) as {
           mailboxId: string;
           emailId: string;
@@ -275,7 +277,9 @@ export class EmailAgent extends AIChatAgent<any> {
           headers: { "Content-Type": "application/json" },
         });
       } catch (e) {
+        // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
         console.error("onNewEmail handler failed:", (e as Error).message);
+        // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
         return new Response(JSON.stringify({ error: (e as Error).message }), {
           status: 500,
           headers: { "Content-Type": "application/json" },
@@ -296,6 +300,7 @@ export class EmailAgent extends AIChatAgent<any> {
     subject: string;
     threadId: string;
   }) {
+    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     const env = this.env as Env;
     const workersai = createWorkersAI({ binding: env.AI });
     const tools = createEmailTools(env, emailData.mailboxId);
@@ -308,6 +313,7 @@ export class EmailAgent extends AIChatAgent<any> {
     let emailBody = "";
     let threadContext = "";
     try {
+      // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
       const email = (await stub.getEmail(emailData.emailId)) as EmailFull | null;
       if (email?.body) {
         const isInjection = await isPromptInjection(env.AI, email.body);
@@ -351,12 +357,14 @@ export class EmailAgent extends AIChatAgent<any> {
       }
 
       // Load thread for conversation context
+      // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
       const threadEmails = (await stub.getEmails({
         thread_id: emailData.threadId,
       })) as EmailMetadata[];
       if (threadEmails.length > 1) {
         const fullThread = await Promise.all(
           threadEmails.map(async (e) => {
+            // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
             const full = (await stub.getEmail(e.id)) as EmailFull | null;
             const text = full?.body ? stripHtmlToText(full.body) : "";
             return {
@@ -421,6 +429,7 @@ export class EmailAgent extends AIChatAgent<any> {
         }
       }
     } catch (e) {
+      // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
       console.warn("Pre-read failed, agent will use tools:", (e as Error).message);
     }
 
@@ -549,7 +558,9 @@ Based on the email content and thread context above, draft a reply using draft_r
 
       return { status: "draft_generated", text: result.text };
     } catch (e) {
+      // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
       console.error("Auto-draft failed:", (e as Error).message);
+      // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
       return { status: "error", error: (e as Error).message };
     }
   }

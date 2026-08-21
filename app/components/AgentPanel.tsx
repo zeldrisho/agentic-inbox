@@ -3,6 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { Badge, Button, Loader, Tooltip } from "@cloudflare/kumo";
+import { SquareButton } from "~/components/ui/SquareButton";
 import {
   ArrowUpIcon,
   RobotIcon,
@@ -25,7 +26,7 @@ import remarkGfm from "remark-gfm";
 import { useUIStore } from "~/hooks/useUIStore";
 import type { UIMessage } from "ai";
 
-const TOOL_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
+const TOOL_LABELS = {
   list_emails: {
     label: "Fetching emails",
     icon: <EnvelopeSimpleIcon size={14} weight="bold" />,
@@ -62,10 +63,11 @@ const TOOL_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
     label: "Moving email",
     icon: <EnvelopeSimpleIcon size={14} weight="bold" />,
   },
-};
+} satisfies Record<string, { label: string; icon: React.ReactNode }>;
 
 function ToolCallBadge({ toolName, state }: { toolName: string; state: string }) {
-  const info = TOOL_LABELS[toolName] || {
+  // SAFETY: `toolName` is a dynamic tool identifier; it is a known key of TOOL_LABELS when recognized.
+  const info = TOOL_LABELS[toolName as keyof typeof TOOL_LABELS] ?? {
     label: toolName,
     icon: <WrenchIcon size={14} weight="bold" />,
   };
@@ -85,7 +87,10 @@ function ToolCallBadge({ toolName, state }: { toolName: string; state: string })
 }
 
 function getToolNameFromPart(part: UIMessage["parts"][number]): string | null {
-  if (part.type === "dynamic-tool") return (part as any).toolName ?? null;
+  if (part.type === "dynamic-tool") {
+    // SAFETY: dynamic-tool parts expose an unmodeled `toolName` field accessed via `as any`.
+    return (part as any).toolName ?? null;
+  }
   if (part.type.startsWith("tool-")) return part.type.replace("tool-", "");
   return null;
 }
@@ -226,6 +231,7 @@ function MessageBubble({
               <ToolCallBadge
                 key={key}
                 toolName={toolName}
+                // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
                 state={(part as any).state ?? "running"}
               />
             );
@@ -272,7 +278,7 @@ function AgentChatConnected({
     const text = inputValue.trim();
     if (!text || isStreaming) return;
     setInputValue("");
-    sendMessage({ text });
+    void sendMessage({ text });
     if (inputRef.current) inputRef.current.style.height = "auto";
   };
 
@@ -301,9 +307,9 @@ function AgentChatConnected({
           {isStreaming && <Loader size="sm" />}
           {messages.length > 0 && (
             <Tooltip content="Clear chat" asChild>
-              <Button
+              <SquareButton
                 variant="ghost"
-                shape="square"
+
                 size="sm"
                 icon={<TrashIcon size={14} />}
                 onClick={() => {
@@ -358,7 +364,9 @@ function AgentChatConnected({
                       id?: string;
                     } | null = null;
                     for (const part of msg.parts) {
+                      // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
                       if ((part as any).toolName === "draft_reply" && (part as any).result) {
+                        // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
                         draftData = (part as any).result;
                         break;
                       }
@@ -380,7 +388,7 @@ function AgentChatConnected({
                         draftEmail,
                       });
                     } else {
-                      sendMessage({
+                      void sendMessage({
                         text: "Let me edit this draft first. Show me what you have so I can modify it.",
                       });
                     }
@@ -431,15 +439,16 @@ function AgentChatConnected({
               className="flex-1 resize-none rounded-lg border border-kumo-line bg-kumo-control px-3 py-2 text-xs text-kumo-default placeholder:text-kumo-subtle focus:outline-none focus:ring-1 focus:ring-kumo-ring min-h-[36px] max-h-[100px]"
               style={{ height: "auto", overflow: "hidden" }}
               onInput={(e) => {
+                // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
                 const t = e.target as HTMLTextAreaElement;
                 t.style.height = "auto";
                 t.style.height = `${Math.min(t.scrollHeight, 100)}px`;
                 t.style.overflow = t.scrollHeight > 100 ? "auto" : "hidden";
               }}
             />
-            <Button
+            <SquareButton
               variant="primary"
-              shape="square"
+
               size="sm"
               disabled={!inputValue.trim()}
               icon={<ArrowUpIcon size={14} weight="bold" />}

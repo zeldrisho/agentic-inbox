@@ -9,7 +9,7 @@
  * - verifyDraft: reviews draft email bodies and removes agent/system artifacts.
  */
 
-import { escapeHtml, stripHtmlToText, textToHtml } from "./email-helpers";
+import { stripHtmlToText, textToHtml } from "./email-helpers";
 
 // ── Prompt Injection Scanner ───────────────────────────────────────
 
@@ -31,6 +31,7 @@ export async function isPromptInjection(
   if (plainText.length < 10) return false;
 
   try {
+    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     const response = (await ai.run("@cf/meta/llama-3.1-8b-instruct-fast", {
       messages: [
         { role: "system", content: INJECTION_PROMPT },
@@ -49,6 +50,7 @@ export async function isPromptInjection(
 
     return false;
   } catch (e) {
+    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     console.error("Prompt injection scanner failed, skipping auto-draft:", (e as Error).message);
     // Fail closed: treat scanner failures as potential injection to avoid
     // auto-drafting replies to emails we couldn't verify.
@@ -102,7 +104,7 @@ RULES:
 /**
  * Split an HTML body into the reply portion and the quoted block.
  */
-function splitQuotedBlock(html: string): { reply: string; quoted: string } {
+function splitQuotedBlock(html: string) {
   const match = html.match(/(\s*(?:<br\s*\/?>)\s*)?(<blockquote[\s\S]*<\/blockquote>)\s*$/i);
   if (match) {
     const quoted = match[0];
@@ -132,6 +134,7 @@ export async function verifyDraft(ai: Ai, body: string): Promise<string> {
   if (replyText.trim().length < 20) return body;
 
   try {
+    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     const response = (await ai.run("@cf/meta/llama-4-scout-17b-16e-instruct", {
       messages: [
         { role: "system", content: VERIFIER_PROMPT },
@@ -177,6 +180,7 @@ export async function verifyDraft(ai: Ai, body: string): Promise<string> {
   } catch (e) {
     console.error(
       "AI failed — returns empty body, callers may save blank draft:",
+      // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
       (e as Error).message,
     );
     return "";

@@ -2,7 +2,8 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { Button, Tooltip } from "@cloudflare/kumo";
+import { Tooltip } from "@cloudflare/kumo";
+import { SquareButton } from "~/components/ui/SquareButton";
 import { CheckIcon, CopyIcon, PlugsIcon, WrenchIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import { useParams } from "react-router";
@@ -22,9 +23,9 @@ function CopyButton({ text }: { text: string }) {
 
   return (
     <Tooltip content={copied ? "Copied!" : "Copy"} asChild>
-      <Button
+      <SquareButton
         variant="ghost"
-        shape="square"
+
         size="sm"
         icon={
           copied ? (
@@ -54,9 +55,11 @@ const TOOLS = [
 ];
 
 export default function MCPPanel() {
-  const { mailboxId } = useParams<{ mailboxId: string }>();
+  const { mailboxId: _mailboxId } = useParams<{ mailboxId: string }>();
   const baseUrl =
-    typeof window !== "undefined" ? window.location.origin : "https://your-app.workers.dev";
+    globalThis.window !== undefined
+      ? globalThis.window.location.origin
+      : "https://your-app.workers.dev";
   const mcpUrl = `${baseUrl}/mcp`;
 
   return (

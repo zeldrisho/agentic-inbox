@@ -10,6 +10,7 @@ import { queryKeys } from "./keys";
 export function useFolders(mailboxId: string | undefined) {
   return useQuery<Folder[]>({
     queryKey: mailboxId ? queryKeys.folders.list(mailboxId) : ["folders", "_disabled"],
+    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     queryFn: () => api.listFolders(mailboxId!) as Promise<Folder[]>,
     enabled: !!mailboxId,
   });
@@ -21,7 +22,7 @@ export function useCreateFolder() {
     mutationFn: ({ mailboxId, name }: { mailboxId: string; name: string }) =>
       api.createFolder(mailboxId, name),
     onSuccess: (_data, { mailboxId }) => {
-      qc.invalidateQueries({ queryKey: queryKeys.folders.list(mailboxId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.folders.list(mailboxId) });
     },
   });
 }
@@ -32,7 +33,7 @@ export function useUpdateFolder() {
     mutationFn: ({ mailboxId, id, name }: { mailboxId: string; id: string; name: string }) =>
       api.updateFolder(mailboxId, id, name),
     onSuccess: (_data, { mailboxId }) => {
-      qc.invalidateQueries({ queryKey: queryKeys.folders.list(mailboxId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.folders.list(mailboxId) });
     },
   });
 }
@@ -43,7 +44,7 @@ export function useDeleteFolder() {
     mutationFn: ({ mailboxId, id }: { mailboxId: string; id: string }) =>
       api.deleteFolder(mailboxId, id),
     onSuccess: (_data, { mailboxId }) => {
-      qc.invalidateQueries({ queryKey: queryKeys.folders.list(mailboxId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.folders.list(mailboxId) });
     },
   });
 }

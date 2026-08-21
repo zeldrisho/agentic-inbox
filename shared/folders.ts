@@ -37,14 +37,14 @@ export const SYSTEM_FOLDER_IDS: readonly FolderId[] = [
  * Human-readable display names for folder IDs.
  * Used in the sidebar, search result badges, and tool descriptions.
  */
-export const FOLDER_DISPLAY_NAMES: Record<string, string> = {
+export const FOLDER_DISPLAY_NAMES = {
   [Folders.INBOX]: "Inbox",
   [Folders.SENT]: "Sent",
   [Folders.DRAFT]: "Drafts",
   [Folders.ARCHIVE]: "Archive",
   [Folders.TRASH]: "Trash",
   [Folders.SPAM]: "Spam",
-};
+} satisfies Record<string, string>;
 
 /** Formatted string for tool parameter descriptions (agent + MCP). */
 export const FOLDER_TOOL_DESCRIPTION = "Folder to list: inbox, sent, draft, archive, trash";
@@ -57,8 +57,8 @@ export const MOVE_FOLDER_TOOL_DESCRIPTION = "Target folder: inbox, sent, draft, 
  * with a capitalised first letter.
  */
 export function getFolderDisplayName(folderId: string): string {
-  return (
-    FOLDER_DISPLAY_NAMES[folderId.toLowerCase()] ||
-    folderId.charAt(0).toUpperCase() + folderId.slice(1)
-  );
+  // SAFETY: folderId arrives as an untrusted API string; only known FolderId keys resolve,
+  // and the `??` fallback covers any value outside that closed set.
+  const name = FOLDER_DISPLAY_NAMES[folderId.toLowerCase() as FolderId];
+  return name ?? folderId.charAt(0).toUpperCase() + folderId.slice(1);
 }
