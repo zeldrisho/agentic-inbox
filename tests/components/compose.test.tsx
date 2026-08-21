@@ -117,3 +117,70 @@ describe("send→draft flow (unit)", () => {
     expect(a.outgoingMessageId).toContain("@example.com");
   });
 });
+
+// ── Real component rendering (RTL) ─────────────────────────────────
+
+describe("EmailIframe rendering", () => {
+  it("renders a sandboxed iframe with sanitized content", async () => {
+    const { render } = await import("@testing-library/react");
+    const EmailIframe = (await import("app/components/EmailIframe")).default;
+    const { container } = render(<EmailIframe body="<p>Hello email</p>" />);
+    const iframe = container.querySelector("iframe");
+    expect(iframe).not.toBeNull();
+    // sandboxed: no same-origin access
+    expect(iframe!.getAttribute("sandbox")).toContain("allow-scripts");
+    expect(iframe!.getAttribute("sandbox")).not.toContain("allow-same-origin");
+  });
+
+  it("sanitizes scripts out of the rendered srcdoc", async () => {
+    const { render } = await import("@testing-library/react");
+    const EmailIframe = (await import("app/components/EmailIframe")).default;
+    const { container } = render(
+      <EmailIframe body={'<p>Hi</p><script>alert(1)</script><style>.x{}</style>'} />,
+    );
+    const iframe = container.querySelector("iframe");
+    const srcdoc = iframe!.getAttribute("srcdoc") || "";
+    expect(srcdoc).toContain("Hi");
+    expect(srcdoc).not.toContain("alert(1)");
+    expect(srcdoc).not.toContain(".x{}");
+  });
+});
+
+describe("ComposeEmail rendering", () => {
+  it("opens the compose dialog with form fields", async () => {
+    const React = await import("react");
+    const { render, screen } = await import("@testing-library/react");
+    const { QueryClient, QueryClientProvider } = await import("@tanstack/react-query");
+    const { MemoryRouter } = await import("react-router");
+    const kumo = await import("@cloudflare/kumo");
+    const ComposeEmail = (await import("app/components/ComposeEmail")).default;
+    const { useUIStore } = await import("app/hooks/useUIStore");
+
+    useUIStore.getState().openComposeModal();
+
+    function Wrapper({ children }: { children: React.ReactNode }) {
+      const [client] = React.useState(() => new QueryClient());
+      return (
+        <QueryClientProvider client={client}>
+          <kumo.LinkProvider component={(props: Record<string, unknown>) => React.createElement("a", props)}>
+            <kumo.TooltipProvider>
+              <kumo.Toasty>
+                <MemoryRouter initialEntries={["/alice@example.com/inbox"]}>{children}</MemoryRouter>
+              </kumo.Toasty>
+            </kumo.TooltipProvider>
+          </kumo.LinkProvider>
+        </QueryClientProvider>
+      );
+    }
+
+    try {
+      render(<ComposeEmail />, { wrapper: Wrapper });
+      // New-compose title and required fields are visible
+      expect(screen.getByText("New Message")).toBeTruthy();
+      expect(screen.getByPlaceholderText(/recipient@example.com/)).toBeTruthy();
+      expect(screen.getByPlaceholderText(/email subject/i)).toBeTruthy();
+    } finally {
+      useUIStore.getState().closeComposeModal();
+    }
+  });
+});

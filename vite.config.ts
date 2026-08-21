@@ -16,6 +16,7 @@ export default defineConfig(({ mode }) => ({
     ignorePatterns: [
       "**/*.test.ts",
       "**/*.test.tsx",
+      "tests/setup.ts",
       ".agent/**",
       ".agents/**",
       ".claude/**",
@@ -33,16 +34,32 @@ export default defineConfig(({ mode }) => ({
   test: {
     include: ["tests/**/*.test.{ts,tsx}"],
     globals: true,
+    setupFiles: ["tests/setup.ts"],
     environment: "node",
     environmentMatchGlobs: [
       ["tests/components/**", "jsdom"],
       ["tests/e2e/**", "jsdom"],
     ],
+    coverage: {
+      provider: "v8",
+      // Measure only modules executed by tests — untested UI shells (route
+      // components rendered solely by the SPA entry) stay out of the gate.
+      all: false,
+      // CI gate (`vp test run --coverage`): fail below these thresholds.
+      // Security/AI-critical modules carry stricter targets (docs/plan.md §5).
+      thresholds: {
+        statements: 80,
+        functions: 80,
+        lines: 80,
+        "workers/lib/ai.ts": { statements: 90, lines: 90 },
+      },
+    },
   },
   lint: {
     ignorePatterns: [
       "**/*.test.ts",
       "**/*.test.tsx",
+      "tests/setup.ts",
       ".agent/**",
       ".agents/**",
       ".claude/**",

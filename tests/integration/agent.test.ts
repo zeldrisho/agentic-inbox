@@ -2,172 +2,282 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { describe, it, expect, vi } from "vite-plus/test";
-import * as aiLib from "workers/lib/ai";
-import { DEFAULT_AGENT_MODEL, AUTOROUTE_FALLBACKS, AUTOROUTE_SENTINEL, FALLBACK_MODELS } from "shared/models";
+import { describe, it, expect, vi, beforeEach } from "vite-plus/test";
 
-function createMockEnv(store: Record<string, string> = {}) {
-  const map = new Map<string, string>(Object.entries(store));
-  return {
+// ── Mocks for the agent's heavy dependencies ────────────────────────
+// vi.mock factories are hoisted, so use vi.hoisted for shared mock fns.
+const { generateTextMock, streamTextMock, convertToModelMessagesMock, stepCountIsMock, workersaiFactoryMock } =
+  vi.hoisted(() => ({
+    generateTextMock: vi.fn(),
+    streamTextMock: vi.fn(),
+    convertToModelMessagesMock: vi.fn(async (msgs: unknown) => msgs),
+    stepCountIsMock: vi.fn(() => () => false),
+    workersaiFactoryMock: vi.fn(),
+  }));
+
+vi.mock("@cloudflare/ai-chat", () => ({
+  AIChatAgent: class {
+    env: unknown;
+    name: string;
+    messages: unknown[] = [];
+    constructor(_ctx: unknown, env: unknown) {
+      this.env = env;
+      this.name = "alice@example.com";
+    }
+    async persistMessages(msgs: unknown[]) {
+      this.messages = msgs;
+    }
+    async onRequest(_req: Request) {
+      return new Response("base");
+    }
+  },
+}));
+
+vi.mock("ai", () => ({
+  streamText: streamTextMock,
+  generateText: generateTextMock,
+  convertToModelMessages: convertToModelMessagesMock,
+  stepCountIs: stepCountIsMock,
+}));
+
+vi.mock("workers-ai-provider", () => ({
+  createWorkersAI: workersaiFactoryMock,
+}));
+
+vi.mock("workers/lib/ai", () => ({
+  verifyDraft: vi.fn(async (_ai: unknown, body: string) => body),
+  isPromptInjection: vi.fn(async () => false),
+}));
+
+import { EmailAgent } from "workers/agent";
+import { verifyDraft, isPromptInjection } from "workers/lib/ai";
+import { DEFAULT_AGENT_MODEL, AUTOROUTE_FALLBACKS, AUTOROUTE_SENTINEL } from "shared/models";
+import type { Env } from "workers/types";
+
+// ── Mock env ────────────────────────────────────────────────────────
+
+function createMockEnv(mailboxSettings: Record<string, unknown> = {}) {
+  const store = new Map<string, string>();
+  store.set("mailboxes/alice@example.com.json", JSON.stringify(mailboxSettings));
+  const stub = {
+    getEmail: vi.fn(async () => ({
+      id: "e1",
+      subject: "Hello",
+      sender: "bob@example.com",
+      recipient: "alice@example.com",
+      date: "2026-01-01T00:00:00.000Z",
+      read: true,
+      starred: false,
+      body: "<p>Original body</p>",
+      thread_id: "t1",
+      message_id: "msg-1",
+    })),
+    getEmails: vi.fn(async () => []),
+    createEmail: vi.fn(async () => {}),
+  };
+  const env = {
     BUCKET: {
       get: vi.fn(async (key: string) => {
-        const v = map.get(key);
+        const v = store.get(key);
         return v ? ({ json: async () => JSON.parse(v) } as unknown as R2ObjectBody) : null;
       }),
       head: vi.fn(async () => null),
-      put: vi.fn(async (k: string, v: string) => { map.set(k, v); }),
+      put: vi.fn(async () => {}),
     } as unknown as R2Bucket,
     AI: { run: vi.fn(async () => ({ response: "NO" })) } as unknown as Ai,
     MAILBOX: {
       idFromName: vi.fn((n: string) => n as unknown as DurableObjectId),
-      get: vi.fn(() => ({
-        getEmail: vi.fn(async () => ({ id: "e1", body: "<p>hello</p>", thread_id: "t1" })),
-        getEmails: vi.fn(async () => []),
-        createEmail: vi.fn(async () => {}),
-      } as unknown as DurableObjectStub<unknown>)),
+      get: vi.fn(() => stub as unknown as DurableObjectStub<unknown>),
     } as unknown as DurableObjectNamespace,
-    _store: map,
-  } as unknown as Cloudflare.Env & { _store: Map<string, string> };
+    _stub: stub,
+  } as unknown as Env & { _stub: typeof stub };
+  return env;
 }
 
-// Inline helpers mirroring agent private functions (tested via behavior)
-async function getAgentModel(env: unknown, mailboxId: string): Promise<string> {
-  const e = env as { BUCKET: { get: (k: string) => Promise<{ json: () => Promise<unknown> } | null> } };
-  try {
-    const obj = await e.BUCKET.get(`mailboxes/${mailboxId}.json`);
-    if (obj) {
-      const s = await obj.json() as { agentModel?: string };
-      const m = s.agentModel?.trim();
-      if (m) return m;
-    }
-  } catch { /* fallback */ }
-  return DEFAULT_AGENT_MODEL;
+function createAgent(env: Env) {
+  return new EmailAgent({} as unknown as DurableObjectState, env);
 }
 
-function resolveModelWithFallback(primaryId: string) {
-  const primary = primaryId === AUTOROUTE_SENTINEL ? DEFAULT_AGENT_MODEL : primaryId;
-  const fallbacks = [...AUTOROUTE_FALLBACKS].filter((m) => m !== primary);
-  return { primary, fallbacks };
-}
+const NEW_EMAIL = {
+  mailboxId: "alice@example.com",
+  emailId: "e1",
+  sender: "bob@example.com",
+  subject: "Hello",
+  threadId: "t1",
+};
 
-describe("EmailAgent gated auto-draft (unit logic)", () => {
-  it("skips when agentAutoDraft is false", async () => {
-    const env = createMockEnv({ "mailboxes/alice@example.com.json": JSON.stringify({ agentAutoDraft: false }) });
-    const obj = await (env.BUCKET as unknown as { get: (k: string) => Promise<{ json: () => Promise<{ agentAutoDraft?: boolean }> } | null> }).get("mailboxes/alice@example.com.json");
-    const settings = obj ? await obj.json() : {};
-    const shouldDraft = (settings as { agentAutoDraft?: boolean }).agentAutoDraft === true;
-    expect(shouldDraft).toBe(false);
+// ── Gated auto-draft ────────────────────────────────────────────────
+
+describe("EmailAgent.handleNewEmail gating", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    workersaiFactoryMock.mockReturnValue(vi.fn());
+    generateTextMock.mockResolvedValue({ steps: [], text: "" });
   });
 
-  it("proceeds when agentAutoDraft is true", async () => {
-    const env = createMockEnv({ "mailboxes/alice@example.com.json": JSON.stringify({ agentAutoDraft: true }) });
-    const obj = await (env.BUCKET as unknown as { get: (k: string) => Promise<{ json: () => Promise<{ agentAutoDraft?: boolean }> } | null> }).get("mailboxes/alice@example.com.json");
-    const settings = obj ? await obj.json() : {};
-    expect(settings.agentAutoDraft).toBe(true);
+  it("skips when agentAutoDraft is false (no AI call)", async () => {
+    const env = createMockEnv({ agentAutoDraft: false });
+    const agent = createAgent(env);
+    const result = await agent.handleNewEmail(NEW_EMAIL);
+    expect(result).toEqual({ status: "skipped", reason: "auto_draft_disabled" });
+    expect(generateTextMock).not.toHaveBeenCalled();
+    expect(env.AI.run).not.toHaveBeenCalled();
   });
 
-  it("defaults to false when no setting", async () => {
+  it("skips when agentAutoDraft is missing (default off)", async () => {
     const env = createMockEnv({});
-    const obj = await (env.BUCKET as unknown as { get: (k: string) => Promise<unknown> }).get("mailboxes/alice@example.com.json");
-    expect(obj).toBeNull();
+    const agent = createAgent(env);
+    const result = await agent.handleNewEmail(NEW_EMAIL);
+    expect(result).toEqual({ status: "skipped", reason: "auto_draft_disabled" });
+    expect(generateTextMock).not.toHaveBeenCalled();
+  });
+
+  it("blocks when prompt injection detected in email body", async () => {
+    vi.mocked(isPromptInjection).mockResolvedValueOnce(true);
+    const env = createMockEnv({ agentAutoDraft: true });
+    const agent = createAgent(env);
+    const result = await agent.handleNewEmail(NEW_EMAIL);
+    expect(result).toBeUndefined();
+    expect(generateTextMock).not.toHaveBeenCalled();
+    // Persisted a blocked notice to chat
+    expect(agent.messages.length).toBe(2);
+    const assistantMsg = agent.messages[1] as { content: string };
+    expect(assistantMsg.content).toContain("Blocked auto-draft");
+  });
+
+  it("blocks when prompt injection detected in thread context", async () => {
+    // First call (email body) is clean, second (thread context) is injection
+    vi.mocked(isPromptInjection)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    const env = createMockEnv({ agentAutoDraft: true });
+    // Two emails in the thread so threadContext is built
+    env._stub.getEmails = vi.fn(async () => [
+      { id: "e1", sender: "a@ex.com", recipient: "b@ex.com", subject: "Hi", date: "2026-01-01", folder_id: "inbox" },
+      { id: "e2", sender: "b@ex.com", recipient: "a@ex.com", subject: "Hi", date: "2026-01-02", folder_id: "inbox" },
+    ]);
+    const agent = createAgent(env);
+    const result = await agent.handleNewEmail(NEW_EMAIL);
+    expect(result).toBeUndefined();
+    expect(generateTextMock).not.toHaveBeenCalled();
+    const assistantMsg = agent.messages[1] as { content: string };
+    expect(assistantMsg.content).toContain("Blocked auto-draft");
+  });
+
+  it("returns error status when generateText throws", async () => {
+    generateTextMock.mockRejectedValueOnce(new Error("model exploded"));
+    const env = createMockEnv({ agentAutoDraft: true });
+    const agent = createAgent(env);
+    const result = await agent.handleNewEmail(NEW_EMAIL);
+    expect(result).toEqual({ status: "error", error: "model exploded" });
   });
 });
 
-describe("getAgentModel + autoroute fallback", () => {
-  it("returns DEFAULT_AGENT_MODEL when no setting", async () => {
-    const env = createMockEnv({});
-    expect(await getAgentModel(env, "alice@example.com")).toBe(DEFAULT_AGENT_MODEL);
+// ── Model resolution + autoroute fallback ───────────────────────────
+
+describe("EmailAgent model resolution", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    workersaiFactoryMock.mockReturnValue(vi.fn());
+    generateTextMock.mockResolvedValue({ steps: [], text: "" });
   });
 
-  it("returns per-mailbox model when set", async () => {
+  it("uses DEFAULT_AGENT_MODEL when no per-mailbox setting", async () => {
+    const env = createMockEnv({ agentAutoDraft: true });
+    const agent = createAgent(env);
+    await agent.handleNewEmail(NEW_EMAIL);
+    const modelFn = workersaiFactoryMock.mock.results[0].value as ReturnType<typeof vi.fn>;
+    expect(modelFn).toHaveBeenCalledWith(
+      DEFAULT_AGENT_MODEL,
+      expect.objectContaining({ fallback: expect.objectContaining({ mode: "client" }) }),
+    );
+  });
+
+  it("uses per-mailbox model when set", async () => {
     const custom = "@cf/meta/llama-4-scout-17b-16e-instruct";
-    const env = createMockEnv({ "mailboxes/alice@example.com.json": JSON.stringify({ agentModel: custom }) });
-    expect(await getAgentModel(env, "alice@example.com")).toBe(custom);
+    const env = createMockEnv({ agentAutoDraft: true, agentModel: custom });
+    const agent = createAgent(env);
+    await agent.handleNewEmail(NEW_EMAIL);
+    const modelFn = workersaiFactoryMock.mock.results[0].value as ReturnType<typeof vi.fn>;
+    expect(modelFn).toHaveBeenCalledWith(custom, expect.anything());
   });
 
-  it("trims whitespace", async () => {
-    const env = createMockEnv({ "mailboxes/alice@example.com.json": JSON.stringify({ agentModel: "  @cf/test/model  " }) });
-    expect(await getAgentModel(env, "alice@example.com")).toBe("@cf/test/model");
-  });
-
-  it("autoroute sentinel resolves to default with fallbacks", () => {
-    const { primary, fallbacks } = resolveModelWithFallback(AUTOROUTE_SENTINEL);
+  it("autoroute sentinel resolves to default with fallback chain", async () => {
+    const env = createMockEnv({ agentAutoDraft: true, agentModel: AUTOROUTE_SENTINEL });
+    const agent = createAgent(env);
+    await agent.handleNewEmail(NEW_EMAIL);
+    const modelFn = workersaiFactoryMock.mock.results[0].value as ReturnType<typeof vi.fn>;
+    const [primary, opts] = modelFn.mock.calls[0] as [string, { fallback: { models: string[] } }];
     expect(primary).toBe(DEFAULT_AGENT_MODEL);
-    expect(fallbacks).toEqual([...AUTOROUTE_FALLBACKS].filter((m) => m !== DEFAULT_AGENT_MODEL));
+    expect(opts.fallback.models).toEqual(
+      [...AUTOROUTE_FALLBACKS].filter((m) => m !== DEFAULT_AGENT_MODEL),
+    );
   });
 
-  it("custom primary is excluded from fallbacks", () => {
-    const custom = FALLBACK_MODELS[1];
-    const { primary, fallbacks } = resolveModelWithFallback(custom);
+  it("custom primary is excluded from fallback chain", async () => {
+    const custom = AUTOROUTE_FALLBACKS[0];
+    const env = createMockEnv({ agentAutoDraft: true, agentModel: custom });
+    const agent = createAgent(env);
+    await agent.handleNewEmail(NEW_EMAIL);
+    const modelFn = workersaiFactoryMock.mock.results[0].value as ReturnType<typeof vi.fn>;
+    const [primary, opts] = modelFn.mock.calls[0] as [string, { fallback: { models: string[] } }];
     expect(primary).toBe(custom);
-    expect(fallbacks).not.toContain(custom);
-  });
-
-  it("primary not in fallbacks still returns all fallbacks", () => {
-    const { primary, fallbacks } = resolveModelWithFallback("@cf/unknown/model");
-    expect(primary).toBe("@cf/unknown/model");
-    expect(fallbacks).toEqual([...AUTOROUTE_FALLBACKS]);
+    expect(opts.fallback.models).not.toContain(custom);
   });
 });
 
-describe("verifyDraft inline fallback (blank-save hole guard)", () => {
-  it("verifyDraft returns sanitized text for valid body", async () => {
-    const ai = { run: vi.fn(async () => ({ response: "Hello world - this is legitimate business content with sufficient length to pass verification properly." })) } as unknown as Ai;
-    const body = "Hello world - this is legitimate business content with sufficient length to pass verification properly.";
-    const result = await aiLib.verifyDraft(ai, body);
-    expect(result).toBeDefined();
-    expect(typeof result).toBe("string");
+// ── Inline draft fallback (verifyDraft blank-save guard) ────────────
+
+describe("EmailAgent inline draft fallback", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    workersaiFactoryMock.mockReturnValue(vi.fn());
   });
 
-  it("verifyDraft returns empty on AI failure (hole)", async () => {
-    const ai = { run: vi.fn(async () => { throw new Error("AI timeout"); }) } as unknown as Ai;
-    const body = "This is a long enough email body that needs verification and will fail due to AI error";
-    const result = await aiLib.verifyDraft(ai, body);
-    expect(result).toBe("");
+  it("saves inline text as draft when verifyDraft returns non-blank", async () => {
+    generateTextMock.mockResolvedValueOnce({
+      steps: [], // no draft tool called
+      text: "Here is a clean reply with enough business content to verify.",
+    });
+    vi.mocked(verifyDraft).mockResolvedValueOnce(
+      "Here is a clean reply with enough business content to verify.",
+    );
+    const env = createMockEnv({ agentAutoDraft: true });
+    const agent = createAgent(env);
+    const result = await agent.handleNewEmail(NEW_EMAIL);
+    expect(result).toMatchObject({ status: "draft_generated" });
+    expect(env._stub.createEmail).toHaveBeenCalled();
+    const created = env._stub.createEmail.mock.calls[0];
+    expect(created[0]).toBe("draft");
+    expect(created[1].in_reply_to).toBe("e1");
   });
 
-  it("caller must guard blank save: should not create draft when verifyDraft empty", async () => {
-    const ai = { run: vi.fn(async () => { throw new Error("fail"); }) } as unknown as Ai;
-    const createEmail = vi.fn();
-    const body = "This is a long enough body that would normally be verified but AI fails";
-    const sanitized = await aiLib.verifyDraft(ai, body);
-    if (!sanitized) {
-      // Guard: skip creation
-    } else {
-      await createEmail();
-    }
-    expect(sanitized).toBe("");
-    expect(createEmail).not.toHaveBeenCalled();
+  it("skips draft save when verifyDraft returns blank (blank-save guard)", async () => {
+    generateTextMock.mockResolvedValueOnce({
+      steps: [],
+      text: "Draft created. The operator can review.",
+    });
+    vi.mocked(verifyDraft).mockResolvedValueOnce(""); // AI failure -> empty
+    const env = createMockEnv({ agentAutoDraft: true });
+    const agent = createAgent(env);
+    const result = await agent.handleNewEmail(NEW_EMAIL);
+    expect(result).toMatchObject({ status: "draft_generated" });
+    // No draft saved because verification returned blank
+    expect(env._stub.createEmail).not.toHaveBeenCalled();
   });
 
-  it("verifyDraft returns original when AI removes >50% content", async () => {
-    const ai = { run: vi.fn(async () => ({ response: "Hi" })) } as unknown as Ai;
-    const body = "This is a very long email body with lots of legitimate business content about pricing and features and more details";
-    const result = await aiLib.verifyDraft(ai, body);
-    expect(result).toBe(body);
-  });
-
-  it("inline text fallback saves only when sanitized non-empty", async () => {
-    const ai = { run: vi.fn(async () => ({ response: "Cleaned reply with business content and pricing details that are sufficient length." })) } as unknown as Ai;
-    const inlineText = "Cleaned reply with business content and pricing details that are sufficient length.";
-    const sanitized = await aiLib.verifyDraft(ai, inlineText);
-    expect(sanitized).not.toBe("");
-    // Simulate agent inline fallback: save only if sanitized non-empty
-    const shouldSave = !!sanitized && sanitized.trim().length > 0;
-    expect(shouldSave).toBe(true);
-  });
-});
-
-describe("isPromptInjection fail-closed", () => {
-  it("returns true on AI failure (fail closed)", async () => {
-    const ai = { run: vi.fn(async () => { throw new Error("timeout"); }) } as unknown as Ai;
-    const result = await aiLib.isPromptInjection(ai, "This is a long enough body to trigger scan for injection detection");
-    expect(result).toBe(true);
-  });
-
-  it("returns false for normal email", async () => {
-    const ai = { run: vi.fn(async () => ({ response: "NO" })) } as unknown as Ai;
-    const result = await aiLib.isPromptInjection(ai, "Hello, do you have pricing for 10k emails? This is a normal support question.");
-    expect(result).toBe(false);
+  it("does not inline-save when draft tool was called", async () => {
+    generateTextMock.mockResolvedValueOnce({
+      steps: [{ toolCalls: [{ toolName: "draft_reply" }] }],
+      text: "Created draft reply to bob@example.com.",
+    });
+    const env = createMockEnv({ agentAutoDraft: true });
+    const agent = createAgent(env);
+    await agent.handleNewEmail(NEW_EMAIL);
+    // createEmail not called by the inline fallback path (tool handles it)
+    expect(env._stub.createEmail).not.toHaveBeenCalled();
+    // Chat persisted with simple success message
+    const assistantMsg = agent.messages[1] as { content: string };
+    expect(assistantMsg.content).toContain("Created draft reply");
   });
 });

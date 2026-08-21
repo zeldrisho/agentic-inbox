@@ -86,7 +86,7 @@ Deploying provisions R2, Durable Objects, and Workers AI. After deploying, follo
 
 ## Known gaps
 
-- Tests cover unit cases (`tests/`); integration/E2E pending. CI runs `vp check` → `vp test` → `vp build`.
+- Testing: unit + integration suites and a CI coverage gate are in place — see `docs/testing.md` for commands, thresholds, and Workers-mocking recipes. Remaining work (browser E2E, branch coverage) is tracked in `docs/plan.md`. CI runs `vp check` → `vp test run --coverage` → `vp run build`.
 - Lint/format tooling is provided by Vite+ (`vp check`, Oxlint + Oxfmt); no ESLint/Prettier config. There is a latent version gap: `oxlint`/`@oxlint/plugins` are pinned at `1.79.0` while `vite-plus@0.2.9` bundles `1.77.0`/`1.73.0`. The top-level pins win (cwd-first resolution), so this is currently harmless, but a future "just use whatever vite-plus bundles" cleanup would silently downgrade linting. Keep the pins unless you also move the custom `tools/oxlint/anti-slop` rules to the bundled version's API.
 - Documented code-level debt: `DELETE /mailboxes/:id` does not yet delete Durable Object data or R2 attachment blobs; draft creation is create-then-delete (not atomic); `CreateMailboxBody.settings` is unvalidated and `agentSystemPrompt` flows straight to the AI.
 
