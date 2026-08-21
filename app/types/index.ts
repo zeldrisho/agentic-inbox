@@ -65,17 +65,24 @@ export interface Folder {
   unreadCount: number;
 }
 
-/** Outbound email payload sent to the API for send/reply/forward. */
+/**
+ * Outbound email payload sent to the API for send/reply/forward.
+ *
+ * Mirrors `SendEmailRequestSchema` in `workers/lib/schemas.ts`: `to` and
+ * `subject` are required, and at least one of `html` or `text` must be present.
+ */
+export type OutboundEmailContent =
+  | { html: string; text?: string }
+  | { text: string; html?: string };
+
 export type OutboundEmail = {
-  to?: string | string[];
+  to: string | string[];
   cc?: string | string[];
   bcc?: string | string[];
   from: string | { email: string; name: string };
-  subject?: string;
+  subject: string;
   body?: string;
-  html?: string;
-  text?: string;
   in_reply_to?: string;
   thread_id?: string;
   draft_id?: string;
-};
+} & OutboundEmailContent;

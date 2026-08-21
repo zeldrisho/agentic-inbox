@@ -271,7 +271,7 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
         ? { email: currentMailbox.email, name: fromName }
         : currentMailbox.email;
     const emailData = {
-      to: toEmailListValue(toRecipients),
+      to: toEmailListValue(toRecipients) ?? "",
       cc: toEmailListValue(ccRecipients),
       bcc: toEmailListValue(bccRecipients),
       from,

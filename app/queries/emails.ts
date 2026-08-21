@@ -113,7 +113,7 @@ export function useUpdateEmail() {
     }: {
       mailboxId: string;
       id: string;
-      data: Partial<Email>;
+      data: Partial<Pick<Email, "read" | "starred">>;
     }) => api.updateEmail(mailboxId, id, data),
     onMutate: async ({ mailboxId, id, data }) => {
       // Only target list queries (3rd key element is an object = params),

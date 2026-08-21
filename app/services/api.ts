@@ -135,7 +135,7 @@ const api = {
     post<void>(`/api/v1/mailboxes/${mailboxId}/emails`, email),
   getEmail: (mailboxId: string, id: string, opts?: { signal?: AbortSignal }) =>
     get<Email>(`/api/v1/mailboxes/${mailboxId}/emails/${id}`, { signal: opts?.signal }),
-  updateEmail: (mailboxId: string, id: string, data: Partial<Email>) =>
+  updateEmail: (mailboxId: string, id: string, data: Partial<Pick<Email, "read" | "starred">>) =>
     put<Email>(`/api/v1/mailboxes/${mailboxId}/emails/${id}`, data),
   deleteEmail: (mailboxId: string, id: string) =>
     del<void>(`/api/v1/mailboxes/${mailboxId}/emails/${id}`),

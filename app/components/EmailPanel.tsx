@@ -203,7 +203,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
         ? allMessages.find((msg) => msg.id === target.in_reply_to)
         : undefined;
       const emailData = {
-        to: toEmailListValue(toRecipients),
+        to: toEmailListValue(toRecipients) ?? "",
         cc: toEmailListValue(splitEmailList(target.cc)),
         bcc: toEmailListValue(splitEmailList(target.bcc)),
         from,
