@@ -42,6 +42,14 @@ interface EmailPanelToolbarProps {
   onDelete: () => void;
 }
 
+/**
+ * Renders message actions for draft and non-draft email folders.
+ *
+ * @param email - The email whose state determines the star and read-status controls
+ * @param isDraftFolder - Whether to show draft actions instead of reply actions
+ * @param isSending - Whether the draft send action is in progress
+ * @param moveToFolders - Folders available for moving the email
+ */
 export default function EmailPanelToolbar({
   email,
   mailboxId: _mailboxId,
@@ -196,6 +204,12 @@ export default function EmailPanelToolbar({
   );
 }
 
+/**
+ * Provides a dropdown menu for moving an item to a folder.
+ *
+ * @param folders - The folders available for selection
+ * @param onMove - Called with the selected folder's ID
+ */
 function MoveToFolderMenu({
   folders,
   onMove,

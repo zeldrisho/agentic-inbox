@@ -43,7 +43,12 @@ const DraftBody = z.object({
   draft_id: z.string().optional(),
 });
 
-// -- Helpers --------------------------------------------------------
+/**
+ * Converts text to a lowercase hyphen-separated slug.
+ *
+ * @param text - The text to convert
+ * @returns A slug with non-alphanumeric characters removed, or an empty string if no valid characters remain
+ */
 
 function slugify(text: string) {
   // can return "" for non-alphanumeric input
@@ -57,6 +62,13 @@ function slugify(text: string) {
     .replace(/-+$/, "");
 }
 
+/**
+ * Parses a request query parameter as a number.
+ *
+ * @param c - The application request context
+ * @param key - The query parameter name
+ * @returns The parsed number, or `undefined` when the parameter is missing or not numeric
+ */
 function intQuery(c: AppContext, key: string): number | undefined {
   const v = c.req.query(key);
   if (!v) return undefined;
@@ -64,6 +76,13 @@ function intQuery(c: AppContext, key: string): number | undefined {
   return Number.isNaN(n) ? undefined : n;
 }
 
+/**
+ * Parses a query parameter as a boolean value.
+ *
+ * @param c - The request context containing the query parameter
+ * @param key - The query parameter name
+ * @returns `undefined` if the parameter is missing or empty, `true` for `"true"` or `"1"`, and `false` for other values
+ */
 function boolQuery(c: AppContext, key: string): boolean | undefined {
   const v = c.req.query(key);
   if (v === undefined || v === "") return undefined;
@@ -451,6 +470,13 @@ app.get(
 
 const MAX_EMAIL_SIZE = 25 * 1024 * 1024;
 
+/**
+ * Reads a stream into a byte array subject to the maximum email size.
+ *
+ * @param streamSize - The declared size of the stream in bytes
+ * @returns The stream contents as a byte array
+ * @throws If the declared size is invalid or exceeds the maximum, or if the stream exceeds its declared size
+ */
 async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
   if (streamSize > MAX_EMAIL_SIZE)
     throw new Error(`Email too large: ${streamSize} bytes exceeds ${MAX_EMAIL_SIZE} byte limit`);
@@ -471,6 +497,15 @@ async function streamToArrayBuffer(stream: ReadableStream, streamSize: number) {
   return result;
 }
 
+/**
+ * Processes an inbound email, stores it in the matching mailbox, and triggers automatic drafting.
+ *
+ * Emails without a valid recipient or matching mailbox are rejected or ignored. Attachments and
+ * threading metadata are preserved when the message is stored.
+ *
+ * @param event - The inbound email stream and its declared size
+ * @throws Error If the email has no valid recipient or its content fails stream validation
+ */
 async function receiveEmail(
   event: { raw: ReadableStream; rawSize: number },
   env: Env,

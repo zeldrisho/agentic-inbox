@@ -40,7 +40,10 @@ export function splitEmailList(value?: string | null): string[] {
 }
 
 /**
- * Convert a list of addresses into the API payload format.
+ * Converts email addresses to the API payload format.
+ *
+ * @param addresses - The email addresses to convert
+ * @returns `undefined` for an empty list, the address as a string for a single entry, or the addresses as an array
  */
 export function toEmailListValue(addresses: string[]): string | string[] | undefined {
   if (addresses.length === 0) return undefined;
@@ -48,8 +51,10 @@ export function toEmailListValue(addresses: string[]): string | string[] | undef
 }
 
 /**
- * Convert HTML content to plain text.
- * Uses DOM APIs so must only be called client-side.
+ * Converts HTML content to trimmed plain text.
+ *
+ * @param html - The HTML content to convert
+ * @returns The converted plain-text content
  */
 export function htmlToPlainText(html: string): string {
   // Sanitize with DOMPurify before DOM parsing to prevent XSS during innerHTML assignment.
@@ -77,6 +82,11 @@ export function stripHtml(html: string): string {
     .trim();
 }
 
+/**
+ * Decodes numeric and common named HTML entities in text.
+ *
+ * @returns The text with supported HTML entities decoded.
+ */
 function decodeHtmlEntities(text: string): string {
   return text
     .replace(/&#(\d+);/g, (_match: string, code: string) => String.fromCharCode(Number(code)))
@@ -92,6 +102,13 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&nbsp;/g, " ");
 }
 
+/**
+ * Creates a plain-text snippet from HTML or text content.
+ *
+ * @param snippet - The content to clean and truncate
+ * @param maxLength - The maximum number of characters before the ellipsis
+ * @returns The cleaned snippet, truncated with `...` when it exceeds `maxLength`, or an empty string when no content remains
+ */
 export function getSnippetText(snippet?: string | null, maxLength = 100): string {
   if (!snippet) return "";
 
@@ -110,8 +127,10 @@ export function getSnippetText(snippet?: string | null, maxLength = 100): string
 }
 
 /**
- * Escape all five OWASP-recommended HTML special characters in plain text.
- * Safe for use in both text content and attribute contexts.
+ * Escapes HTML-sensitive characters in text for safe insertion into HTML.
+ *
+ * @param text - The text to escape
+ * @returns The escaped text, or an empty string when `text` is empty
  */
 export function escapeHtml(text: string): string {
   if (!text) return "";
@@ -124,7 +143,10 @@ export function escapeHtml(text: string): string {
 }
 
 /**
- * Generate the HTML signature block for compose forms.
+ * Builds an HTML signature block for compose forms when the signature is enabled and contains content.
+ *
+ * @param settings - Optional compose settings containing the signature configuration.
+ * @returns A sanitized or escaped HTML signature block, or an empty string when no signature is available.
  */
 export function getSignatureBlock(settings?: {
   signature?: { enabled: boolean; text?: string; html?: string };
@@ -141,7 +163,12 @@ export function getSignatureBlock(settings?: {
 }
 
 /**
- * Build a quoted reply block HTML string from original email data.
+ * Creates an HTML quoted-reply block from the original email.
+ *
+ * @param dateStr - The original email date
+ * @param sender - The original sender
+ * @param body - The original email body
+ * @returns The quoted-reply HTML, or an empty string when the body is empty
  */
 export function buildQuotedReplyBlock(
   dateStr: string | undefined,
@@ -164,8 +191,10 @@ export function buildQuotedReplyBlock(
 }
 
 /**
- * Rewrite CID references in email HTML to API URLs for inline images.
- * Replaces `src="cid:image001@example.com"` with the attachment API endpoint.
+ * Replaces inline image content-ID references with attachment API URLs.
+ *
+ * @param attachments - Attachments whose inline content IDs should be rewritten.
+ * @returns The email body with matching inline image references replaced.
  */
 export function rewriteInlineImages(
   body: string,
@@ -189,14 +218,34 @@ export function rewriteInlineImages(
   return result;
 }
 
+/**
+ * Selects attachments that are not marked as inline.
+ *
+ * @param attachments - The attachments to filter.
+ * @returns Attachments whose disposition is not `"inline"`, or an empty array when no attachments are provided.
+ */
 export function getNonInlineAttachments(attachments?: Attachment[]): Attachment[] {
   return attachments?.filter((attachment) => attachment.disposition !== "inline") ?? [];
 }
 
+/**
+ * Builds the API URL for an email attachment.
+ *
+ * @param mailboxId - The mailbox identifier
+ * @param emailId - The email identifier
+ * @param attachmentId - The attachment identifier
+ * @returns The attachment API URL
+ */
 export function getAttachmentUrl(mailboxId: string, emailId: string, attachmentId: string): string {
   return `/api/v1/mailboxes/${mailboxId}/emails/${emailId}/attachments/${attachmentId}`;
 }
 
+/**
+ * Initiates a browser download for the specified URL and filename.
+ *
+ * @param url - The URL of the file to download
+ * @param filename - The suggested name for the downloaded file
+ */
 export function downloadFile(url: string, filename: string) {
   const link = document.createElement("a");
   link.href = url;

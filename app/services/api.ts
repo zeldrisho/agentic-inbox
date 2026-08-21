@@ -20,6 +20,14 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Sends an HTTP request and parses the response according to its status and content type.
+ *
+ * @param url - The request URL
+ * @param options - Fetch options for the request
+ * @returns The parsed JSON response, a response blob, or `undefined` for a 204 response
+ * @throws `ApiError` if the response status is outside the 2xx range
+ */
 async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -65,6 +73,13 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
   }
 }
 
+/**
+ * Sends a GET request with optional query parameters, response format, and cancellation.
+ *
+ * @param url - The request URL
+ * @param opts - Optional query parameters, response format, and abort signal
+ * @returns The parsed response value
+ */
 function get<T>(
   url: string,
   opts?: { params?: Record<string, string>; responseType?: string; signal?: AbortSignal },
@@ -77,6 +92,14 @@ function get<T>(
   return request<T>(`${url}${query}`, requestOptions);
 }
 
+/**
+ * Sends a JSON-encoded POST request.
+ *
+ * @param url - The request URL
+ * @param body - The optional request payload
+ * @param opts - Optional request settings, including an abort signal
+ * @returns The parsed response value
+ */
 function post<T>(url: string, body?: JsonValue, opts?: { signal?: AbortSignal }) {
   return request<T>(url, {
     method: "POST",
@@ -85,6 +108,13 @@ function post<T>(url: string, body?: JsonValue, opts?: { signal?: AbortSignal })
   });
 }
 
+/**
+ * Sends a JSON PUT request to the specified URL.
+ *
+ * @param url - The request URL
+ * @param body - The optional JSON request body
+ * @returns The parsed response value
+ */
 function put<T>(url: string, body?: JsonValue) {
   return request<T>(url, {
     method: "PUT",
@@ -92,6 +122,12 @@ function put<T>(url: string, body?: JsonValue) {
   });
 }
 
+/**
+ * Sends a DELETE request to the specified URL.
+ *
+ * @param url - The URL to request
+ * @returns The parsed response body
+ */
 function del<T>(url: string) {
   return request<T>(url, { method: "DELETE" });
 }
@@ -135,7 +171,7 @@ const api = {
     post<void>(`/api/v1/mailboxes/${mailboxId}/emails`, email),
   getEmail: (mailboxId: string, id: string, opts?: { signal?: AbortSignal }) =>
     get<Email>(`/api/v1/mailboxes/${mailboxId}/emails/${id}`, { signal: opts?.signal }),
-  updateEmail: (mailboxId: string, id: string, data: Partial<Email>) =>
+  updateEmail: (mailboxId: string, id: string, data: Partial<Pick<Email, "read" | "starred">>) =>
     put<Email>(`/api/v1/mailboxes/${mailboxId}/emails/${id}`, data),
   deleteEmail: (mailboxId: string, id: string) =>
     del<void>(`/api/v1/mailboxes/${mailboxId}/emails/${id}`),

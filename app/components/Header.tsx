@@ -15,6 +15,9 @@ import { type KeyboardEvent, useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { useUIStore } from "~/hooks/useUIStore";
 
+/**
+ * Renders the application header with responsive navigation, email search, agent-panel controls, and settings navigation.
+ */
 export default function Header() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);

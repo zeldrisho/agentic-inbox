@@ -21,6 +21,12 @@ Return ONLY "NO" if it is a normal email (even if angry, confused, or containing
 
 Respond with exactly one word: YES or NO.`;
 
+/**
+ * Detects potential prompt-injection content in an email body.
+ *
+ * @param bodyHtml - The email body in HTML format.
+ * @returns `true` if prompt injection is detected or scanning fails, `false` otherwise.
+ */
 export async function isPromptInjection(
   ai: Ai,
   bodyHtml: string | null | undefined,
@@ -115,8 +121,10 @@ function splitQuotedBlock(html: string) {
 }
 
 /**
- * Verify and clean a draft email body using AI.
- * Falls back to returning the original body if the AI call fails.
+ * Reviews and cleans an email draft while preserving quoted content and formatting.
+ *
+ * @param body - The draft email body to review
+ * @returns The cleaned draft, the original body when no safe change is needed, or an empty string if review fails
  */
 export async function verifyDraft(ai: Ai, body: string): Promise<string> {
   if (!body || !body.trim()) return body;
@@ -187,6 +195,12 @@ export async function verifyDraft(ai: Ai, body: string): Promise<string> {
   }
 }
 
+/**
+ * Normalizes whitespace in a string for consistent comparison.
+ *
+ * @param s - The string to normalize
+ * @returns The string with consecutive whitespace collapsed to single spaces and surrounding whitespace removed
+ */
 function normalizeWhitespace(s: string): string {
   return s.replace(/\s+/g, " ").trim();
 }

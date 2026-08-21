@@ -6,6 +6,9 @@ import { Button, Empty } from "@cloudflare/kumo";
 import { WarningIcon } from "@phosphor-icons/react";
 import { useNavigate } from "react-router";
 
+/**
+ * Renders a centered page-not-found view with an option to return home.
+ */
 export default function NotFoundRoute() {
   const navigate = useNavigate();
 

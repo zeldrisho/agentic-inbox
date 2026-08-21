@@ -24,6 +24,14 @@ import {
 import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
 
+/**
+ * Adds a trimmed email address to a list when it is nonempty and not already present.
+ *
+ * @param addresses - The list to update
+ * @param seen - The normalized addresses already added to the list
+ * @param address - The address to add
+ * @param exclude - An address to exclude from the list
+ */
 function appendUniqueAddress(
   addresses: string[],
   seen: Set<string>,
@@ -58,11 +66,25 @@ const EMPTY_FIELDS: ComposeFormFields = {
   body: "",
 };
 
+/**
+ * Adds the specified reply or forward prefix to a subject when needed.
+ *
+ * @param subject - The original message subject
+ * @param prefix - The prefix to add
+ * @returns The subject with the specified prefix
+ */
 function getPrefixedSubject(subject: string, prefix: "Re" | "Fwd") {
   const expectedPrefix = `${prefix}: `;
   return subject.startsWith(expectedPrefix) ? subject : `${expectedPrefix}${subject}`;
 }
 
+/**
+ * Builds an HTML body containing an optional signature and the original message formatted as a forwarded message.
+ *
+ * @param original - The original email to include in the forwarded message
+ * @param sigBlock - The signature HTML to place before the forwarded message
+ * @returns The formatted forwarded-message HTML
+ */
 function buildForwardBody(
   original: NonNullable<ReturnType<typeof useUIStore.getState>["composeOptions"]["originalEmail"]>,
   sigBlock: string,
@@ -74,6 +96,13 @@ function buildForwardBody(
   return `<p><br></p>${sigBlock ? `${sigBlock}<br>` : ""}<div style="border: 1px solid #ddd; padding: 1em; background-color: #f9f9f9; margin: 1em 0;"><strong>Forwarded message:</strong><br><strong>From:</strong> ${safeSender}<br><strong>Date:</strong> ${formatComposeDate(original.date)}<br><strong>Subject:</strong> ${safeSubject}<br><br>${safeBody}</div>`;
 }
 
+/**
+ * Builds deduplicated recipients for a reply-all message.
+ *
+ * @param original - The original email whose sender and recipients are included.
+ * @param selfAddress - The current mailbox address to exclude from the recipients.
+ * @returns The reply-all `to` and `cc` recipient lists and whether the CC/BCC fields should be shown.
+ */
 function buildReplyAllFields(
   original: NonNullable<ReturnType<typeof useUIStore.getState>["composeOptions"]["originalEmail"]>,
   selfAddress?: string,
@@ -104,6 +133,14 @@ function buildReplyAllFields(
   };
 }
 
+/**
+ * Builds the initial compose form fields for a draft, reply, forward, or new message.
+ *
+ * @param composeOptions - Compose state containing the draft, original message, and compose mode
+ * @param mailboxEmail - Current mailbox address used to exclude it from reply-all recipients
+ * @param sigBlock - HTML signature to include in the message body
+ * @returns Initial values for the compose form fields
+ */
 function buildInitialComposeFields(
   composeOptions: ReturnType<typeof useUIStore.getState>["composeOptions"],
   mailboxEmail: string | undefined,
@@ -162,6 +199,12 @@ function buildInitialComposeFields(
   };
 }
 
+/**
+ * Manages compose form state, draft saving, email sending, and compose panel controls.
+ *
+ * @param mailboxId - The mailbox used to load account settings and perform email operations
+ * @returns Compose field values, state setters, status flags, form title, action handlers, and close functions
+ */
 export function useComposeForm(mailboxId?: string, _folder?: string) {
   const toastManager = useKumoToastManager();
   const { composeOptions, closePanel, closeCompose } = useUIStore();
@@ -271,7 +314,7 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
         ? { email: currentMailbox.email, name: fromName }
         : currentMailbox.email;
     const emailData = {
-      to: toEmailListValue(toRecipients),
+      to: toEmailListValue(toRecipients) ?? "",
       cc: toEmailListValue(ccRecipients),
       bcc: toEmailListValue(bccRecipients),
       from,

@@ -14,7 +14,14 @@ interface EmailListResponse {
   totalCount: number;
 }
 
-// ---------- Queries ----------
+/**
+ * Fetches the emails for a mailbox using the supplied query parameters.
+ *
+ * @param mailboxId - The mailbox identifier; the query is disabled when it is undefined
+ * @param params - Email list filters and pagination parameters
+ * @param options - Query enablement and polling options
+ * @returns The emails and total count for the mailbox
+ */
 
 export function useEmails(
   mailboxId: string | undefined,
@@ -41,6 +48,13 @@ export function useEmails(
   });
 }
 
+/**
+ * Fetches a single email from a mailbox.
+ *
+ * @param mailboxId - The mailbox identifier
+ * @param emailId - The email identifier
+ * @returns The email query result
+ */
 export function useEmail(mailboxId: string | undefined, emailId: string | undefined) {
   return useQuery<Email>({
     queryKey:
@@ -52,6 +66,13 @@ export function useEmail(mailboxId: string | undefined, emailId: string | undefi
   });
 }
 
+/**
+ * Fetches all messages in an email thread and caches each message for individual access.
+ *
+ * @param mailboxId - The mailbox containing the thread
+ * @param threadId - The thread to fetch
+ * @returns The messages in the thread
+ */
 export function useThreadReplies(
   mailboxId: string | undefined,
   threadId: string | undefined | null,
@@ -94,6 +115,11 @@ function useInvalidateEmailData() {
   };
 }
 
+/**
+ * Provides a mutation for sending an outbound email.
+ *
+ * @returns A mutation for sending an email and invalidating related mailbox data after success.
+ */
 export function useSendEmail() {
   const invalidate = useInvalidateEmailData();
   return useMutation({
@@ -103,6 +129,11 @@ export function useSendEmail() {
   });
 }
 
+/**
+ * Provides a mutation for updating an email's read or starred status with optimistic cache updates.
+ *
+ * @returns A mutation for updating an email and synchronizing related cached data
+ */
 export function useUpdateEmail() {
   const qc = useQueryClient();
   return useMutation({
@@ -113,7 +144,7 @@ export function useUpdateEmail() {
     }: {
       mailboxId: string;
       id: string;
-      data: Partial<Email>;
+      data: Partial<Pick<Email, "read" | "starred">>;
     }) => api.updateEmail(mailboxId, id, data),
     onMutate: async ({ mailboxId, id, data }) => {
       // Only target list queries (3rd key element is an object = params),
@@ -174,6 +205,11 @@ export function useUpdateEmail() {
   });
 }
 
+/**
+ * Marks all messages in a thread as read.
+ *
+ * @returns A mutation for marking a thread as read.
+ */
 export function useMarkThreadRead() {
   const qc = useQueryClient();
   return useMutation({
@@ -188,6 +224,11 @@ export function useMarkThreadRead() {
   });
 }
 
+/**
+ * Provides a mutation for deleting an email and invalidating related mailbox data after success.
+ *
+ * @returns The email deletion mutation.
+ */
 export function useDeleteEmail() {
   const invalidate = useInvalidateEmailData();
   return useMutation({
@@ -197,6 +238,11 @@ export function useDeleteEmail() {
   });
 }
 
+/**
+ * Provides a mutation for moving an email to another folder.
+ *
+ * @returns The email move mutation.
+ */
 export function useMoveEmail() {
   const invalidate = useInvalidateEmailData();
   return useMutation({
@@ -213,6 +259,12 @@ export function useMoveEmail() {
   });
 }
 
+/**
+ * Saves a draft email and refreshes related mailbox data.
+ *
+ * @param mailboxId - The mailbox containing the draft
+ * @param draft - The draft fields to save
+ */
 export function useSaveDraft() {
   const invalidate = useInvalidateEmailData();
   return useMutation({
@@ -236,6 +288,11 @@ export function useSaveDraft() {
   });
 }
 
+/**
+ * Provides a mutation for replying to an email.
+ *
+ * @returns The reply-to-email mutation.
+ */
 export function useReplyToEmail() {
   const invalidate = useInvalidateEmailData();
   return useMutation({
@@ -252,6 +309,11 @@ export function useReplyToEmail() {
   });
 }
 
+/**
+ * Provides a mutation for forwarding an email.
+ *
+ * @returns A mutation for forwarding an email and invalidating related email data after success.
+ */
 export function useForwardEmail() {
   const invalidate = useInvalidateEmailData();
   return useMutation({

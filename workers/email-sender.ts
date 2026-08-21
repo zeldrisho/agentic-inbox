@@ -32,12 +32,10 @@ export interface SendEmailParams {
 }
 
 /**
- * Send an email using the Cloudflare Email Service binding.
+ * Sends an email through the Cloudflare Email Service binding.
  *
- * @param binding  - The `EMAIL` SendEmail binding from env
- * @param params   - Email parameters (to, from, subject, body, etc.)
- * @returns The send result with messageId
- * @throws On validation or delivery errors (error has `.code` property)
+ * @param params - Email recipients, sender, subject, body, and optional message fields
+ * @returns An object containing the sent message's identifier
  */
 export async function sendEmail(
   binding: SendEmail,

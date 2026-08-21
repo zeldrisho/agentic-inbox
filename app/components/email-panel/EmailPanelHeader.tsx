@@ -8,6 +8,13 @@ interface EmailPanelHeaderProps {
   showThreadCount: boolean;
 }
 
+/**
+ * Renders an email panel header with an optional message count for the thread.
+ *
+ * @param subject - The email subject displayed in the header.
+ * @param messageCount - The number of messages in the thread.
+ * @param showThreadCount - Whether to display the thread message count.
+ */
 export default function EmailPanelHeader({
   subject,
   messageCount,

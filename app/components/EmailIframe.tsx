@@ -12,20 +12,11 @@ interface EmailIframeProps {
 }
 
 /**
- * Renders email HTML inside a sandboxed iframe.
+ * Renders sanitized email HTML in a sandboxed iframe.
  *
- * Security model:
- * - DOMPurify sanitises the HTML before injection.
- * - The iframe sandbox does NOT include `allow-same-origin`, so even if
- *   DOMPurify has a bypass the attacker's code runs in an opaque origin
- *   with no access to the parent page's cookies, DOM, or API.
- * - Because the iframe is cross-origin we cannot read `contentDocument`
- *   for auto-sizing. Instead, the injected HTML includes a tiny inline
- *   script that posts its body height to the parent via `postMessage`.
- *   The `allow-scripts` flag is required for this, but scripts inside
- *   the opaque-origin sandbox cannot access anything useful.
- * - A strict CSP meta tag blocks external resource loads inside the
- *   iframe as a defense-in-depth layer.
+ * @param body - The email HTML to display
+ * @param autoSize - Whether to adjust the iframe height to fit its content
+ * @returns The rendered email iframe
  */
 export default function EmailIframe({ body, autoSize }: EmailIframeProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);

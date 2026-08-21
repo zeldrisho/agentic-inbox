@@ -53,8 +53,10 @@ export const FOLDER_TOOL_DESCRIPTION = "Folder to list: inbox, sent, draft, arch
 export const MOVE_FOLDER_TOOL_DESCRIPTION = "Target folder: inbox, sent, draft, archive, trash";
 
 /**
- * Look up a display name for a folder ID, falling back to the raw ID
- * with a capitalised first letter.
+ * Resolves a folder ID to its human-readable display name.
+ *
+ * @param folderId - The folder ID to resolve, including IDs from untrusted sources
+ * @returns The configured display name for a known folder, or the folder ID with its first character capitalized
  */
 export function getFolderDisplayName(folderId: string): string {
   // SAFETY: folderId arrives as an untrusted API string; only known FolderId keys resolve,

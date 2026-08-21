@@ -15,6 +15,14 @@ interface SearchResponse {
   totalCount: number;
 }
 
+/**
+ * Searches a mailbox using the provided query and page.
+ *
+ * @param mailboxId - The mailbox to search
+ * @param query - The search expression, including supported filters
+ * @param page - The one-based result page to fetch
+ * @returns Query state containing matching emails and the total result count
+ */
 export function useSearchEmails(mailboxId: string | undefined, query: string, page: number) {
   return useQuery<{ results: Email[]; totalCount: number }>({
     queryKey:

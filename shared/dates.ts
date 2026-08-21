@@ -10,7 +10,12 @@
  * imported by both the frontend and backend.
  */
 
-/** Parse safely — returns null on invalid dates instead of NaN-date. */
+/**
+ * Safely parses a date string.
+ *
+ * @param dateStr - The date string to parse
+ * @returns The parsed date, or `null` if the input is missing or invalid
+ */
 function safeParse(dateStr: string | undefined | null): Date | null {
   if (!dateStr) return null;
   try {
@@ -22,10 +27,10 @@ function safeParse(dateStr: string | undefined | null): Date | null {
 }
 
 /**
- * Email list rows.
- * - Today: "3:42 PM"
- * - This year: "Apr 15"
- * - Older: "Apr 15, 2024"
+ * Formats a date for display in an email list.
+ *
+ * @param dateStr - The date string to format
+ * @returns A localized time for dates today, a localized month and day for dates in the current year, a localized month, day, and year for older dates, or the original string if it is invalid
  */
 export function formatListDate(dateStr: string): string {
   const date = safeParse(dateStr);
@@ -52,8 +57,10 @@ export function formatListDate(dateStr: string): string {
 }
 
 /**
- * Email detail header.
- * "Tue, Apr 15, 3:42 PM"
+ * Formats a date for display in an email detail header.
+ *
+ * @param dateStr - The date string to format.
+ * @returns The localized date and time, or the original string if it is invalid.
  */
 export function formatDetailDate(dateStr: string): string {
   const date = safeParse(dateStr);
@@ -69,8 +76,10 @@ export function formatDetailDate(dateStr: string): string {
 }
 
 /**
- * Thread message headers — time only.
- * "3:42 PM"
+ * Formats a valid date as a localized hour and minute.
+ *
+ * @param dateStr - The date string to format
+ * @returns The localized time, or the original string if the date is invalid
  */
 export function formatShortDate(dateStr: string): string {
   const date = safeParse(dateStr);
@@ -83,11 +92,10 @@ export function formatShortDate(dateStr: string): string {
 }
 
 /**
- * Compose quoted replies & backend quoted blocks.
- * "Tue, Apr 15, 2026, 3:42 PM"
+ * Formats a date for quoted replies and backend-generated quoted blocks.
  *
- * Uses explicit "en-US" locale for deterministic output on both browser
- * and Cloudflare Workers (which support `toLocaleString`).
+ * @param dateStr - The date string to format
+ * @returns A localized date string, the original input if invalid, or an empty string if absent
  */
 export function formatQuotedDate(dateStr: string | undefined): string {
   if (!dateStr) return "";

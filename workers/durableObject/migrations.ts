@@ -57,15 +57,10 @@ interface DurableObjectStorage {
 }
 
 /**
- * Wrap SQL in a transaction so multi-statement migrations are atomic.
+ * Prepares SQL for transactional execution.
  *
- * Without this, a migration like `1_initial_setup` (CREATE + INSERT +
- * CREATE + CREATE) could fail mid-way and leave the database in an
- * inconsistent state that the runner considers "applied" but is
- * actually broken.  SQLite transactions guarantee all-or-nothing.
- *
- * Single-statement migrations don't strictly need it but wrapping
- * uniformly costs nothing and avoids accidental omissions.
+ * @param sql - The SQL statement or transaction script to prepare
+ * @returns The trimmed SQL, wrapped in a transaction unless it already begins with `BEGIN`
  */
 function txn(sql: string): string {
   const trimmed = sql.trim();

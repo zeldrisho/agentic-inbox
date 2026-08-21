@@ -9,6 +9,9 @@ import { useComposeForm } from "~/hooks/useComposeForm";
 import RichTextEditor from "./RichTextEditor";
 import { useUIStore } from "~/hooks/useUIStore";
 
+/**
+ * Renders the email composition modal for creating, saving, and sending messages.
+ */
 export default function ComposeEmail() {
   const { mailboxId, folder } = useParams<{
     mailboxId: string;

@@ -73,6 +73,9 @@ const FOLDER_EMPTY_STATES = {
   }
 >;
 
+/**
+ * Renders placeholder rows while the email list is loading.
+ */
 function EmailListSkeleton() {
   return (
     <div className="animate-pulse space-y-1 p-2">
@@ -95,6 +98,12 @@ function EmailListSkeleton() {
   );
 }
 
+/**
+ * Renders a folder-specific empty state with an optional compose action.
+ *
+ * @param folder - The folder identifier used to select the empty-state content
+ * @param onCompose - Called when the user selects the Compose button
+ */
 function FolderEmptyState({ folder, onCompose }: { folder?: string; onCompose: () => void }) {
   // SAFETY: `folder` is a dynamic folder identifier; it is a known key of FOLDER_EMPTY_STATES when set.
   const config = FOLDER_EMPTY_STATES[folder as keyof typeof FOLDER_EMPTY_STATES] ?? {
@@ -122,6 +131,9 @@ function FolderEmptyState({ folder, onCompose }: { folder?: string; onCompose: (
   );
 }
 
+/**
+ * Displays a paginated mailbox folder with email conversations, refresh controls, and folder-specific empty content.
+ */
 export default function EmailListRoute() {
   const { mailboxId, folder } = useParams<{
     mailboxId: string;

@@ -75,12 +75,7 @@ export default defineConfig(({ mode }) => ({
       "anti-slop/no-widen-then-assert": "error",
       "anti-slop/require-safety-comment-for-type-assertion": "error",
     },
-    // typeCheck disabled: tsgolint's type-aware pass surfaces 30 pre-existing code
-    // patterns (fire-and-forget promises, unused vars, intentional control-char regexes
-    // in email parsing) the old `tsc -b` check never enforced. Keep `vp check` green and
-    // rely on the `typecheck` script (tsc -b) for type-checking. Follow-up: fix the code
-    // and re-enable `typeCheck: true`.
-    options: { typeAware: true, typeCheck: false },
+    options: { typeAware: true, typeCheck: true },
   },
   plugins: lazyPlugins(() => [
     // The Cloudflare `ssr` Vite environment makes the plugin set `resolve.external`,

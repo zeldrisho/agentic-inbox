@@ -7,6 +7,11 @@ import { PlugsIcon, RobotIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import MCPPanel from "./MCPPanel";
 
+/**
+ * Loads and renders the agent panel with loading and error states.
+ *
+ * @returns The agent panel, a loading indicator, or an error message.
+ */
 function LazyAgentPanel() {
   const [AgentChat, setAgentChat] = useState<React.ComponentType | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -40,6 +45,9 @@ function LazyAgentPanel() {
   return <AgentChat />;
 }
 
+/**
+ * Renders a sidebar with tabs for the agent and MCP panels.
+ */
 export default function AgentSidebar() {
   const [activeTab, setActiveTab] = useState<"agent" | "mcp">("agent");
 

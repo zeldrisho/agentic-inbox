@@ -33,7 +33,7 @@ vp run cf-typegen   # generate worker-configuration.d.ts + env types from wrangl
 vp run typecheck    # cf-typegen + react-router typegen + tsc -b
 ```
 
-`tsconfig.json` uses project references (`tsconfig.node.json`, `tsconfig.cloudflare.json`). Run `typecheck` after changing bindings, routes, `shared/` types, or `.worker-configuration.d.ts`.
+`tsconfig.json` uses project references (`tsconfig.node.json`, `tsconfig.cloudflare.json`). Run `typecheck` after changing bindings, routes, `shared/` types, or `worker-configuration.d.ts`.
 
 ## Build & deploy
 
@@ -85,7 +85,7 @@ Deploying provisions R2, Durable Objects, and Workers AI. After deploying, follo
 
 ## Known gaps
 
-- No test suite yet — a CI pipeline (GitHub Actions) runs `vp install`, `vp check`, `vp test`, and `vp build`.
+- No test files yet — a CI pipeline (GitHub Actions) runs `vp install`, `vp check`, `vp test`, and `vp build`; `vp test` currently runs with zero test files.
 - Lint/format tooling is provided by Vite+ (`vp check`, Oxlint + Oxfmt); no ESLint/Prettier config. There is a latent version gap: `oxlint`/`@oxlint/plugins` are pinned at `1.79.0` while `vite-plus@0.2.9` bundles `1.77.0`/`1.73.0`. The top-level pins win (cwd-first resolution), so this is currently harmless, but a future "just use whatever vite-plus bundles" cleanup would silently downgrade linting. Keep the pins unless you also move the custom `tools/oxlint/anti-slop` rules to the bundled version's API.
 - Documented code-level debt: `DELETE /mailboxes/:id` does not yet delete Durable Object data or R2 attachment blobs; draft creation is create-then-delete (not atomic); `CreateMailboxBody.settings` is unvalidated and `agentSystemPrompt` flows straight to the AI.
 

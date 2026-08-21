@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Set up the Vite+ (vp) toolchain
         uses: voidzero-dev/setup-vp@v1.17.0
@@ -30,7 +32,12 @@ jobs:
       - name: Install dependencies
         run: vp install
 
-      - name: Lint & format check
+      - name: Generate types
+        run: |
+          vp run cf-typegen
+          vp exec react-router typegen
+
+      - name: Lint, format & type check
         run: vp check
 
       - name: Test

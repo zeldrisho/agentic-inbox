@@ -27,6 +27,9 @@ import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
 import type { Email, Folder, Mailbox } from "~/types";
 
+/**
+ * Renders an animated placeholder while email data is loading.
+ */
 function EmailPanelSkeleton() {
   return (
     <div className="animate-pulse p-5 space-y-4">
@@ -48,6 +51,11 @@ function EmailPanelSkeleton() {
   );
 }
 
+/**
+ * Displays an email and its conversation, with actions for managing, composing, and sending messages.
+ *
+ * @param emailId - The identifier of the email to display
+ */
 export default function EmailPanel({ emailId }: { emailId: string }) {
   const { mailboxId, folder } = useParams<{ mailboxId: string; folder: string }>();
   // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
@@ -203,7 +211,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
         ? allMessages.find((msg) => msg.id === target.in_reply_to)
         : undefined;
       const emailData = {
-        to: toEmailListValue(toRecipients),
+        to: toEmailListValue(toRecipients) ?? "",
         cc: toEmailListValue(splitEmailList(target.cc)),
         bcc: toEmailListValue(splitEmailList(target.bcc)),
         from,

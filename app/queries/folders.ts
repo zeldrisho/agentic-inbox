@@ -7,6 +7,12 @@ import api from "~/services/api";
 import type { Folder } from "~/types";
 import { queryKeys } from "./keys";
 
+/**
+ * Fetches the folders for a mailbox.
+ *
+ * @param mailboxId - The mailbox identifier; when omitted, the query is disabled.
+ * @returns The query result containing the mailbox's folders
+ */
 export function useFolders(mailboxId: string | undefined) {
   return useQuery<Folder[]>({
     queryKey: mailboxId ? queryKeys.folders.list(mailboxId) : ["folders", "_disabled"],
@@ -16,6 +22,11 @@ export function useFolders(mailboxId: string | undefined) {
   });
 }
 
+/**
+ * Provides a mutation for creating a folder in a mailbox.
+ *
+ * @returns A folder-creation mutation.
+ */
 export function useCreateFolder() {
   const qc = useQueryClient();
   return useMutation({
@@ -27,6 +38,11 @@ export function useCreateFolder() {
   });
 }
 
+/**
+ * Provides a mutation for updating a mailbox folder and refreshing its folder list.
+ *
+ * @returns A folder update mutation
+ */
 export function useUpdateFolder() {
   const qc = useQueryClient();
   return useMutation({
@@ -38,6 +54,11 @@ export function useUpdateFolder() {
   });
 }
 
+/**
+ * Provides a mutation for deleting a mailbox folder.
+ *
+ * @returns A folder-deletion mutation that refreshes the mailbox's folder list after success.
+ */
 export function useDeleteFolder() {
   const qc = useQueryClient();
   return useMutation({

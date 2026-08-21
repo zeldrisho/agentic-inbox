@@ -4,7 +4,7 @@ Agentic Inbox is a full email client plus an AI email agent, deployed as a singl
 
 ## High-level design
 
-```
+```text
 ┌──────────────┐     ┌──────────────────┐     ┌───────────────────────┐
 │   Browser    │────>│  Hono Worker     │────>│  MailboxDO (per addr) │
 │  React SPA   │     │  (API + SSR)     │     │  SQLite + R2 blobs    │

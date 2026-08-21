@@ -57,6 +57,23 @@ function Avatar({
   );
 }
 
+/**
+ * Renders an expandable email message within a thread, including message details, content, attachments, and draft actions.
+ *
+ * @param email - The email message to display
+ * @param mailboxId - The mailbox identifier used to process message content and attachments
+ * @param mailboxEmail - The mailbox user's email address
+ * @param isLast - Whether the message is the final message in the thread
+ * @param isDraft - Whether the message is a draft
+ * @param isSending - Whether the draft is currently being sent
+ * @param isExpanded - Whether the message content is expanded
+ * @param onToggleExpand - Toggles the message expansion state
+ * @param onSendDraft - Sends the draft message
+ * @param onEditDraft - Opens the draft for editing
+ * @param onDeleteDraft - Discards the draft message
+ * @param onViewSource - Opens the message source
+ * @param onPreviewImage - Opens an image attachment preview
+ */
 export default function ThreadMessage({
   email,
   mailboxId,

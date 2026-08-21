@@ -28,7 +28,12 @@ import {
 import type { Env } from "../types";
 
 // AI SDK v6 changed tool() overloads significantly. We define tools as plain
-// objects matching the Tool type to avoid overload resolution issues.
+/**
+ * Adapts a tool definition to the AI SDK tool format.
+ *
+ * @param def - The tool description, input schema, and asynchronous executor
+ * @returns A tool object with the corresponding description, input schema, and executor
+ */
 function defineTool(def: {
   description: string;
   parameters: z.ZodType<any>;
@@ -83,8 +88,10 @@ You can ONLY draft emails. You do NOT have the ability to send emails directly.
 Use discard_draft to delete drafts that the operator rejects or that are no longer needed.`;
 
 /**
- * Fetch the custom system prompt for a mailbox from its R2 settings.
- * Falls back to DEFAULT_SYSTEM_PROMPT if none is configured.
+ * Loads the mailbox-specific agent system prompt.
+ *
+ * @param mailboxId - The mailbox whose prompt should be loaded
+ * @returns The configured prompt, or the default system prompt when no valid custom prompt is available
  */
 async function getSystemPrompt(env: Env, mailboxId: string): Promise<string> {
   try {
@@ -92,8 +99,9 @@ async function getSystemPrompt(env: Env, mailboxId: string): Promise<string> {
     const obj = await env.BUCKET.get(key);
     if (obj) {
       const settings = await obj.json<{ agentSystemPrompt?: string }>();
-      if (settings.agentSystemPrompt) {
-        return settings.agentSystemPrompt;
+      const prompt = settings.agentSystemPrompt?.trim();
+      if (prompt) {
+        return prompt;
       }
     }
   } catch {
@@ -102,6 +110,13 @@ async function getSystemPrompt(env: Env, mailboxId: string): Promise<string> {
   return DEFAULT_SYSTEM_PROMPT;
 }
 
+/**
+ * Creates mailbox-scoped tools for listing, reading, searching, drafting, organizing, and deleting emails.
+ *
+ * @param env - The application environment containing required service bindings
+ * @param mailboxId - The mailbox whose emails the tools can access
+ * @returns An object containing the configured email tools
+ */
 function createEmailTools(env: Env, mailboxId: string) {
   return {
     list_emails: defineTool({

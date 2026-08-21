@@ -36,6 +36,12 @@ export interface ParsedSearch {
 // Matches operator:value or operator:"quoted value"
 const OPERATOR_RE = /\b(from|to|subject|in|is|has|before|after):(?:"([^"]*?)"|(\S+))/gi;
 
+/**
+ * Parses a search string into free-text content and structured filters.
+ *
+ * @param input - The search string containing free text and supported `operator:value` filters
+ * @returns The extracted query text and search filters
+ */
 export function parseSearchQuery(input: string): ParsedSearch {
   const result: ParsedSearch = { query: "" };
 
@@ -110,8 +116,10 @@ export function parseSearchQuery(input: string): ParsedSearch {
 }
 
 /**
- * Normalize a date string to ISO format. Accepts YYYY-MM-DD or various
- * Date-parseable strings.
+ * Normalizes a date value to an ISO timestamp.
+ *
+ * @param value - A date string accepted by the JavaScript `Date` parser
+ * @returns The ISO timestamp for a valid date, or `undefined` for an invalid date
  */
 function normalizeDate(value: string): string | undefined {
   try {
