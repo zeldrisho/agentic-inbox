@@ -140,9 +140,10 @@ async function getSystemPrompt(
 }
 
 /**
- * Resolves the agent model for a mailbox.
- * Priority: per-mailbox setting → hardcoded default. Live list is fetched
- * via /api/v1/models and cached; autoroute uses client fallback.
+ * Retrieves the model configured for a mailbox.
+ *
+ * @param mailboxId - The mailbox whose model setting should be loaded
+ * @returns The configured model identifier, or the default agent model when no valid setting is available
  */
 async function getAgentModel(env: Env, mailboxId: string): Promise<string> {
   try {
@@ -159,6 +160,12 @@ async function getAgentModel(env: Env, mailboxId: string): Promise<string> {
   return DEFAULT_AGENT_MODEL;
 }
 
+/**
+ * Determines whether automatic email drafting is enabled for a mailbox.
+ *
+ * @param mailboxId - The mailbox whose automatic drafting setting is checked
+ * @returns `true` if automatic drafting is enabled, `false` otherwise
+ */
 async function isAutoDraftEnabled(env: Env, mailboxId: string): Promise<boolean> {
   try {
     const key = `mailboxes/${mailboxId}.json`;
@@ -174,6 +181,12 @@ async function isAutoDraftEnabled(env: Env, mailboxId: string): Promise<boolean>
   return false;
 }
 
+/**
+ * Resolves the configured model identifier and its fallback models.
+ *
+ * @param primaryId - The configured model identifier, or the autoroute sentinel.
+ * @returns The resolved primary model and fallback models excluding the primary.
+ */
 function resolveModelWithFallback(primaryId: string) {
   const primary = primaryId === AUTOROUTE_SENTINEL ? DEFAULT_AGENT_MODEL : primaryId;
   const fallbacks = [...AUTOROUTE_FALLBACKS].filter((m) => m !== primary);
