@@ -14,6 +14,8 @@ export default defineConfig(({ mode }) => ({
   },
   fmt: {
     ignorePatterns: [
+      "**/*.test.ts",
+      "**/*.test.tsx",
       ".agent/**",
       ".agents/**",
       ".claude/**",
@@ -28,10 +30,15 @@ export default defineConfig(({ mode }) => ({
       "tools/oxlint/anti-slop/**",
     ],
   },
-  // No tests exist yet; don't fail `vp test` until they're added.
-  test: { passWithNoTests: true },
+  test: {
+    include: ["tests/**/*.test.{ts,tsx}"],
+    globals: true,
+    environment: "node",
+  },
   lint: {
     ignorePatterns: [
+      "**/*.test.ts",
+      "**/*.test.tsx",
       ".agent/**",
       ".agents/**",
       ".claude/**",

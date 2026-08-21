@@ -10,9 +10,10 @@
 | -------------------------------------- | ------------------- |
 | Dev server (Vite + Cloudflare)         | `vp run dev`        |
 | Production build                       | `vp run build`      |
+| Check (lint/format/typecheck)          | `vp check`          |
 | Generate Cloudflare/React Router types | `vp run cf-typegen` |
-| Typecheck (types + `tsc -b`)           | `vp run typecheck`  |
 | Build + deploy                         | `vp run deploy`     |
+| Tests                                  | `vp test`           |
 
 ## Project Layout
 
@@ -24,6 +25,7 @@
 | `workers/agent/`         | `EmailAgent` (`AIChatAgent`) — 9 email tools, auto-draft                    |
 | `workers/mcp/`           | `EmailMCP` — exposes the same tools over MCP at `/mcp`                      |
 | `shared/`                | Types/utilities shared by client and worker (`folders.ts`, `dates.ts`)      |
+| `tests/`                 | Vitest suite (`tests/**/*.test.ts`) — mirrors `shared/`, `workers/`, `app/` |
 | `wrangler.jsonc`         | Bindings, Durable Object migrations, and secrets                            |
 
 ## External References
@@ -38,7 +40,6 @@
 
 ## Key Conventions
 
-- Lint/format is managed by Vite+ (`vp check`). No automated tests yet. Run `vp run typecheck` and `vp check` before committing.
 - `requireMailbox` (`workers/lib/mailbox.ts`) enforces mailbox _existence_ only. Cloudflare Access is the single auth boundary; there is no per-mailbox authorization.
 - `mailboxId` is user-supplied for both API and MCP routes. Do not add per-mailbox auth that bypasses the shared Access policy.
 - Keep `workers/index.ts` route handlers thin; push business logic into the Durable Objects and `workers/lib`.

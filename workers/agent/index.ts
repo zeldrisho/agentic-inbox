@@ -25,6 +25,7 @@ import {
   FOLDER_TOOL_DESCRIPTION,
   MOVE_FOLDER_TOOL_DESCRIPTION,
 } from "../../shared/folders";
+import { AUTOROUTE_FALLBACKS, AUTOROUTE_SENTINEL, DEFAULT_AGENT_MODEL } from "../../shared/models";
 import type { Env } from "../types";
 
 // AI SDK v6 changed tool() overloads significantly. We define tools as plain
@@ -50,7 +51,7 @@ function defineTool(def: {
  * Default system prompt used when no custom prompt is configured for a mailbox.
  * Users can override this on a per-mailbox basis via the Settings UI.
  */
-const DEFAULT_SYSTEM_PROMPT = `You are an email assistant that helps manage this inbox. You read emails, draft replies, and help organize conversations.
+const DEFAULT_SYSTEM_PROMPT = `You are an on-demand email assistant. You help manage this inbox only when the user asks.
 
 ## Writing Style
 Write like a real person. Short, direct, flowing prose. Get to the point. Plain text only - no HTML tags in your replies.
@@ -62,11 +63,11 @@ Write like a real person. Short, direct, flowing prose. Get to the point. Plain 
 - Don't structure replies like a template or form letter. Just talk normally.
 
 **Agent Behavior Rules (CRITICAL):**
+- You are on-demand. Only read, summarize, list, or search emails when the user asks.
+- Ask before drafting. Never auto-draft unless explicitly requested.
+- Do not auto-trigger on inbound mail. Wait for the user to ask you to act.
 - NEVER output meta-commentary about what you are doing (e.g. do not say "I am drafting a reply to Alex", "I checked the thread", etc).
-- When a new email arrives, your ONLY job is to call the \`draft_reply\` tool.
-- DO NOT summarize the email. DO NOT explain your actions.
-- Output NOTHING except the tool call. If you must output text, it should ONLY be the literal draft text itself if tools fail.
-- Before drafting ANY reply, carefully read the full thread history.
+- If the user asks you to draft, carefully read the full thread history first.
 - NEVER repeat information that was already shared in a prior message in the thread.
 - Your reply should only contain NEW information or directly respond to what the person just said. Move the conversation forward, don't rehash it.
 
@@ -108,6 +109,47 @@ async function getSystemPrompt(env: Env, mailboxId: string): Promise<string> {
     // Fall through to default
   }
   return DEFAULT_SYSTEM_PROMPT;
+}
+
+/**
+ * Resolves the agent model for a mailbox.
+ * Priority: per-mailbox setting → hardcoded default. Live list is fetched
+ * via /api/v1/models and cached; autoroute uses client fallback.
+ */
+async function getAgentModel(env: Env, mailboxId: string): Promise<string> {
+  try {
+    const key = `mailboxes/${mailboxId}.json`;
+    const obj = await env.BUCKET.get(key);
+    if (obj) {
+      const settings = await obj.json<{ agentModel?: string }>();
+      const m = settings.agentModel?.trim();
+      if (m) return m;
+    }
+  } catch {
+    // fall through
+  }
+  return DEFAULT_AGENT_MODEL;
+}
+
+async function isAutoDraftEnabled(env: Env, mailboxId: string): Promise<boolean> {
+  try {
+    const key = `mailboxes/${mailboxId}.json`;
+    const obj = await env.BUCKET.get(key);
+    if (obj) {
+      const settings = await obj.json<{ agentAutoDraft?: boolean }>();
+      if (settings.agentAutoDraft === true) return true;
+      if (settings.agentAutoDraft === false) return false;
+    }
+  } catch {
+    // fall through
+  }
+  return false;
+}
+
+function resolveModelWithFallback(primaryId: string) {
+  const primary = primaryId === AUTOROUTE_SENTINEL ? DEFAULT_AGENT_MODEL : primaryId;
+  const fallbacks = [...AUTOROUTE_FALLBACKS].filter((m) => m !== primary);
+  return { primary, fallbacks };
 }
 
 /**
@@ -258,9 +300,14 @@ export class EmailAgent extends AIChatAgent<any> {
     const workersai = createWorkersAI({ binding: env.AI });
     const tools = createEmailTools(env, mailboxId);
     const systemPrompt = await getSystemPrompt(env, mailboxId);
+    const modelId = await getAgentModel(env, mailboxId);
+    const { primary, fallbacks } = resolveModelWithFallback(modelId);
+    const model = workersai(primary, {
+      fallback: { mode: "client", models: fallbacks },
+    });
 
     const result = streamText({
-      model: workersai("@cf/moonshotai/kimi-k2.5"),
+      model,
       system: systemPrompt,
       messages: await convertToModelMessages(this.messages),
       tools,
@@ -317,6 +364,9 @@ export class EmailAgent extends AIChatAgent<any> {
   }) {
     // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     const env = this.env as Env;
+    if (!(await isAutoDraftEnabled(env, emailData.mailboxId))) {
+      return { status: "skipped", reason: "auto_draft_disabled" };
+    }
     const workersai = createWorkersAI({ binding: env.AI });
     const tools = createEmailTools(env, emailData.mailboxId);
     const systemPrompt = await getSystemPrompt(env, emailData.mailboxId);
@@ -487,8 +537,13 @@ Based on the email content and thread context above, draft a reply using draft_r
     ];
 
     try {
+      const modelId = await getAgentModel(env, emailData.mailboxId);
+      const { primary, fallbacks } = resolveModelWithFallback(modelId);
+      const model = workersai(primary, {
+        fallback: { mode: "client", models: fallbacks },
+      });
       const result = await generateText({
-        model: workersai("@cf/moonshotai/kimi-k2.5"),
+        model,
         system: systemPrompt,
         messages: await convertToModelMessages(messages),
         tools,

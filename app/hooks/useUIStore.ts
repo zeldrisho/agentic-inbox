@@ -50,7 +50,16 @@ export const useUIStore = create<UIState>((set, get) => ({
   composeOptions: { mode: "new", originalEmail: null },
   isComposeModalOpen: false,
   isSidebarOpen: false,
-  isAgentPanelOpen: true,
+  isAgentPanelOpen: (() => {
+    try {
+      // eslint-disable-next-line anti-slop/no-runtime-typeof
+      if (typeof localStorage === "undefined") return false;
+      const v = localStorage.getItem("agentPanelOpen");
+      return v ? JSON.parse(v) : false;
+    } catch {
+      return false;
+    }
+  })(),
 
   selectEmail: (id) => set({ selectedEmailId: id, isComposing: false }),
 
@@ -88,7 +97,15 @@ export const useUIStore = create<UIState>((set, get) => ({
   closeSidebar: () => set({ isSidebarOpen: false }),
   toggleSidebar: () => set({ isSidebarOpen: !get().isSidebarOpen }),
 
-  toggleAgentPanel: () => set({ isAgentPanelOpen: !get().isAgentPanelOpen }),
+  toggleAgentPanel: () => {
+    const v = !get().isAgentPanelOpen;
+    try {
+      localStorage.setItem("agentPanelOpen", JSON.stringify(v));
+    } catch {
+      // ignore storage errors
+    }
+    set({ isAgentPanelOpen: v });
+  },
 
   openComposeModal: (options) =>
     set({

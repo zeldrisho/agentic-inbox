@@ -17,6 +17,7 @@ import {
 } from "./lib/email-helpers";
 import { SendEmailRequestSchema } from "./lib/schemas";
 import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
+import { handleGetModels } from "./routes/models";
 import { Folders } from "../shared/folders";
 import type { JsonValue } from "../shared/json";
 import type { Env } from "./types";
@@ -125,6 +126,8 @@ app.get("/api/v1/config", (c) => {
   const emailAddresses = c.env.EMAIL_ADDRESSES ?? [];
   return c.json({ domains, emailAddresses });
 });
+
+app.get("/api/v1/models", handleGetModels);
 
 // -- Mailboxes ------------------------------------------------------
 
@@ -650,25 +653,38 @@ async function receiveEmail(
     attachmentData,
   );
 
-  const agentStub = env.EMAIL_AGENT.get(env.EMAIL_AGENT.idFromName(effectiveMailboxId));
-  // SAFETY: the catch handler's error is an unknown thrown value; we assert Error to read `.message`.
-  ctx.waitUntil(
-    agentStub
-      .fetch(
-        new Request("https://agents/onNewEmail", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            mailboxId: effectiveMailboxId,
-            emailId: messageId,
-            sender: (parsedEmail.from?.address || "").toLowerCase(),
-            subject: parsedEmail.subject || "",
-            threadId,
+  // Only trigger agent auto-draft when mailbox has opted in (default off).
+  let shouldAutoDraft = false;
+  try {
+    const obj = await env.BUCKET.get(`mailboxes/${effectiveMailboxId}.json`);
+    if (obj) {
+      const s = await obj.json<{ agentAutoDraft?: boolean }>();
+      shouldAutoDraft = s.agentAutoDraft === true;
+    }
+  } catch {
+    shouldAutoDraft = false;
+  }
+  if (shouldAutoDraft) {
+    const agentStub = env.EMAIL_AGENT.get(env.EMAIL_AGENT.idFromName(effectiveMailboxId));
+    // SAFETY: the catch handler's error is an unknown thrown value; we assert Error to read `.message`.
+    ctx.waitUntil(
+      agentStub
+        .fetch(
+          new Request("https://agents/onNewEmail", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              mailboxId: effectiveMailboxId,
+              emailId: messageId,
+              sender: (parsedEmail.from?.address || "").toLowerCase(),
+              subject: parsedEmail.subject || "",
+              threadId,
+            }),
           }),
-        }),
-      )
-      .catch((e) => console.error("Auto-draft trigger failed:", (e as Error).message)),
-  );
+        )
+        .catch((e) => console.error("Auto-draft trigger failed:", (e as Error).message)),
+    );
+  }
 
   // Catch-all mirror: only mirror when routing actually occurred via catch-all AND the admin mailbox is explicitly configured.
   // Prevent mirroring when resolveAdminMailboxId fell back to an ordinary mailbox.

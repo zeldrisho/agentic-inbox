@@ -58,6 +58,7 @@ Deploying provisions R2, Durable Objects, and Workers AI. After deploying, follo
 | `workers/lib/`           | `mailbox.ts` (auth middleware), `tools.ts`, `ai.ts`, `email-helpers.ts`, `schemas.ts`, `attachments.ts` |
 | `workers/db/`            | Drizzle schema                                                                                          |
 | `shared/`                | `folders.ts`, `dates.ts` — shared client/worker constants & helpers                                     |
+| `tests/`                 | Vitest suite — `tests/**/*.test.ts` mirrors `shared/`, `workers/`, `app/` (`vite.config.ts: test`)      |
 | `wrangler.jsonc`         | Bindings, Durable Object migrations (v1–v3), secrets                                                    |
 | `.dev.vars.example`      | Template for local `POLICY_AUD` / `TEAM_DOMAIN`                                                         |
 
@@ -77,7 +78,7 @@ Deploying provisions R2, Durable Objects, and Workers AI. After deploying, follo
 ## Workflow conventions
 
 - Package manager is **pnpm**, managed by **Vite+ (`vp`)**; the lockfile is `pnpm-lock.yaml`.
-- Lint/format is managed by Vite+ (`vp check`, Oxlint + Oxfmt). No automated tests are configured yet. Gate changes with `vp run typecheck` and `vp check`.
+- Lint/format/test is managed by Vite+ (`vp check`, `vp test` via `vite.config.ts:test`). Gate changes with `vp check` + `vp test` + `typecheck`/`build`.
 - **Toolchain pinning (intentional, do not remove):** `vite` is aliased to `npm:@voidzero-dev/vite-plus-core` and `oxlint`/`@oxlint/plugins` are pinned at `1.79.0` in `package.json` even though `vite-plus` bundles its own copies. `vp` resolves packages with `cwd` **first**, then falls back to its bundled copy, so the top-level pins are what `vp check`/`vp lint` actually run. The `vite` alias is required because `@react-router/dev`, `@cloudflare/vite-plugin`, and `@tailwindcss/vite` import the bare `vite` specifier and peer-depend on it (pnpm's strict isolation would otherwise fail to resolve it). The `oxlint`/`@oxlint/plugins` pins keep the linter in sync with the custom rules in `tools/oxlint/anti-slop/**`, which import `@oxlint/plugins@1.79.0`. Removing them would silently downgrade `vp` to `vite-plus`'s bundled `oxlint@1.77.0`/`@oxlint/plugins@1.73.0` and risk breaking those rules. See _Known gaps_ for the latent version gap.
 - Keep `workers/index.ts` route handlers thin; business logic lives in the Durable Objects (`workers/durableObject`, `workers/agent`, `workers/mcp`) and `workers/lib`.
 - Shared client/worker code belongs in `shared/`.
@@ -85,7 +86,7 @@ Deploying provisions R2, Durable Objects, and Workers AI. After deploying, follo
 
 ## Known gaps
 
-- No test files yet — a CI pipeline (GitHub Actions) runs `vp install`, `vp check`, `vp test`, and `vp build`; `vp test` currently runs with zero test files.
+- Tests cover unit cases (`tests/`); integration/E2E pending. CI runs `vp check` → `vp test` → `vp build`.
 - Lint/format tooling is provided by Vite+ (`vp check`, Oxlint + Oxfmt); no ESLint/Prettier config. There is a latent version gap: `oxlint`/`@oxlint/plugins` are pinned at `1.79.0` while `vite-plus@0.2.9` bundles `1.77.0`/`1.73.0`. The top-level pins win (cwd-first resolution), so this is currently harmless, but a future "just use whatever vite-plus bundles" cleanup would silently downgrade linting. Keep the pins unless you also move the custom `tools/oxlint/anti-slop` rules to the bundled version's API.
 - Documented code-level debt: `DELETE /mailboxes/:id` does not yet delete Durable Object data or R2 attachment blobs; draft creation is create-then-delete (not atomic); `CreateMailboxBody.settings` is unvalidated and `agentSystemPrompt` flows straight to the AI.
 

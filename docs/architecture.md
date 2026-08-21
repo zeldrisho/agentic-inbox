@@ -83,3 +83,11 @@ Cloudflare Access is the **single** authentication/authorization boundary. Once 
 - **Per-mailbox Durable Objects** give strong isolation and SQLite query performance, at the cost of cross-mailbox operations (search/list across mailboxes) requiring enumeration.
 - **Deferred send + auto-draft** keep the request path fast; delivery and drafting happen asynchronously, so transient failures are logged rather than blocking the user.
 - **AI draft verification** favors false negatives (keep content) over false positives (strip real content), with a 50% length drop safety cutoff.
+
+## References
+
+- Workers AI models catalog: <https://developers.cloudflare.com/workers-ai/models/index.md>
+- Workers AI docs index (llms.txt): <https://developers.cloudflare.com/workers-ai/llms.txt>
+- Kumo UI docs index (llms.txt): <https://kumo-ui.com/llms.txt>
+- Model picker API: `GET /api/v1/models` (proxies catalog with 24h R2 cache + 10s `caches.default`, `?refresh=1` bypasses cache) — switch is in chat sidebar next to send (instant session change), not Settings
+- Autoroute: Workers AI client fallback via `workers-ai-provider` `fallback: { mode: "client" }` — no AI Gateway.

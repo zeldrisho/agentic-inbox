@@ -2,7 +2,7 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { Badge, Button, Loader, Tooltip } from "@cloudflare/kumo";
+import { Badge, Button, Loader, Tooltip, useKumoToastManager } from "@cloudflare/kumo";
 import { SquareButton } from "~/components/ui/SquareButton";
 import {
   ArrowUpIcon,
@@ -18,12 +18,16 @@ import {
   CheckCircleIcon,
   StopIcon,
   PencilSimpleIcon,
+  ArrowsClockwiseIcon,
 } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useUIStore } from "~/hooks/useUIStore";
+import { useMailbox, useUpdateMailbox } from "~/queries/mailboxes";
+import { AUTOROUTE_SENTINEL, FALLBACK_MODELS } from "../../shared/models";
+import type { MailboxSettings } from "~/types";
 import type { UIMessage } from "ai";
 
 const TOOL_LABELS = {
@@ -286,6 +290,8 @@ function MessageBubble({
  * @param useAgent - Hook used to create the email agent.
  * @param useAgentChat - Hook used to manage the agent conversation.
  */
+type ModelOption = { id: string; name: string; task?: string; functionCalling?: boolean };
+
 function AgentChatConnected({
   mailboxId,
   useAgent,
@@ -299,6 +305,24 @@ function AgentChatConnected({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [inputValue, setInputValue] = useState("");
   const { startCompose } = useUIStore();
+  const { data: mailbox } = useMailbox(mailboxId);
+  const updateMailbox = useUpdateMailbox();
+  const toastManager = useKumoToastManager();
+  const currentModel = mailbox?.settings?.agentModel || AUTOROUTE_SENTINEL;
+  const modelLabel =
+    currentModel === AUTOROUTE_SENTINEL
+      ? "autoroute"
+      : currentModel.split("/").pop() || currentModel;
+  const [models, setModels] = useState<ModelOption[]>(() =>
+    FALLBACK_MODELS.map((id) => ({
+      id,
+      name: id.split("/").pop() || id,
+      task: "Text Generation",
+      functionCalling: true,
+    })),
+  );
+  const [isRefreshingModels, setIsRefreshingModels] = useState(false);
+  const [isSwitchingModel, setIsSwitchingModel] = useState(false);
 
   const agent = useAgent({ agent: "EmailAgent", name: mailboxId });
   const { messages, sendMessage, status, setMessages, stop } = useAgentChat({ agent });
@@ -312,6 +336,49 @@ function AgentChatConnected({
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  const fetchModels = async (refresh = false) => {
+    setIsRefreshingModels(true);
+    try {
+      const url = refresh ? "/api/v1/models?refresh=1" : "/api/v1/models";
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(String(res.status));
+      // SAFETY: same-origin JSON, shape validated below
+      const data = (await res.json()) as { models: ModelOption[]; warning?: string };
+      if (Array.isArray(data.models) && data.models.length > 0) setModels(data.models);
+    } catch {
+      // keep fallback
+    } finally {
+      setIsRefreshingModels(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchModels(false);
+  }, []);
+
+  const handleModelChange = async (next: string) => {
+    if (!mailbox || next === currentModel || isSwitchingModel) return;
+    setIsSwitchingModel(true);
+    try {
+      // eslint-disable-next-line unicorn/no-useless-fallback-in-spread
+      const nextSettings: MailboxSettings = {
+        ...mailbox.settings,
+        agentModel: next,
+      };
+      await updateMailbox.mutateAsync({
+        mailboxId,
+        settings: nextSettings,
+      });
+      toastManager.add({
+        title: `Model switched to ${next === AUTOROUTE_SENTINEL ? "autoroute" : next}`,
+      });
+    } catch {
+      toastManager.add({ title: "Failed to switch model", variant: "error" });
+    } finally {
+      setIsSwitchingModel(false);
+    }
+  };
 
   const handleSend = () => {
     const text = inputValue.trim();
@@ -341,6 +408,12 @@ function AgentChatConnected({
         <div className="flex items-center gap-2">
           <Badge variant="beta">AI</Badge>
           <span className="text-xs text-kumo-subtle">Email Agent</span>
+          <span
+            className="text-[10px] px-1.5 py-0.5 rounded bg-kumo-fill text-kumo-subtle font-mono truncate max-w-[140px]"
+            title={currentModel}
+          >
+            {modelLabel}
+          </span>
         </div>
         <div className="flex items-center gap-1">
           {isStreaming && <Loader size="sm" />}
@@ -450,8 +523,34 @@ function AgentChatConnected({
         )}
       </div>
 
-      {/* Input */}
-      <div className="shrink-0 border-t border-kumo-line px-3 py-2">
+      {/* Model switch + Input — switch lives near send for instant session change */}
+      <div className="shrink-0 border-t border-kumo-line px-3 py-2 space-y-2">
+        <div className="flex items-center gap-1.5">
+          <select
+            aria-label="Agent model"
+            value={currentModel}
+            onChange={(e) => void handleModelChange(e.target.value)}
+            disabled={isSwitchingModel}
+            className="flex-1 min-w-0 rounded-lg border border-kumo-line bg-kumo-control px-2 py-1.5 text-xs text-kumo-default focus:outline-none focus:ring-1 focus:ring-kumo-ring disabled:opacity-60"
+          >
+            <option value={AUTOROUTE_SENTINEL}>Autoroute — recommended</option>
+            {models.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name} ({m.id}){m.functionCalling ? " · tools" : ""}
+              </option>
+            ))}
+          </select>
+          <Tooltip content="Refresh model list" asChild>
+            <SquareButton
+              variant="ghost"
+              size="sm"
+              icon={<ArrowsClockwiseIcon size={14} />}
+              loading={isRefreshingModels}
+              onClick={() => void fetchModels(true)}
+              aria-label="Refresh model list"
+            />
+          </Tooltip>
+        </div>
         {isStreaming ? (
           <div className="flex justify-center">
             <Button
@@ -487,7 +586,6 @@ function AgentChatConnected({
             />
             <SquareButton
               variant="primary"
-
               size="sm"
               disabled={!inputValue.trim()}
               icon={<ArrowUpIcon size={14} weight="bold" />}
