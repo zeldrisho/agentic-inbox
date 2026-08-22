@@ -162,7 +162,11 @@ describe("ComposeEmail rendering", () => {
       const [client] = React.useState(() => new QueryClient());
       return (
         <QueryClientProvider client={client}>
-          <kumo.LinkProvider component={(props: Record<string, unknown>) => React.createElement("a", props)}>
+          <kumo.LinkProvider
+            component={((props: Record<string, unknown>) =>
+              React.createElement("a", props)) as unknown as React.ForwardRefExoticComponent<
+                React.AnchorHTMLAttributes<HTMLAnchorElement> & React.RefAttributes<HTMLAnchorElement>
+              >}>
             <kumo.TooltipProvider>
               <kumo.Toasty>
                 <MemoryRouter initialEntries={["/alice@example.com/inbox"]}>{children}</MemoryRouter>

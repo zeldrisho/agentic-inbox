@@ -22,52 +22,9 @@ import { Folders } from "../shared/folders";
 import type { JsonValue } from "../shared/json";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
-import type { MailboxDO } from "./durableObject";
+import { asMailboxRpc, type MailboxRpc } from "./lib/mailbox-rpc";
 
 type AppContext = Context<MailboxContext>;
-
-type ExtendedMailboxStub = DurableObjectStub & {
-  getThreadedEmails: (opts: {
-    folder: string;
-    page?: number;
-    limit?: number;
-  }) => Promise<unknown[]>;
-  countThreadedEmails: (folder: string) => Promise<number>;
-  checkSendRateLimit: () => Promise<string | null>;
-  getThreadEmails: (threadId: string) => Promise<unknown[]>;
-  findThreadBySubject: (subject: string, sender?: string) => Promise<string | null>;
-  searchEmails: (
-    opts: Record<string, import("../shared/json").JsonValue | undefined>,
-  ) => Promise<unknown[]>;
-  countSearchResults: (
-    opts: Record<string, import("../shared/json").JsonValue | undefined>,
-  ) => Promise<number>;
-};
-
-/**
- * Treats a Durable Object stub as a mailbox stub with its extended runtime methods.
- *
- * @param stub - The Durable Object stub to widen
- * @returns The stub typed as an `ExtendedMailboxStub`
- */
-function asExtended(stub: DurableObjectStub): ExtendedMailboxStub {
-  // SAFETY: MailboxDO exposes these dynamic methods at runtime; typed stub is narrower.
-  // eslint-disable-next-line anti-slop/no-chained-type-assertions
-  return stub as unknown as ExtendedMailboxStub;
-}
-
-/**
- * Adapts attachment content to a byte-compatible value for object storage.
- *
- * @param value - Attachment content supplied by PostalMime
- * @returns The attachment content as a `Uint8Array` or `ArrayBuffer`
- */
-// eslint-disable-next-line anti-slop/no-unknown-parameters
-function asAnyContent(value: unknown): Uint8Array | ArrayBuffer {
-  // SAFETY: PostalMime attachment content is ArrayBuffer|Uint8Array; R2 put accepts either.
-  // eslint-disable-next-line anti-slop/no-chained-type-assertions
-  return value as unknown as Uint8Array | ArrayBuffer;
-}
 
 // -- Request body schemas (kept for validation) ---------------------
 
@@ -180,6 +137,49 @@ app.get("/api/v1/config", (c) => {
 
 app.get("/api/v1/models", handleGetModels);
 
+/**
+ * Migrates catch-all messages to a newly created mailbox.
+ *
+ * Only messages routed through explicit domain admin mailboxes are migrated.
+ * Associated attachment metadata is transferred while the referenced R2 objects
+ * remain in place.
+ *
+ * @param mailboxId - The newly created mailbox address
+ * @returns The number of emails migrated
+ */
+async function migrateCatchAllMail(env: Env, mailboxId: string): Promise<number> {
+  const domain = mailboxId.split("@")[1];
+  if (!domain) return 0;
+
+  const explicitAdmins = [`admin@${domain}`, `catchall@${domain}`, `catch-all@${domain}`].filter(
+    (a) => a !== mailboxId,
+  );
+
+  let migrated = 0;
+  for (const adminId of explicitAdmins) {
+    if (!(await env.BUCKET.head(`mailboxes/${adminId}.json`))) continue;
+    const adminStub = asMailboxRpc(env.MAILBOX.get(env.MAILBOX.idFromName(adminId)));
+    const extracted = await adminStub.extractEmailsByRecipient(mailboxId);
+    if (!extracted || extracted.emails.length === 0) continue;
+
+    const targetStub = asMailboxRpc(env.MAILBOX.get(env.MAILBOX.idFromName(mailboxId)));
+    const attachmentsByEmail = new Map<string, typeof extracted.attachments>();
+    for (const att of extracted.attachments) {
+      const list = attachmentsByEmail.get(att.email_id) ?? [];
+      list.push(att);
+      attachmentsByEmail.set(att.email_id, list);
+    }
+    for (const email of extracted.emails) {
+      await targetStub.createEmail(Folders.INBOX, email, attachmentsByEmail.get(email.id) ?? []);
+    }
+    migrated += extracted.emails.length;
+    console.info(
+      `Catch-all takeover: moved ${extracted.emails.length} emails ${adminId} -> ${mailboxId}`,
+    );
+  }
+  return migrated;
+}
+
 // -- Mailboxes ------------------------------------------------------
 
 app.get("/api/v1/mailboxes", async (c) => {
@@ -208,9 +208,18 @@ app.post("/api/v1/mailboxes", async (c) => {
   };
   const finalSettings = { ...defaultSettings, ...settings };
   await c.env.BUCKET.put(key, JSON.stringify(finalSettings));
-  const stub = c.env.MAILBOX.get(c.env.MAILBOX.idFromName(email));
+  const stub = asMailboxRpc(c.env.MAILBOX.get(c.env.MAILBOX.idFromName(email)));
   await stub.getFolders();
-  return c.json({ id: email, email, name, settings: finalSettings }, 201);
+  // Take over any catch-all mail that was routed to a domain admin while this
+  // address did not exist. Best-effort: creation succeeds even if migration fails.
+  let migratedInbox = 0;
+  try {
+    migratedInbox = await migrateCatchAllMail(c.env, email);
+  } catch (e) {
+    // SAFETY: caught error is unknown, assert Error to read message
+    console.error(`Catch-all migration failed for ${email}:`, (e as Error).message);
+  }
+  return c.json({ id: email, email, name, settings: finalSettings, migratedInbox }, 201);
 });
 
 app.get("/api/v1/mailboxes/:mailboxId", async (c) => {
@@ -234,7 +243,29 @@ app.delete("/api/v1/mailboxes/:mailboxId", async (c) => {
   const mailboxId = c.req.param("mailboxId")!;
   const key = `mailboxes/${mailboxId}.json`;
   if (!(await c.env.BUCKET.head(key))) return c.json({ error: "Not found" }, 404);
-  await c.env.BUCKET.delete(key); // TODO: also delete DO data and R2 attachment blobs
+
+  // Full deletion cascade: DO data first, then R2 blobs, then the existence marker.
+  // 1. Wipe the mailbox DO's emails/attachments/custom folders; collect blob keys.
+  const stub = asMailboxRpc(c.env.MAILBOX.get(c.env.MAILBOX.idFromName(mailboxId)));
+  const blobs = await stub.destroy();
+  // 2. Delete every stored attachment blob from R2 in batches (delete() accepts up to 1000 keys).
+  if (blobs.length > 0) {
+    const keys = blobs.map((b) => b.key);
+    for (let i = 0; i < keys.length; i += 1000) {
+      const batch = keys.slice(i, i + 1000);
+      await c.env.BUCKET.delete(batch);
+    }
+  }
+  // 3. Best-effort: destroy the per-mailbox agent DO (chat history, schedules).
+  const agentDestroyed = c.env.EMAIL_AGENT.get(c.env.EMAIL_AGENT.idFromName(mailboxId)).destroy();
+  c.executionCtx.waitUntil(
+    agentDestroyed.catch((e) => {
+      // SAFETY: caught error is unknown, assert Error to read message
+      console.error(`Agent destroy failed for ${mailboxId}:`, (e as Error).message);
+    }),
+  );
+  // 4. Finally remove the settings blob — the mailbox existence marker.
+  await c.env.BUCKET.delete(key);
   return c.body(null, 204);
 });
 
@@ -247,18 +278,16 @@ app.get("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
   const page = intQuery(c, "page");
   const limit = intQuery(c, "limit");
   // SAFETY: query params are untyped strings; sortColumn is validated inside MailboxDO via allowlist.
-  // eslint-disable-next-line anti-slop/no-chained-type-assertions
-  const sortColumn = c.req.query("sortColumn") as unknown as NonNullable<
-    Parameters<MailboxDO["getEmails"]>[0]
+  const sortColumn = c.req.query("sortColumn") as NonNullable<
+    Parameters<MailboxRpc["getEmails"]>[0]
   >["sortColumn"];
   // SAFETY: sortDirection is a validated enum string pulled from the query string.
   const sortDirection = c.req.query("sortDirection") as "ASC" | "DESC" | undefined;
   const stub = c.var.mailboxStub;
 
   if (threaded && folder) {
-    const ext = asExtended(stub);
-    const emails = await ext.getThreadedEmails({ folder, page, limit });
-    const totalCount = await ext.countThreadedEmails(folder);
+    const emails = await stub.getThreadedEmails({ folder, page, limit });
+    const totalCount = await stub.countThreadedEmails(folder);
     return c.json({ emails, totalCount });
   }
   const emails = await stub.getEmails({
@@ -303,7 +332,7 @@ app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
 
   const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
   const stub = c.var.mailboxStub;
-  const rateLimitError = await asExtended(stub).checkSendRateLimit();
+  const rateLimitError = await stub.checkSendRateLimit();
   if (rateLimitError) return c.json({ error: rateLimitError }, 429);
   const attachmentData = await storeAttachments(c.env.BUCKET, messageId, attachments);
 
@@ -426,7 +455,7 @@ app.post("/api/v1/mailboxes/:mailboxId/emails/:id/move", async (c: AppContext) =
 // -- Threads --------------------------------------------------------
 
 app.get("/api/v1/mailboxes/:mailboxId/threads/:threadId", async (c: AppContext) => {
-  return c.json(await asExtended(c.var.mailboxStub).getThreadEmails(c.req.param("threadId")!));
+  return c.json(await c.var.mailboxStub.getThreadEmails(c.req.param("threadId")!));
 });
 
 app.post("/api/v1/mailboxes/:mailboxId/threads/:threadId/read", async (c: AppContext) => {
@@ -480,19 +509,13 @@ app.get("/api/v1/mailboxes/:mailboxId/search", async (c: AppContext) => {
     is_read: boolQuery(c, "is_read"),
     is_starred: boolQuery(c, "is_starred"),
     has_attachment: boolQuery(c, "has_attachment"),
-  } satisfies Record<string, JsonValue | undefined>;
-  const ext = asExtended(c.var.mailboxStub);
-  const emails = await ext.searchEmails({
+  };
+  const emails = await c.var.mailboxStub.searchEmails({
     ...searchOpts,
     page: intQuery(c, "page"),
     limit: intQuery(c, "limit"),
   });
-  // SAFETY: searchOpts is typed as Record<string, JsonValue|undefined> matching DO's SearchFilterOptions.
-  // eslint-disable-next-line anti-slop/no-chained-type-assertions
-  const totalCount = await ext.countSearchResults(
-    // eslint-disable-next-line anti-slop/no-chained-type-assertions, anti-slop/no-known-value-widening
-    searchOpts as unknown as Record<string, import("../shared/json").JsonValue | undefined>,
-  );
+  const totalCount = await c.var.mailboxStub.countSearchResults(searchOpts);
   return c.json({ emails, totalCount });
 });
 
@@ -594,7 +617,7 @@ async function receiveEmail(
   if (allowedAddresses.length > 0) {
     mailboxId = allRecipients.find((addr) => allowedAddresses.includes(addr));
     if (!mailboxId) {
-      console.log(`Ignoring email: no recipient matches EMAIL_ADDRESSES.`);
+      console.info(`Ignoring email: no recipient matches EMAIL_ADDRESSES.`);
       return;
     }
   } else {
@@ -607,7 +630,6 @@ async function receiveEmail(
   // Catch-all: if the exact recipient mailbox does not exist, route to the admin mailbox for that domain
   let effectiveMailboxId = mailboxId;
   let adminMailboxId: string | undefined;
-  let routedByCatchAll = false;
 
   if (!(await env.BUCKET.head(`mailboxes/${mailboxId}.json`))) {
     // Helper: resolve the admin (catch-all) mailbox for a domain.
@@ -630,20 +652,19 @@ async function receiveEmail(
     adminMailboxId = await resolveAdminMailboxId(domain);
 
     if (adminMailboxId) {
-      console.log(
+      console.info(
         `Catch-all: ${mailboxId} -> ${adminMailboxId} (mailbox ${mailboxId} does not exist)`,
       );
       effectiveMailboxId = adminMailboxId;
-      routedByCatchAll = true;
     } else {
-      console.log(
+      console.info(
         `Ignoring email for ${mailboxId}: mailbox does not exist and no catch-all found for domain`,
       );
       return;
     }
   }
 
-  const stub = env.MAILBOX.get(env.MAILBOX.idFromName(effectiveMailboxId));
+  const stub = asMailboxRpc(env.MAILBOX.get(env.MAILBOX.idFromName(effectiveMailboxId)));
 
   const attachmentData: StoredAttachment[] = [];
   if (parsedEmail.attachments) {
@@ -678,7 +699,7 @@ async function receiveEmail(
   let threadId = emailReferences[0] || inReplyTo || messageId;
 
   if (!inReplyTo && emailReferences.length === 0) {
-    const subjectThread = await asExtended(stub).findThreadBySubject(
+    const subjectThread = await stub.findThreadBySubject(
       parsedEmail.subject || "",
       parsedEmail.from?.address || undefined,
     );
@@ -740,106 +761,12 @@ async function receiveEmail(
     );
   }
 
-  // Catch-all mirror: only mirror when routing actually occurred via catch-all AND the admin mailbox is explicitly configured.
-  // Prevent mirroring when resolveAdminMailboxId fell back to an ordinary mailbox.
-  const domain = mailboxId.split("@")[1]?.toLowerCase();
-  const isExplicitAdminMailbox =
-    adminMailboxId &&
-    domain &&
-    (adminMailboxId === `admin@${domain}` ||
-      adminMailboxId === `catchall@${domain}` ||
-      adminMailboxId === `catch-all@${domain}`);
-
-  if (
-    routedByCatchAll &&
-    adminMailboxId &&
-    adminMailboxId !== effectiveMailboxId &&
-    isExplicitAdminMailbox
-  ) {
-    try {
-      const adminMessageId = crypto.randomUUID();
-      const adminStub = env.MAILBOX.get(env.MAILBOX.idFromName(adminMailboxId));
-
-      // Duplicate attachments under the admin's messageId so R2 keys remain per-email
-      const adminAttachmentData: StoredAttachment[] = [];
-      if (parsedEmail.attachments) {
-        for (const att of parsedEmail.attachments) {
-          const attId = crypto.randomUUID();
-          const filename = (att.filename || "untitled")
-            .split("")
-            .filter((ch) => ch.charCodeAt(0) > 31)
-            .join("")
-            .replace(/[/\\:*?"<>|]/g, "_");
-          // SAFETY: PostalMime attachment content is ArrayBuffer|Uint8Array, R2 put accepts either
-          await env.BUCKET.put(
-            `attachments/${adminMessageId}/${attId}/${filename}`,
-            // SAFETY: PostalMime content is ArrayBuffer|Uint8Array
-            asAnyContent(att.content),
-          );
-          adminAttachmentData.push({
-            id: attId,
-            email_id: adminMessageId,
-            filename,
-            mimetype: att.mimeType,
-            size:
-              att.content instanceof ArrayBuffer
-                ? att.content.byteLength
-                : // SAFETY: non-ArrayBuffer content is Uint8Array with .length
-                  // eslint-disable-next-line anti-slop/no-chained-type-assertions
-                  (asAnyContent(att.content) as Uint8Array).length,
-            content_id: att.contentId || null,
-            disposition: att.disposition || "attachment",
-          });
-        }
-      }
-
-      // Reuse same threading logic but resolve against the admin mailbox's existing threads
-      let adminThreadId = threadId;
-      // If the primary resolved via subject lookup, try to resolve similarly for admin; otherwise keep same threadId
-      // Use the already-parsed inReplyTo/emailReferences; for admin we ensure thread grouping is consistent.
-      if (!inReplyTo && emailReferences.length === 0) {
-        const adminSubjectThread = await asExtended(
-          // SAFETY: adminStub is a MailboxDO stub; widen to untyped for helper.
-          // eslint-disable-next-line anti-slop/no-chained-type-assertions
-          adminStub as unknown as DurableObjectStub,
-        ).findThreadBySubject(parsedEmail.subject || "", parsedEmail.from?.address || undefined);
-        if (adminSubjectThread) adminThreadId = adminSubjectThread;
-        else adminThreadId = adminMessageId; // ensure admin copy has its own thread if no match (don't reuse primary's subject thread that may not exist in admin)
-        // If primary had a subject thread, adminThreadId above may already be set correctly; keep primary's resolution if admin has none?
-        // Prefer primary's threadId when it matched a real thread, fallback to admin's own resolution
-        if (adminThreadId === adminMessageId && threadId !== messageId) adminThreadId = threadId;
-      }
-
-      await adminStub.createEmail(
-        Folders.INBOX,
-        {
-          id: adminMessageId,
-          subject: parsedEmail.subject || "",
-          sender: (parsedEmail.from?.address || "").toLowerCase(),
-          recipient: allRecipients.join(", "),
-          cc: ccRecipients.join(", ") || null,
-          bcc: bccRecipients.join(", ") || null,
-          date: new Date().toISOString(),
-          body: parsedEmail.html || parsedEmail.text || "",
-          in_reply_to: inReplyTo,
-          email_references: emailReferences.length > 0 ? JSON.stringify(emailReferences) : null,
-          thread_id: adminThreadId,
-          message_id: originalMessageId,
-          raw_headers: JSON.stringify(parsedEmail.headers),
-        },
-        adminAttachmentData,
-      );
-      console.log(
-        `Catch-all mirror: ${mailboxId} -> ${adminMailboxId} (copy ${adminMessageId}) - agent suppressed for mirror`,
-      );
-      // Intentionally do NOT trigger EmailAgent for mirrored copies.
-      // Admin agent only runs when email was directly addressed to admin (handled by the primary waitUntil above where effectiveMailboxId === adminMailboxId).
-      // This prevents duplicate drafts/cost for mirrored mail while preserving direct-to-admin auto-draft.
-    } catch (e) {
-      // SAFETY: caught error is unknown, assert Error to read message
-      console.error("Catch-all mirror to admin failed:", (e as Error).message);
-    }
-  }
+  // Note: an earlier revision mirrored catch-all-routed mail into the admin DO
+  // a second time here. That block was unreachable — `routedByCatchAll` is only
+  // set when `effectiveMailboxId` has already become `adminMailboxId`, so its
+  // own guard (`adminMailboxId !== effectiveMailboxId`) could never hold, and
+  // primary delivery already lands in the admin DO. Catch-all mail is re-filed
+  // into a newly created mailbox by `migrateCatchAllMail` instead.
 }
 
 export { app, receiveEmail };

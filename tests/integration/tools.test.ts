@@ -111,6 +111,15 @@ const ORIGINAL_EMAIL = {
 
 // ── toolListMailboxes / toolListEmails ──────────────────────────────
 
+
+/** Asserts a tool result is the success branch, throwing on the `{ error }` shape. */
+function expectOk<T>(result: T): Extract<T, { status: string }> {
+  if (result !== null && typeof result === "object" && "error" in result) {
+    throw new Error(`Unexpected tool error: ${String((result as { error: unknown }).error)}`);
+  }
+  return result as Extract<T, { status: string }>;
+}
+
 describe("toolListMailboxes", () => {
   it("lists mailboxes from bucket metadata", async () => {
     const env = createMockEnv({
@@ -228,7 +237,8 @@ describe("toolDraftReply", () => {
       isPlainText: true,
       runVerifyDraft: true,
     });
-    expect(result.status).toBe("draft_saved");
+    const ok1 = expectOk(result);
+    expect(ok1.status).toBe("draft_saved");
     expect(verifyDraft).toHaveBeenCalled();
     const created = (stub.createEmail as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(created[0]).toBe(Folders.DRAFT);
@@ -266,7 +276,7 @@ describe("toolDraftReply", () => {
       subject: "Re: Hello",
       body: "Thanks",
     });
-    expect(result.status).toBe("draft_saved");
+    expect(expectOk(result).status).toBe("draft_saved");
     const created = (stub.createEmail as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(created[1].thread_id).toBe("e1");
   });
@@ -284,10 +294,11 @@ describe("toolDraftEmail", () => {
       body: "Hello there",
       isPlainText: true,
     });
-    expect(result.status).toBe("draft_saved");
+    const okDraft = expectOk(result);
+    expect(okDraft.status).toBe("draft_saved");
     const created = (stub.createEmail as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(created[0]).toBe(Folders.DRAFT);
-    expect(created[1].thread_id).toBe(result.draftId);
+    expect(created[1].thread_id).toBe(okDraft.draftId);
     expect(created[1].body).toContain("Hello there");
   });
 
@@ -300,7 +311,7 @@ describe("toolDraftEmail", () => {
       body: "Hello",
       in_reply_to: "e1",
     });
-    expect(result.threadId).toBe("t1");
+    expect(expectOk(result).threadId).toBe("t1");
   });
 
   it("returns error when verification fails", async () => {
@@ -342,7 +353,7 @@ describe("toolUpdateDraft", () => {
       subject: "Updated",
       bodyHtml: "New body content here",
     });
-    expect(result.status).toBe("draft_updated");
+    expect(expectOk(result).status).toBe("draft_updated");
     expect(stub.deleteEmail).toHaveBeenCalledWith("d1");
     const created = (stub.createEmail as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(created[1].subject).toBe("Updated");
@@ -520,7 +531,7 @@ describe("toolSendReply", () => {
       subject: "Re: Hello",
       bodyHtml: "<p>Hi there</p>",
     });
-    expect(result.status).toBe("sent");
+    expect(expectOk(result).status).toBe("sent");
     expect(sendEmail).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -588,7 +599,7 @@ describe("toolSendEmail", () => {
       subject: "Hi",
       bodyHtml: "<p>Hello</p>",
     });
-    expect(result.status).toBe("sent");
+    expect(expectOk(result).status).toBe("sent");
     expect(sendEmail).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ to: "bob@example.com", from: "alice@example.com" }),

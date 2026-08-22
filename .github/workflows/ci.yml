@@ -40,8 +40,34 @@ jobs:
       - name: Lint, format & type check
         run: vp check
 
-      - name: Test (coverage gate ≥80%, ai.ts ≥90%)
+      - name: Test (coverage gates in vite.config.ts)
         run: vp test run --coverage
 
       - name: Build
         run: vp run build
+
+  e2e:
+    name: Browser E2E (Playwright)
+    runs-on: ubuntu-latest
+    # Non-blocking while the suite soaks — flip to required once stable.
+    continue-on-error: true
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up the Vite+ (vp) toolchain
+        uses: voidzero-dev/setup-vp@v1.17.0
+        with:
+          node-version: "24"
+          cache: true
+
+      - name: Install dependencies
+        run: vp install
+
+      - name: Install Chromium with system dependencies
+        run: vp exec playwright install --with-deps chromium
+
+      - name: Run browser E2E (starts `vp run dev` itself)
+        run: vp run test:e2e

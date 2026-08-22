@@ -58,9 +58,9 @@ function setupHook<T>(hook: () => T) {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   const wrapper = ({ children }: { children: ReactNode }) =>
-    (
-      { children } as { children: ReactNode }
-    ) && <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    (({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    ))({ children });
   return { ...renderHook(hook, { wrapper }), client };
 }
 

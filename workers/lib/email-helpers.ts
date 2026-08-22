@@ -8,8 +8,9 @@
  * Includes: DO stub helpers, sender validation, message-ID generation,
  * threading, HTML utilities, and tool-logic (getFullEmail / getFullThread).
  */
-import type { MailboxDO } from "../durableObject";
 import type { EmailFull } from "./schemas";
+import type { MailboxRpc } from "./mailbox-rpc";
+import { asMailboxRpc } from "./mailbox-rpc";
 import { Folders } from "../../shared/folders";
 import type { Env } from "../types";
 import { formatQuotedDate } from "../../shared/dates";
@@ -17,13 +18,15 @@ import { formatQuotedDate } from "../../shared/dates";
 // ── DO Stub ────────────────────────────────────────────────────────
 
 /**
- * Resolve a MailboxDO stub from a mailbox email address.
- * Replaces the repeated 3-line ns.idFromName / ns.get pattern.
+ * Resolves the RPC contract for a mailbox Durable Object.
+ *
+ * @param mailboxId - The mailbox identifier used to locate the Durable Object
+ * @returns The mailbox RPC contract
  */
-export function getMailboxStub(env: Env, mailboxId: string): DurableObjectStub<MailboxDO> {
+export function getMailboxStub(env: Env, mailboxId: string): MailboxRpc {
   const ns = env.MAILBOX;
   const id = ns.idFromName(mailboxId);
-  return ns.get(id);
+  return asMailboxRpc(ns.get(id));
 }
 
 // ── Mailbox Listing ────────────────────────────────────────────────
@@ -155,13 +158,9 @@ export function buildThreadingHeaders(
  *
  * @returns The referenced original email, or the provided email when no matching original exists.
  */
-export async function resolveOriginalEmail(
-  stub: DurableObjectStub<MailboxDO>,
-  email: EmailFull,
-): Promise<EmailFull> {
+export async function resolveOriginalEmail(stub: MailboxRpc, email: EmailFull): Promise<EmailFull> {
   if (email.folder_id === Folders.DRAFT && email.in_reply_to) {
-    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
-    const realOriginal = (await stub.getEmail(email.in_reply_to)) as EmailFull | null;
+    const realOriginal = await stub.getEmail(email.in_reply_to);
     if (realOriginal) return realOriginal;
   }
   return email;
@@ -305,9 +304,8 @@ export function buildQuotedReplyBlock(original: {
  *
  * @returns The email with `body_text` and `body_html` fields, or `null` if the email is not found.
  */
-export async function getFullEmail(stub: DurableObjectStub<MailboxDO>, emailId: string) {
-  // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
-  const email = (await stub.getEmail(emailId)) as EmailFull | null;
+export async function getFullEmail(stub: MailboxRpc, emailId: string) {
+  const email = await stub.getEmail(emailId);
   if (!email) return null;
 
   const textBody = email.body ? stripHtmlToText(email.body) : "";
@@ -320,9 +318,8 @@ export async function getFullEmail(stub: DurableObjectStub<MailboxDO>, emailId: 
  * @param threadId - The identifier of the thread to retrieve
  * @returns The thread identifier, message count, and chronologically sorted messages
  */
-export async function getFullThread(stub: DurableObjectStub<MailboxDO>, threadId: string) {
-  // SAFETY: `getThreadEmails` is part of the DO's dynamic runtime API; the full DurableObjectStub<MailboxDO> type is too heavy to instantiate.
-  const emails: EmailFull[] = await (stub as any).getThreadEmails(threadId);
+export async function getFullThread(stub: MailboxRpc, threadId: string) {
+  const emails = await stub.getThreadEmails(threadId);
 
   const enriched = emails.map((email) => {
     const textBody = email.body ? stripHtmlToText(email.body) : "";

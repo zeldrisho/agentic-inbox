@@ -5,4 +5,6 @@
 export interface Env extends Cloudflare.Env {
   POLICY_AUD: string;
   TEAM_DOMAIN: string;
+  /** Secret — set via `wrangler secret put DOMAINS` (comma-separated Email Routing domains). */
+  DOMAINS: string;
 }

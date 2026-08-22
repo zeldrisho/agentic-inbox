@@ -3,7 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 // @vitest-environment jsdom
-import { describe, it, expect } from "vite-plus/test";
+import { describe, it, expect, vi } from "vite-plus/test";
 import {
   formatBytes,
   splitEmailList,

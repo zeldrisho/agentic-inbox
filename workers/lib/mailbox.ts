@@ -8,13 +8,14 @@
  * and attaches it to the Hono context (`c.var.mailboxStub`).
  */
 import { createMiddleware } from "hono/factory";
-import type { MailboxDO } from "../durableObject";
 import type { Env } from "../types";
+import { asMailboxRpc, type MailboxRpc } from "./mailbox-rpc";
 
 export type MailboxContext = {
   Bindings: Env;
   Variables: {
-    mailboxStub: DurableObjectStub<MailboxDO>;
+    /** Caller-facing RPC contract for the mailbox's Durable Object. */
+    mailboxStub: MailboxRpc;
   };
 };
 
@@ -30,12 +31,12 @@ export const requireMailbox = createMiddleware<MailboxContext>(async (c, next) =
     return c.json({ error: "Not found" }, 404);
   }
 
-  // Instantiate DO stub
+  // Instantiate DO stub and widen once to the caller-facing RPC contract.
   const ns = c.env.MAILBOX;
   const id = ns.idFromName(mailboxId);
-  const stub = ns.get(id);
+  const rpc = asMailboxRpc(ns.get(id));
 
-  c.set("mailboxStub", stub);
+  c.set("mailboxStub", rpc);
 
   await next();
 });

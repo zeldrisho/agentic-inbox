@@ -21,8 +21,14 @@ export default function MailboxRoute() {
   // Prefetch mailbox data for child components
   useMailbox(mailboxId);
   const prevMailboxIdRef = useRef<string | undefined>(undefined);
-  const { isSidebarOpen, closeSidebar, isAgentPanelOpen, closePanel, closeComposeModal } =
-    useUIStore();
+  const {
+    isSidebarOpen,
+    closeSidebar,
+    isAgentPanelOpen,
+    toggleAgentPanel,
+    closePanel,
+    closeComposeModal,
+  } = useUIStore();
 
   useEffect(() => {
     if (prevMailboxIdRef.current && mailboxId && prevMailboxIdRef.current !== mailboxId) {
@@ -65,9 +71,19 @@ export default function MailboxRoute() {
         </main>
       </div>
 
-      {/* Agent + MCP sidebar -- togglable on desktop */}
+      {/* Agent + MCP sidebar — full-screen overlay on mobile, docked panel on desktop */}
       {isAgentPanelOpen && (
-        <div className="hidden lg:flex w-[380px] shrink-0 border-l border-kumo-line flex-col bg-kumo-base overflow-hidden">
+        <div
+          className="fixed inset-0 z-40 flex flex-col bg-kumo-base overflow-hidden lg:relative lg:inset-auto lg:z-auto lg:w-[380px] lg:shrink-0 lg:border-l border-kumo-line"
+          role="dialog"
+          aria-modal="true"
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && window.innerWidth < 1024) {
+              toggleAgentPanel();
+            }
+          }}
+          tabIndex={-1}
+        >
           <AgentSidebar />
         </div>
       )}

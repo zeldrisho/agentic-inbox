@@ -23,6 +23,9 @@ vi.mock("@modelcontextprotocol/sdk/server/mcp.js", () => ({
     tool(name: string, _desc: string, _schema: unknown, handler: ToolHandler) {
       registeredTools.set(name, handler);
     }
+    registerTool(name: string, _config: unknown, handler: ToolHandler) {
+      registeredTools.set(name, handler);
+    }
   },
 }));
 
@@ -67,6 +70,7 @@ vi.mock("workers/lib/tools", () => ({
 }));
 
 import { EmailMCP } from "workers/mcp";
+import type { Env } from "workers/types";
 
 function createEnvWithBucket(mailboxes: string[] = ["alice@example.com"]) {
   const store = new Map<string, string>();
@@ -87,11 +91,11 @@ function createEnvWithBucket(mailboxes: string[] = ["alice@example.com"]) {
     } as unknown as R2Bucket,
     MAILBOX: {
       idFromName: vi.fn((n: string) => n as unknown as DurableObjectId),
-      get: vi.fn(() => ({}) as unknown as DurableObjectStub<unknown>),
+      get: vi.fn(() => ({}) as unknown as DurableObjectStub),
     } as unknown as DurableObjectNamespace,
     EMAIL: { send: vi.fn() } as unknown as SendEmail,
     AI: { run: vi.fn() } as unknown as Ai,
-  } as unknown as Cloudflare.Env;
+  } as unknown as Env;
 }
 
 async function initMcp(mailboxes?: string[]) {

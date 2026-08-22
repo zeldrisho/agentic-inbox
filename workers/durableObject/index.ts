@@ -4,11 +4,12 @@
 
 import { DurableObject } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/durable-sqlite";
-import { eq, and, or, asc, desc, sql } from "drizzle-orm";
+import { eq, and, or, asc, desc, sql, inArray } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import * as schema from "../db/schema";
 import { Folders } from "../../shared/folders";
 import type { Env } from "../types";
+import type { MailboxRpc } from "../lib/mailbox-rpc";
 import { applyMigrations, mailboxMigrations } from "./migrations";
 
 /**
@@ -71,7 +72,11 @@ interface GetEmailsOptions {
   sortDirection?: "ASC" | "DESC";
 }
 
-interface EmailData {
+/**
+ * Payload for creating an email. Part of the caller-facing `MailboxRpc`
+ * contract — see workers/lib/mailbox-rpc.ts.
+ */
+export interface EmailData {
   id: string;
   subject: string;
   sender: string;
@@ -89,7 +94,11 @@ interface EmailData {
   raw_headers?: string | null;
 }
 
-interface AttachmentData {
+/**
+ * Payload for storing attachment metadata alongside a created email. Part of
+ * the caller-facing `MailboxRpc` contract — see workers/lib/mailbox-rpc.ts.
+ */
+export interface AttachmentData {
   id: string;
   email_id: string;
   filename: string;
@@ -899,4 +908,120 @@ export class MailboxDO extends DurableObject<Env> {
       this.db.insert(schema.attachments).values(attachments).run();
     }
   }
+
+  // ── Catch-all takeover ────────────────────────────────────────
+
+  /**
+   * Extracts inbox emails addressed to `recipient` (exact match among the
+   * comma-separated recipient tokens) along with their attachment rows, and
+   * removes them from this mailbox.
+   *
+   * Used when a mailbox is created after catch-all routing already delivered
+   * its mail to a domain admin mailbox. R2 attachment blobs are intentionally
+   * left in place: their keys (`attachments/<emailId>/<attId>/<filename>`) are
+   * stable and are reused by the receiving mailbox's email rows.
+   *
+   * @param recipient - Exact mailbox address to take over mail for
+   * @returns Extracted emails with their attachments, or `null` when nothing matched
+   */
+  async extractEmailsByRecipient(recipient: string): Promise<{
+    emails: EmailData[];
+    attachments: AttachmentData[];
+  } | null> {
+    const lower = recipient.toLowerCase().trim();
+    if (!lower) return null;
+
+    const rows = this.db
+      .select()
+      .from(schema.emails)
+      .where(
+        sql`${schema.emails.folder_id} = (SELECT id FROM folders WHERE name = ${Folders.INBOX} OR id = ${Folders.INBOX} LIMIT 1)`,
+      )
+      .all();
+
+    const matched = rows.filter((r) =>
+      (r.recipient ?? "")
+        .toLowerCase()
+        .split(",")
+        .map((s) => s.trim())
+        .includes(lower),
+    );
+    if (matched.length === 0) return null;
+
+    const ids = matched.map((m) => m.id);
+    const attRows = this.db
+      .select()
+      .from(schema.attachments)
+      .where(inArray(schema.attachments.email_id, ids))
+      .all();
+
+    this.db.delete(schema.attachments).where(inArray(schema.attachments.email_id, ids)).run();
+    this.db.delete(schema.emails).where(inArray(schema.emails.id, ids)).run();
+
+    return {
+      emails: matched.map((r) => ({
+        id: r.id,
+        subject: r.subject ?? "",
+        sender: r.sender ?? "",
+        recipient: r.recipient ?? "",
+        cc: r.cc,
+        bcc: r.bcc,
+        date: r.date ?? new Date().toISOString(),
+        body: r.body ?? "",
+        read: !!r.read,
+        starred: !!r.starred,
+        in_reply_to: r.in_reply_to,
+        email_references: r.email_references,
+        thread_id: r.thread_id,
+        message_id: r.message_id,
+        raw_headers: r.raw_headers,
+      })),
+      attachments: attRows,
+    };
+  }
+
+  // ── Destruction ────────────────────────────────────────────────
+
+  /**
+   * Wipe all mailbox data ahead of deletion.
+   *
+   * Removes every email, attachment row, and custom folder so the DO can be
+   * safely re-created later under the same address (the seeded default folders
+   * are preserved for that purpose). Returns the R2 keys of every stored
+   * attachment blob so the caller can delete them from the bucket.
+   */
+  async destroy(): Promise<{ key: string }[]> {
+    const blobs = this.db
+      .select({
+        emailId: schema.attachments.email_id,
+        id: schema.attachments.id,
+        filename: schema.attachments.filename,
+      })
+      .from(schema.attachments)
+      .all();
+
+    // Explicit deletes rather than relying on FK cascade semantics.
+    this.db.delete(schema.attachments).run();
+    this.db.delete(schema.emails).run();
+    this.db.delete(schema.folders).where(eq(schema.folders.is_deletable, 1)).run();
+
+    return blobs.map((b) => ({ key: `attachments/${b.emailId}/${b.id}/${b.filename}` }));
+  }
 }
+
+/**
+ * Compile-time guard: `MailboxDO` must implement every method of the caller-facing
+ * `MailboxRpc` contract with compatible signatures. If `MailboxDO` renames, removes,
+ * or changes the signature of a `MailboxRpc` method, TypeScript's assignability check
+ * fails at this declaration instead of silently breaking at every `asMailboxRpc` call site.
+ *
+ * The mapped type verifies each `MailboxDO.prototype` method is assignable to the
+ * corresponding `MailboxRpc` member (contravariant in parameters, covariant in return type).
+ */
+// SAFETY: empty object literal is safe because the mapped type constraint verifies
+// that each method on MailboxDO.prototype is callable-compatible with MailboxRpc.
+const _assertMailboxDOImplementsRpc: {
+  [K in keyof MailboxRpc]: MailboxDO[K];
+} = MailboxDO.prototype;
+
+export { _assertMailboxDOImplementsRpc };

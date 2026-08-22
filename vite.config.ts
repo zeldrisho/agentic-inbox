@@ -45,14 +45,25 @@ export default defineConfig(({ mode }) => ({
       // Measure only modules executed by tests — untested UI shells (route
       // components rendered solely by the SPA entry) stay out of the gate.
       all: false,
-      include: ["workers/lib/ai.ts"],
+      include: [
+        "workers/lib/ai.ts",
+        "workers/index.ts",
+        "workers/routes/reply-forward.ts",
+        "app/hooks/useComposeForm.ts",
+      ],
       // CI gate (`vp test run --coverage`): fail below these thresholds.
       // Security/AI-critical modules carry stricter targets (docs/plan.md §5).
       thresholds: {
         statements: 80,
         functions: 80,
         lines: 80,
+        branches: 75,
         "workers/lib/ai.ts": { statements: 90, lines: 90 },
+        // P2 error-path gates (docs/plan.md): the failure branches of the
+        // inbound/send boundaries and the compose form are pinned explicitly.
+        "workers/index.ts": { branches: 68 },
+        "workers/routes/reply-forward.ts": { branches: 75 },
+        "app/hooks/useComposeForm.ts": { branches: 82 },
       },
     },
   },

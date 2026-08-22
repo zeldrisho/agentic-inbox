@@ -14,7 +14,6 @@
  * are reused directly — this module covers the remaining shared operations.
  */
 
-import type { EmailFull } from "./schemas";
 import {
   getMailboxStub,
   getFullEmail,
@@ -106,8 +105,7 @@ export async function toolSearchEmails(
   params: { query: string; folder?: string },
 ) {
   const stub = getMailboxStub(env, mailboxId);
-  // SAFETY: `searchEmails` is part of the DO's dynamic runtime API; the full DurableObjectStub<MailboxDO> type is too heavy to instantiate.
-  return (stub as any).searchEmails({
+  return stub.searchEmails({
     query: params.query,
     folder: params.folder,
   });
@@ -116,7 +114,7 @@ export async function toolSearchEmails(
 // ── draft_reply ────────────────────────────────────────────────────
 
 /**
- * Creates a draft reply to an existing email.
+ * Creates and saves a draft reply to an existing email, including the quoted original message.
  *
  * @param env - The application environment.
  * @param mailboxId - The mailbox that owns the draft.
@@ -126,8 +124,8 @@ export async function toolSearchEmails(
  * @param params.subject - The draft subject.
  * @param params.body - The reply body.
  * @param params.isPlainText - Whether to convert the body from plain text to HTML.
- * @param params.runVerifyDraft - Whether to verify the body before saving the draft.
- * @returns Draft metadata when saved, or an error message when verification fails.
+ * @param params.runVerifyDraft - Whether to verify and sanitize the body before saving.
+ * @returns Draft metadata when saved, or an error message if verification fails.
  */
 export async function toolDraftReply(
   env: Env,
@@ -165,7 +163,7 @@ export async function toolDraftReply(
 
   // Get the original email for thread_id and quoted text
   // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
-  const original = (await stub.getEmail(params.originalEmailId)) as EmailFull | null;
+  const original = await stub.getEmail(params.originalEmailId);
   const threadId = original?.thread_id || params.originalEmailId;
 
   // Append quoted original message
@@ -260,7 +258,7 @@ export async function toolDraftEmail(
   let resolvedThreadId = params.thread_id;
   if (!resolvedThreadId && params.in_reply_to) {
     // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
-    const original = (await stub.getEmail(params.in_reply_to)) as EmailFull | null;
+    const original = await stub.getEmail(params.in_reply_to);
     resolvedThreadId = original?.thread_id || params.in_reply_to;
   }
   if (!resolvedThreadId) {
@@ -319,7 +317,7 @@ export async function toolUpdateDraft(
   const stub = getMailboxStub(env, mailboxId);
 
   // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
-  const oldDraft = (await stub.getEmail(params.draftId)) as EmailFull | null;
+  const oldDraft = await stub.getEmail(params.draftId);
   if (!oldDraft) {
     return { error: "Draft not found" };
   }
@@ -444,9 +442,9 @@ export async function toolDeleteEmail(env: Env, mailboxId: string, emailId: stri
  * Sends a reply to an existing email and records it in the Sent folder.
  *
  * @param mailboxId - The mailbox sending the reply
- * @param params - The reply details, including the original email identifier, recipient, subject, and body
+ * @param params - The original email ID, recipient, subject, and reply body
  * @returns A sent status with the message identifier, or an error message
- * @throws Error if the mailbox identifier does not contain a valid domain
+ * @throws Error if `mailboxId` does not include a domain
  */
 
 export async function toolSendReply(
@@ -462,14 +460,12 @@ export async function toolSendReply(
   const stub = getMailboxStub(env, mailboxId);
 
   // Check send rate limit
-  // SAFETY: `checkSendRateLimit` is part of the DO's dynamic runtime API; the full DurableObjectStub<MailboxDO> type is too heavy to instantiate.
-  const rateLimitError = await (stub as any).checkSendRateLimit();
+  const rateLimitError = await stub.checkSendRateLimit();
   if (rateLimitError) {
     return { error: rateLimitError };
   }
 
-  // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
-  const originalEmail = (await stub.getEmail(params.originalEmailId)) as EmailFull | null;
+  const originalEmail = await stub.getEmail(params.originalEmailId);
   if (!originalEmail) {
     return { error: "Original email not found" };
   }
@@ -533,7 +529,7 @@ export async function toolSendReply(
  *
  * @param mailboxId - The sender mailbox address
  * @param params - The recipient, subject, and HTML body of the email
- * @returns A sent status with the message ID, or an error message
+ * @returns Sent message metadata, or an error message
  * @throws Error if `mailboxId` is not a valid email address
  */
 
@@ -549,8 +545,7 @@ export async function toolSendEmail(
   const stub = getMailboxStub(env, mailboxId);
 
   // Check send rate limit
-  // SAFETY: `checkSendRateLimit` is part of the DO's dynamic runtime API; the full DurableObjectStub<MailboxDO> type is too heavy to instantiate.
-  const rateLimitError = await (stub as any).checkSendRateLimit();
+  const rateLimitError = await stub.checkSendRateLimit();
   if (rateLimitError) {
     return { error: rateLimitError };
   }

@@ -14,7 +14,10 @@ function mockBucket(overrides: Partial<Record<string, unknown>> = {}) {
     return v ? ({ json: async () => JSON.parse(v) } as unknown as R2ObjectBody) : null;
   });
   const put = vi.fn(async (key: string, val: string) => { store.set(key, val); });
-  const del = vi.fn(async (key: string) => { store.delete(key); });
+  const del = vi.fn(async (key: string | string[]) => {
+    // R2Bucket.delete accepts a single key or a batch of up to 1000 keys.
+    for (const k of Array.isArray(key) ? key : [key]) store.delete(k);
+  });
   const list = vi.fn(async () => ({ objects: [...store.keys()].filter((k) => k.startsWith("mailboxes/")).map((k) => ({ key: k })), truncated: false }));
   // prefill store from overrides._store if needed
   if ((overrides as unknown as { _store?: Map<string,string> })._store) {
@@ -45,6 +48,7 @@ function mockMailboxStub(overrides: Record<string, unknown> = {}) {
     countSearchResults: vi.fn(async () => 0),
     findThreadBySubject: vi.fn(async () => null),
     updateEmail: vi.fn(async () => null),
+    destroy: vi.fn(async () => [] as { key: string }[]),
     ...overrides,
   };
 }
@@ -55,11 +59,14 @@ function mockEnv(bucket: ReturnType<typeof mockBucket>, mailboxStub?: ReturnType
     BUCKET: bucket as unknown as R2Bucket,
     MAILBOX: {
       idFromName: vi.fn((n: string) => n as unknown as DurableObjectId),
-      get: vi.fn(() => stub as unknown as DurableObjectStub<unknown>),
+      get: vi.fn(() => stub as unknown as DurableObjectStub),
     },
     EMAIL: { send: vi.fn(async () => {}) } as unknown as SendEmail,
     AI: { run: vi.fn(async () => ({ response: "clean" })) } as unknown as Ai,
-    EMAIL_AGENT: { idFromName: vi.fn((n: string) => n), get: vi.fn(() => ({ fetch: vi.fn() })) } as unknown as DurableObjectNamespace,
+    EMAIL_AGENT: {
+      idFromName: vi.fn((n: string) => n),
+      get: vi.fn(() => ({ fetch: vi.fn(), destroy: vi.fn(async () => {}) })),
+    } as unknown as DurableObjectNamespace,
     DOMAINS: "example.com",
     EMAIL_ADDRESSES: [] as unknown as string[],
     _stub: stub,
@@ -67,7 +74,7 @@ function mockEnv(bucket: ReturnType<typeof mockBucket>, mailboxStub?: ReturnType
 }
 
 type EnvWithStub = Env & { _stub: ReturnType<typeof mockMailboxStub> };
-type Env = Cloudflare.Env & { BUCKET: R2Bucket; MAILBOX: DurableObjectNamespace; EMAIL: SendEmail; AI: Ai; EMAIL_AGENT: DurableObjectNamespace; DOMAINS: string; EMAIL_ADDRESSES: string[] };
+type Env = Omit<Cloudflare.Env, "EMAIL_ADDRESSES"> & { BUCKET: R2Bucket; MAILBOX: DurableObjectNamespace; EMAIL: SendEmail; AI: Ai; EMAIL_AGENT: DurableObjectNamespace; DOMAINS: string; EMAIL_ADDRESSES: string[] };
 
 async function requestApp(env: EnvWithStub, method: string, path: string, body?: unknown, headers: Record<string,string> = {}) {
   const init: RequestInit = { method, headers: { "Content-Type": "application/json", ...headers } };
@@ -395,10 +402,42 @@ describe("GET/PUT/DELETE /api/v1/mailboxes/:id", () => {
     const env = mockEnv(bucket);
     const { res } = await requestApp(env, "DELETE", "/api/v1/mailboxes/alice@example.com");
     expect(res.status).toBe(204);
+    expect(env._stub.destroy).toHaveBeenCalled();
     expect(bucket.delete).toHaveBeenCalled();
 
     const { res: res404 } = await requestApp(env, "DELETE", "/api/v1/mailboxes/alice@example.com");
     expect(res404.status).toBe(404);
+  });
+
+  it("DELETE cascades: DO wipe, R2 attachment blobs, agent destroy, settings blob", async () => {
+    const bucket = mockBucket();
+    bucket._store.set("mailboxes/alice@example.com.json", JSON.stringify({}));
+    const stub = mockMailboxStub({
+      destroy: vi.fn(async () => [
+        { key: "attachments/e1/att1/a.txt" },
+        { key: "attachments/e2/att2/b.pdf" },
+      ]),
+    });
+    const env = mockEnv(bucket, stub);
+    const agentDestroy = vi.fn(async () => {});
+    (
+      env.EMAIL_AGENT as unknown as {
+        get: (id: unknown) => { destroy: () => Promise<void> };
+      }
+    ).get = () => ({ destroy: agentDestroy });
+
+    const { res } = await requestApp(env, "DELETE", "/api/v1/mailboxes/alice@example.com");
+    expect(res.status).toBe(204);
+    expect(stub.destroy).toHaveBeenCalled();
+    // Attachment blobs are removed in one batch call...
+    expect(bucket.delete).toHaveBeenCalledWith([
+      "attachments/e1/att1/a.txt",
+      "attachments/e2/att2/b.pdf",
+    ]);
+    // ...the agent DO is destroyed best-effort...
+    expect(agentDestroy).toHaveBeenCalled();
+    // ...and the settings/existence marker is removed.
+    expect(bucket._store.has("mailboxes/alice@example.com.json")).toBe(false);
   });
 });
 

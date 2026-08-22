@@ -4,7 +4,7 @@
 
 import { Button, Dialog, Input, Loader, Select, Text, useKumoToastManager } from "@cloudflare/kumo";
 import { SquareButton } from "~/components/ui/SquareButton";
-import { EnvelopeIcon, PlusIcon, TrashIcon, ShuffleIcon, SparkleIcon } from "@phosphor-icons/react";
+import { EnvelopeIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { ThemeToggle } from "~/components/ThemeToggle";
 import { useQuery } from "@tanstack/react-query";
 import { type FormEvent, useEffect, useRef, useState } from "react";
@@ -23,7 +23,7 @@ export function meta() {
 }
 
 /**
- * Renders the mailbox listing page and manages mailbox creation and deletion.
+ * Renders the mailbox listing page with controls for creating and deleting mailboxes.
  */
 export default function HomeRoute() {
   const toastManager = useKumoToastManager();
@@ -186,50 +186,6 @@ export default function HomeRoute() {
 
   const isLoading = isConfigLoading && !configData;
 
-  const handleGenerateRandom = (domainOverride?: string) => {
-    const adjectives = [
-      "bright",
-      "swift",
-      "calm",
-      "bold",
-      "smart",
-      "quick",
-      "happy",
-      "keen",
-      "cool",
-      "warm",
-      "clever",
-      "brave",
-      "crisp",
-      "lively",
-    ];
-    const nouns = [
-      "fox",
-      "wave",
-      "star",
-      "cloud",
-      "river",
-      "forest",
-      "stone",
-      "light",
-      "field",
-      "crest",
-      "harbor",
-      "peak",
-      "bloom",
-      "spark",
-    ];
-    const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
-    const noun = nouns[Math.floor(Math.random() * nouns.length)];
-    const num = Math.floor(100 + Math.random() * 900);
-    const prefix = `${adj}-${noun}-${num}`;
-    const name = `${adj.charAt(0).toUpperCase() + adj.slice(1)} ${noun.charAt(0).toUpperCase() + noun.slice(1)}`;
-    setNewPrefix(prefix);
-    setNewName(name);
-    if (domainOverride) setSelectedDomain(domainOverride);
-    else if (!selectedDomain && domains.length > 0) setSelectedDomain(domains[0]);
-  };
-
   return (
     <div className="min-h-screen bg-kumo-recessed">
       <div className="mx-auto max-w-2xl px-4 py-8 md:px-6 md:py-16">
@@ -327,18 +283,7 @@ export default function HomeRoute() {
       {/* Create Dialog */}
       <Dialog.Root open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <Dialog size="sm" className="p-6">
-          <div className="flex items-start justify-between mb-5 gap-2">
-            <Dialog.Title className="text-base font-semibold">Create New Mailbox</Dialog.Title>
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={<ShuffleIcon size={14} />}
-              onClick={() => handleGenerateRandom()}
-              type="button"
-            >
-              Random
-            </Button>
-          </div>
+          <Dialog.Title className="text-base font-semibold mb-5">Create New Mailbox</Dialog.Title>
           <form onSubmit={handleCreate} className="space-y-4">
             {createError && (
               <Text variant="error" size="sm">
@@ -402,27 +347,6 @@ export default function HomeRoute() {
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
             />
-            {domains.length > 1 && (
-              <div>
-                <span className="text-xs font-medium text-kumo-subtle mb-1.5 block">
-                  Quick generate for domain
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {domains.map((d) => (
-                    <Button
-                      key={d}
-                      variant="secondary"
-                      size="sm"
-                      icon={<SparkleIcon size={12} />}
-                      onClick={() => handleGenerateRandom(d)}
-                      type="button"
-                    >
-                      {d}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
             <div className="flex justify-end gap-2 pt-2">
               <Dialog.Close
                 render={(props) => (
