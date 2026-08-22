@@ -2,18 +2,7 @@
 
 ## Package Manager
 
-- Use **pnpm**, managed by **Vite+ (`vp`)**: `vp install`
-
-## Commands
-
-| Task                           | Command             |
-| ------------------------------ | ------------------- |
-| Dev server (Vite + Cloudflare) | `vp run dev`        |
-| Production build               | `vp run build`      |
-| Check (lint/format/typecheck)  | `vp check`          |
-| Generate Cloudflare types      | `vp run cf-typegen` |
-| Build + deploy                 | `vp run deploy`     |
-| Tests                          | `vp test`           |
+- Use **vp**: `vp install`
 
 ## Project Layout
 
@@ -28,6 +17,25 @@
 | `tests/`                 | Vitest suite (`tests/**/*.test.ts`) — mirrors `shared/`, `workers/`, `app/` |
 | `wrangler.jsonc`         | Bindings, Durable Object migrations, and secrets                            |
 
+## Commands
+
+| Task                           | Command                  |
+| ------------------------------ | ------------------------ |
+| Dev server (Vite + Cloudflare) | `vp run dev`             |
+| Check (lint/format/typecheck)  | `vp check`               |
+| Generate Cloudflare types      | `vp run cf-typegen`      |
+| Tests                          | `vp test run --coverage` |
+| Production build               | `vp run build`           |
+| Build + deploy                 | `vp run deploy`          |
+
+## Key Conventions
+
+- `requireMailbox` (`workers/lib/mailbox.ts`) enforces mailbox _existence_ only. Cloudflare Access is the single auth boundary; there is no per-mailbox authorization.
+- `mailboxId` is user-supplied for both API and MCP routes. Do not add per-mailbox auth that bypasses the shared Access policy.
+- Keep `workers/index.ts` route handlers thin; push business logic into the Durable Objects and `workers/lib`.
+- Before implementation, run `git fetch --prune`, start from the latest `main`, and preserve uncommitted work.
+- Delete a completed local branch only when it is merged into its target and its upstream branch is gone.
+
 ## External References
 
 | Need                        | File                          |
@@ -37,10 +45,4 @@
 | Architecture                | `docs/architecture.md`        |
 | Security model & invariants | `docs/security-invariants.md` |
 | REST API reference          | `docs/api.md`                 |
-
-## Key Conventions
-
-- `requireMailbox` (`workers/lib/mailbox.ts`) enforces mailbox _existence_ only. Cloudflare Access is the single auth boundary; there is no per-mailbox authorization.
-- `mailboxId` is user-supplied for both API and MCP routes. Do not add per-mailbox auth that bypasses the shared Access policy.
-- Keep `workers/index.ts` route handlers thin; push business logic into the Durable Objects and `workers/lib`.
-- Before implementation, run `git fetch --prune`, start from the latest `main`, and preserve uncommitted work.
+| Testing & coverage          | `docs/testing.md`             |

@@ -40,7 +40,7 @@ https://github.com/cloudflare/agentic-inbox/issues/4#issuecomment-4269118513
 - **Full email client** — Send and receive emails via Cloudflare Email Routing with a rich text composer, reply/forward threading, folder organization, search, and attachments
 - **Per-mailbox isolation** — Each mailbox runs in its own Durable Object with SQLite storage and R2 for attachments
 - **Built-in AI agent** — Side panel with 9 email tools for reading, searching, drafting, and sending
-- **Auto-draft on new email** — Agent automatically reads inbound emails and generates draft replies, always requiring explicit confirmation before sending
+- **Auto-draft on new email (opt-in)** — When `agentAutoDraft` is enabled the agent reads inbound email and generates a draft reply, always requiring explicit confirmation before sending (default off — see `docs/agent-on-demand.md`)
 - **Configurable and persistent** — Custom system prompts per mailbox, persistent chat history, streaming markdown responses, and tool call visibility
 
 ## Stack
@@ -50,16 +50,18 @@ https://github.com/cloudflare/agentic-inbox/issues/4#issuecomment-4269118513
 - **AI Agent:** Cloudflare Agents SDK (`AIChatAgent`), AI SDK v6, Workers AI (`@cf/moonshotai/kimi-k2.5`), `react-markdown` + `remark-gfm`
 - **Auth:** Cloudflare Access JWT validation (required outside local development)
 
-## Getting Started
+## Quick start (local dev)
 
 ```bash
 vp install
-vp run dev
+vp run dev   # http://localhost:5173 — Access check skipped in dev
 ```
+
+See `docs/development.md` for prerequisites and `wrangler.jsonc` bindings.
 
 ### Configuration
 
-1. Set your domain in `wrangler.jsonc`
+1. Set `DOMAINS` as a Worker secret: `npx wrangler secret put DOMAINS` (comma-separated, e.g. `example.com`) — do not set it in `wrangler.jsonc`
 2. Create an R2 bucket named `agentic-inbox`: `wrangler r2 bucket create agentic-inbox`
 
 ### Deploy
@@ -79,6 +81,8 @@ vp run deploy
 Any user who passes the shared Cloudflare Access policy can access all mailboxes in this app by design. This includes the MCP server at `/mcp` -- external AI tools (Claude Code, Cursor, etc.) connected via MCP can operate on any mailbox by passing a `mailboxId` parameter. There is no per-mailbox authorization; the Cloudflare Access policy is the single trust boundary.
 
 ## Architecture
+
+> Full diagram, trade-offs, and data flow: `docs/architecture.md`.
 
 ```
 ┌──────────────┐     ┌──────────────────┐     ┌─────────────────┐

@@ -13,10 +13,6 @@
 - `app/hooks/useUIStore.ts:isAgentPanelOpen` defaults `false`, persisted to `localStorage:agentPanelOpen`. `app/routes/mailbox.tsx` conditionally mounts `AgentSidebar` only when open (saves WS + `agents/react` dynamic import).
 - Toggle in `app/components/Header.tsx:RobotIcon` (desktop `hidden lg:flex`).
 
-## Tests to add
-
-- `receiveEmail` matrix `agentAutoDraft` true/false; `agent.test.ts` 0 AI calls when gated off; E2E asserts sidebar closed on `/mailbox/:id/emails/inbox`.
-
 ## References
 
 - Workers AI models catalog: <https://developers.cloudflare.com/workers-ai/models/index.md>

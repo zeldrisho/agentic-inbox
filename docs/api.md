@@ -1,6 +1,20 @@
 # REST API Reference
 
-The Hono API (`workers/index.ts`) serves `/api/v1/...`. All routes sit behind the global Cloudflare Access middleware (see `docs/security-invariants.md`); routes under `/mailboxes/:mailboxId/*` additionally require the mailbox to exist (`requireMailbox`). Unless noted, requests and responses are JSON.
+The Hono API (`workers/index.ts`) serves `/api/v1/...`. All routes sit behind the global Cloudflare Access middleware (see `docs/security-invariants.md`); routes under `/mailboxes/:mailboxId/*` additionally require the mailbox to exist (`requireMailbox`). Unless noted, requests and responses are JSON. Every request must carry a valid Cloudflare Access JWT in `cf-access-jwt-assertion` (missing/invalid → `403`); `DOMAINS`/`EMAIL_ADDRESSES` mismatches return `403`, Zod validation failures `400`, and missing mailboxes/emails `404`. Pagination on list/search endpoints: `page` (default `1`), `limit` (default `20`, max `100`).
+
+## Examples
+
+```bash
+# Create mailbox
+curl -H "cf-access-jwt-assertion: $TOKEN" -H "Content-Type: application/json" \
+  -d '{"email":"hello@example.com","name":"Hello"}' \
+  https://inbox.example.com/api/v1/mailboxes
+
+# Send email (202 on success)
+curl -H "cf-access-jwt-assertion: $TOKEN" -H "Content-Type: application/json" \
+  -d '{"to":"bob@example.com","subject":"Hi","body":"Hello"}' \
+  https://inbox.example.com/api/v1/mailboxes/hello@example.com/emails
+```
 
 ## Config
 
@@ -74,4 +88,5 @@ The Hono API (`workers/index.ts`) serves `/api/v1/...`. All routes sit behind th
 ## Notes
 
 - Request bodies are validated with Zod (`workers/lib/schemas.ts` and inline schemas in `workers/index.ts`); invalid input returns `400`.
-- Email delivery and auto-drafting are asynchronous (deferred via `executionCtx.waitUntil`); the API responds before they complete.
+- `POST /mailboxes/:id/emails` is `202` (`{id, status:"sent"}`) — delivery is deferred via `executionCtx.waitUntil(EMAIL.send)`; auto-draft (when `agentAutoDraft` is on) is also deferred. Other writes are `200`/`201`.
+- No rate-limit headers are exposed; a `429` may be returned by the send path under load — retry with backoff.
