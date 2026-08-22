@@ -4,7 +4,7 @@
 
 import { DurableObject } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/durable-sqlite";
-import { eq, and, or, asc, desc, sql } from "drizzle-orm";
+import { eq, and, or, asc, desc, sql, inArray } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import * as schema from "../db/schema";
 import { Folders } from "../../shared/folders";
@@ -898,6 +898,77 @@ export class MailboxDO extends DurableObject<Env> {
     if (attachments.length > 0) {
       this.db.insert(schema.attachments).values(attachments).run();
     }
+  }
+
+  // ── Catch-all takeover ────────────────────────────────────────
+
+  /**
+   * Extracts inbox emails addressed to `recipient` (exact match among the
+   * comma-separated recipient tokens) along with their attachment rows, and
+   * removes them from this mailbox.
+   *
+   * Used when a mailbox is created after catch-all routing already delivered
+   * its mail to a domain admin mailbox. R2 attachment blobs are intentionally
+   * left in place: their keys (`attachments/<emailId>/<attId>/<filename>`) are
+   * stable and are reused by the receiving mailbox's email rows.
+   *
+   * @param recipient - Exact mailbox address to take over mail for
+   * @returns Extracted emails with their attachments, or `null` when nothing matched
+   */
+  async extractEmailsByRecipient(recipient: string): Promise<{
+    emails: EmailData[];
+    attachments: AttachmentData[];
+  } | null> {
+    const lower = recipient.toLowerCase().trim();
+    if (!lower) return null;
+
+    const rows = this.db
+      .select()
+      .from(schema.emails)
+      .where(
+        sql`${schema.emails.folder_id} = (SELECT id FROM folders WHERE name = ${Folders.INBOX} OR id = ${Folders.INBOX} LIMIT 1)`,
+      )
+      .all();
+
+    const matched = rows.filter((r) =>
+      (r.recipient ?? "")
+        .toLowerCase()
+        .split(",")
+        .map((s) => s.trim())
+        .includes(lower),
+    );
+    if (matched.length === 0) return null;
+
+    const ids = matched.map((m) => m.id);
+    const attRows = this.db
+      .select()
+      .from(schema.attachments)
+      .where(inArray(schema.attachments.email_id, ids))
+      .all();
+
+    this.db.delete(schema.attachments).where(inArray(schema.attachments.email_id, ids)).run();
+    this.db.delete(schema.emails).where(inArray(schema.emails.id, ids)).run();
+
+    return {
+      emails: matched.map((r) => ({
+        id: r.id,
+        subject: r.subject ?? "",
+        sender: r.sender ?? "",
+        recipient: r.recipient ?? "",
+        cc: r.cc,
+        bcc: r.bcc,
+        date: r.date ?? new Date().toISOString(),
+        body: r.body ?? "",
+        read: !!r.read,
+        starred: !!r.starred,
+        in_reply_to: r.in_reply_to,
+        email_references: r.email_references,
+        thread_id: r.thread_id,
+        message_id: r.message_id,
+        raw_headers: r.raw_headers,
+      })),
+      attachments: attRows,
+    };
   }
 
   // ── Destruction ────────────────────────────────────────────────

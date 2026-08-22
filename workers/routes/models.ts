@@ -6,8 +6,6 @@ import type { Context } from "hono";
 import { FALLBACK_MODELS } from "../../shared/models";
 import type { Env } from "../types";
 
-const MODELS_CATALOG_URL = "https://developers.cloudflare.com/workers-ai/models/index.md";
-const LLMS_URL = MODELS_CATALOG_URL;
 const CACHE_R2_KEY = "cache/models.json";
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 
@@ -33,58 +31,43 @@ function fallbackCatalog(): CatalogModel[] {
 }
 
 /**
- * Parses Workers AI model links from a catalog document.
+ * Fetches the live Workers AI catalog through the AI binding's model search
+ * (the same backend as `GET /accounts/{account_id}/ai/models/search`). The
+ * API hides models past their planned deprecation date by default; entries
+ * that still report `deprecated: true` are filtered out defensively so the
+ * selector never offers a model the platform is retiring.
  *
- * @param text - Markdown text containing Workers AI model links
- * @returns Normalized catalog entries, or `null` if no model links are found
+ * @param ai - The Workers AI binding
+ * @returns Live catalog entries sorted by id, or `null` if the search failed
  */
-function parseLlmsTxt(text: string): CatalogModel[] | null {
-  // Extract slug from every ".../workers-ai/models/<slug>/" link in the markdown.
-  // The markdown catalog uses short slugs like "kimi-k2.5", "llama-3.1-8b-instruct".
-  // We map those back to full "@cf/..." IDs via the fallback list when possible;
-  // otherwise we surface the slug as "@cf/<slug>" so the UI still shows something live.
-  const urlRegex = /https:\/\/developers\.cloudflare\.com\/workers-ai\/models\/([^/)\s#?"]+)/g;
-  const slugs = new Set<string>();
-  let m: RegExpExecArray | null;
-  while ((m = urlRegex.exec(text))) {
-    let slug = m[1].replace(/\.md$/, "").replace(/\/$/, "");
-    if (!slug || slug === "index" || slug.startsWith("@")) {
-      if (slug.startsWith("@cf/") || slug.startsWith("@hf/")) {
-        slugs.add(slug);
-        continue;
-      }
-      // Skip empty slugs, the catalog "index" page, and bare "@..." segments.
-      continue;
-    }
-    // ignore non-model segments like "index"
-    if (slug.includes("/")) continue;
-    slugs.add(slug);
-  }
-  if (slugs.size === 0) return null;
+/**
+ * Runtime search entry. Extends the generated `AiModelsSearchObject` with
+ * deprecation metadata that the type does not model yet but the API returns.
+ */
+type SearchEntry = AiModelsSearchObject & { deprecated?: boolean };
 
-  // Build lookup: short name -> full id from fallback list
-  const shortToFull = new Map<string, string>();
-  for (const full of FALLBACK_MODELS) {
-    const short = full.split("/").pop()!;
-    shortToFull.set(short, full);
-  }
+async function fetchLiveCatalog(ai: Ai): Promise<CatalogModel[] | null> {
+  try {
+    // SAFETY: the binding returns AiModelsSearchObject entries; the runtime payload additionally carries `deprecated`, modeled by SearchEntry.
+    const raw = (await ai.models({ task: "Text Generation" })) as SearchEntry[];
+    if (!Array.isArray(raw) || raw.length === 0) return null;
 
-  const ids = new Set<string>();
-  for (const slug of slugs) {
-    if (slug.startsWith("@cf/") || slug.startsWith("@hf/")) {
-      ids.add(slug);
-    } else if (shortToFull.has(slug)) {
-      ids.add(shortToFull.get(slug)!);
+    const models: CatalogModel[] = [];
+    for (const m of raw) {
+      if (!m.name || !m.name.startsWith("@")) continue;
+      if (m.deprecated === true) continue;
+      models.push({
+        id: m.name,
+        name: m.name.split("/").pop() || m.name,
+        task: m.task?.name ?? "Text Generation",
+        functionCalling: true,
+      });
     }
-    // Omit unknown slugs that don't match any known model
+    if (models.length === 0) return null;
+    return models.sort((a, b) => a.id.localeCompare(b.id));
+  } catch {
+    return null;
   }
-  if (ids.size === 0) return null;
-  return [...ids].map((id) => ({
-    id,
-    name: id.split("/").pop() || id,
-    task: "Text Generation",
-    functionCalling: true,
-  }));
 }
 
 /**
@@ -132,36 +115,19 @@ export async function handleGetModels(c: Context<{ Bindings: Env }>) {
     }
   }
 
-  let models: CatalogModel[] | null = null;
-  let source = "models/index.md";
+  const live = await fetchLiveCatalog(c.env.AI);
+  let models: CatalogModel[];
+  let source: string;
   let warning: string | undefined;
 
-  try {
-    const res = await fetch(LLMS_URL, {
-      headers: { Accept: "text/markdown, text/plain, */*" },
-    });
-    if (res.ok) {
-      const text = await res.text();
-      models = parseLlmsTxt(text);
-      if (!models || models.length === 0) {
-        // No parseable models — fall back
-        models = null;
-      }
-    } else {
-      models = null;
-    }
-  } catch {
-    models = null;
-  }
-
-  if (!models) {
+  if (live) {
+    models = live;
+    source = "ai-models-search";
+  } else {
     models = fallbackCatalog();
     source = "fallback";
     warning = "using fallback list";
   }
-
-  // Filter to Text Generation / function calling if metadata available — fallback already is filtered
-  // If we parsed real catalog, we already filtered; keep as is.
 
   // eslint-disable-next-line anti-slop/no-unsafe-dictionary-type, anti-slop/no-known-value-widening
   const payload: Record<string, unknown> = {
@@ -197,8 +163,4 @@ export async function handleGetModels(c: Context<{ Bindings: Env }>) {
   }
 
   return c.json(payload);
-}
-
-export function parseLlmsTxtForTest(text: string) {
-  return parseLlmsTxt(text);
 }

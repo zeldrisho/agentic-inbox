@@ -180,6 +180,55 @@ app.get("/api/v1/config", (c) => {
 
 app.get("/api/v1/models", handleGetModels);
 
+/**
+ * Re-files catch-all mail into a newly created mailbox.
+ *
+ * While an address didn't exist, inbound mail for it was routed (and mirrored)
+ * to the domain's explicit admin mailbox (`admin@`, `catchall@`, `catch-all@`).
+ * Once the address is created, this moves those messages — with their
+ * attachment rows — from each admin DO into the new mailbox's DO. R2 blobs are
+ * left untouched: their keys are stable and reused by the new email rows.
+ *
+ * Only explicit admin mailboxes are used as sources; catch-all fallbacks to
+ * ordinary first-mailbox-on-domain routing are never migrated.
+ *
+ * @param env - Worker environment providing R2 and Durable Object bindings
+ * @param mailboxId - The address that was just created
+ * @returns Number of emails migrated
+ */
+async function migrateCatchAllMail(env: Env, mailboxId: string): Promise<number> {
+  const domain = mailboxId.split("@")[1];
+  if (!domain) return 0;
+
+  const explicitAdmins = [`admin@${domain}`, `catchall@${domain}`, `catch-all@${domain}`].filter(
+    (a) => a !== mailboxId,
+  );
+
+  let migrated = 0;
+  for (const adminId of explicitAdmins) {
+    if (!(await env.BUCKET.head(`mailboxes/${adminId}.json`))) continue;
+    const adminStub = env.MAILBOX.get(env.MAILBOX.idFromName(adminId));
+    const extracted = await adminStub.extractEmailsByRecipient(mailboxId);
+    if (!extracted || extracted.emails.length === 0) continue;
+
+    const targetStub = env.MAILBOX.get(env.MAILBOX.idFromName(mailboxId));
+    const attachmentsByEmail = new Map<string, typeof extracted.attachments>();
+    for (const att of extracted.attachments) {
+      const list = attachmentsByEmail.get(att.email_id) ?? [];
+      list.push(att);
+      attachmentsByEmail.set(att.email_id, list);
+    }
+    for (const email of extracted.emails) {
+      await targetStub.createEmail(Folders.INBOX, email, attachmentsByEmail.get(email.id) ?? []);
+    }
+    migrated += extracted.emails.length;
+    console.info(
+      `Catch-all takeover: moved ${extracted.emails.length} emails ${adminId} -> ${mailboxId}`,
+    );
+  }
+  return migrated;
+}
+
 // -- Mailboxes ------------------------------------------------------
 
 app.get("/api/v1/mailboxes", async (c) => {
@@ -210,7 +259,16 @@ app.post("/api/v1/mailboxes", async (c) => {
   await c.env.BUCKET.put(key, JSON.stringify(finalSettings));
   const stub = c.env.MAILBOX.get(c.env.MAILBOX.idFromName(email));
   await stub.getFolders();
-  return c.json({ id: email, email, name, settings: finalSettings }, 201);
+  // Take over any catch-all mail that was routed to a domain admin while this
+  // address did not exist. Best-effort: creation succeeds even if migration fails.
+  let migratedInbox = 0;
+  try {
+    migratedInbox = await migrateCatchAllMail(c.env, email);
+  } catch (e) {
+    // SAFETY: caught error is unknown, assert Error to read message
+    console.error(`Catch-all migration failed for ${email}:`, (e as Error).message);
+  }
+  return c.json({ id: email, email, name, settings: finalSettings, migratedInbox }, 201);
 });
 
 app.get("/api/v1/mailboxes/:mailboxId", async (c) => {
