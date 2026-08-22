@@ -2,7 +2,14 @@
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 
-import { Badge, Button, Loader, Tooltip, useKumoToastManager } from "@cloudflare/kumo";
+import {
+  Badge,
+  Button,
+  DropdownMenu,
+  Loader,
+  Tooltip,
+  useKumoToastManager,
+} from "@cloudflare/kumo";
 import { SquareButton } from "~/components/ui/SquareButton";
 import {
   ArrowUpIcon,
@@ -19,6 +26,7 @@ import {
   StopIcon,
   PencilSimpleIcon,
   ArrowsClockwiseIcon,
+  CaretDownIcon,
 } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router";
@@ -531,20 +539,47 @@ function AgentChatConnected({
       {/* Model switch + Input — switch lives near send for instant session change */}
       <div className="shrink-0 border-t border-kumo-line px-3 py-2 space-y-2">
         <div className="flex items-center gap-1.5">
-          <select
-            aria-label="Agent model"
-            value={currentModel}
-            onChange={(e) => void handleModelChange(e.target.value)}
-            disabled={isSwitchingModel}
-            className="flex-1 min-w-0 rounded-lg border border-kumo-line bg-kumo-control px-2 py-1.5 text-xs text-kumo-default focus:outline-none focus:ring-1 focus:ring-kumo-ring disabled:opacity-60"
-          >
-            <option value={AUTOROUTE_SENTINEL}>Autoroute — recommended</option>
-            {models.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name} ({m.id}){m.functionCalling ? " · tools" : ""}
-              </option>
-            ))}
-          </select>
+          <DropdownMenu>
+            <DropdownMenu.Trigger
+              render={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={<CaretDownIcon size={12} />}
+                  disabled={isSwitchingModel}
+                  loading={isSwitchingModel}
+                  aria-label="Agent model"
+                  className="flex-1 min-w-0 justify-between"
+                >
+                  <span className="truncate">{modelLabel}</span>
+                </Button>
+              }
+            />
+            <DropdownMenu.Content align="start" className="w-64">
+              <DropdownMenu.RadioGroup
+                value={currentModel}
+                onValueChange={(value) => void handleModelChange(value)}
+              >
+                <DropdownMenu.RadioItem value={AUTOROUTE_SENTINEL}>
+                  Autoroute — recommended
+                  <DropdownMenu.RadioItemIndicator />
+                </DropdownMenu.RadioItem>
+                <DropdownMenu.Separator />
+                {models.map((m) => (
+                  <DropdownMenu.RadioItem key={m.id} value={m.id}>
+                    <span className="flex flex-col min-w-0">
+                      <span className="truncate">{m.name}</span>
+                      <span className="text-[10px] text-kumo-subtle truncate font-mono">
+                        {m.id}
+                        {m.functionCalling ? " · tools" : ""}
+                      </span>
+                    </span>
+                    <DropdownMenu.RadioItemIndicator />
+                  </DropdownMenu.RadioItem>
+                ))}
+              </DropdownMenu.RadioGroup>
+            </DropdownMenu.Content>
+          </DropdownMenu>
           <Tooltip content="Refresh model list" asChild>
             <SquareButton
               variant="ghost"
