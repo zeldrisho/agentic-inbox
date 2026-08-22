@@ -138,20 +138,14 @@ app.get("/api/v1/config", (c) => {
 app.get("/api/v1/models", handleGetModels);
 
 /**
- * Re-files catch-all mail into a newly created mailbox.
+ * Migrates catch-all messages to a newly created mailbox.
  *
- * While an address didn't exist, inbound mail for it was routed (and mirrored)
- * to the domain's explicit admin mailbox (`admin@`, `catchall@`, `catch-all@`).
- * Once the address is created, this moves those messages — with their
- * attachment rows — from each admin DO into the new mailbox's DO. R2 blobs are
- * left untouched: their keys are stable and reused by the new email rows.
+ * Only messages routed through explicit domain admin mailboxes are migrated.
+ * Associated attachment metadata is transferred while the referenced R2 objects
+ * remain in place.
  *
- * Only explicit admin mailboxes are used as sources; catch-all fallbacks to
- * ordinary first-mailbox-on-domain routing are never migrated.
- *
- * @param env - Worker environment providing R2 and Durable Object bindings
- * @param mailboxId - The address that was just created
- * @returns Number of emails migrated
+ * @param mailboxId - The newly created mailbox address
+ * @returns The number of emails migrated
  */
 async function migrateCatchAllMail(env: Env, mailboxId: string): Promise<number> {
   const domain = mailboxId.split("@")[1];

@@ -46,6 +46,11 @@ function fallbackCatalog(): CatalogModel[] {
  */
 type SearchEntry = AiModelsSearchObject & { deprecated?: boolean };
 
+/**
+ * Retrieves and normalizes available text-generation models from Workers AI.
+ *
+ * @returns Sorted catalog models, or `null` when the catalog cannot be retrieved or contains no usable models.
+ */
 async function fetchLiveCatalog(ai: Ai): Promise<CatalogModel[] | null> {
   try {
     // SAFETY: the binding returns AiModelsSearchObject entries; the runtime payload additionally carries `deprecated`, modeled by SearchEntry.

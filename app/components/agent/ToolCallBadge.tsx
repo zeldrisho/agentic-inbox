@@ -59,6 +59,7 @@ const TOOL_LABELS = {
  *
  * @param toolName - The identifier of the tool call.
  * @param state - The current state of the tool call.
+ * @returns A badge displaying the tool label, icon, and completion status.
  */
 export function ToolCallBadge({ toolName, state }: { toolName: string; state: string }) {
   // SAFETY: `toolName` is a dynamic tool identifier; it is a known key of TOOL_LABELS when recognized.

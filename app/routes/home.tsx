@@ -23,7 +23,7 @@ export function meta() {
 }
 
 /**
- * Renders the mailbox listing page and manages mailbox creation and deletion.
+ * Renders the mailbox listing page with controls for creating and deleting mailboxes.
  */
 export default function HomeRoute() {
   const toastManager = useKumoToastManager();
