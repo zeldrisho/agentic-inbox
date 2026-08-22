@@ -377,9 +377,7 @@ function AgentChatConnected({
         mailboxId,
         settings: nextSettings,
       });
-      toastManager.add({
-        title: `Model switched to ${next === AUTOROUTE_SENTINEL ? "autoroute" : next}`,
-      });
+      // No success toast — the selector + header badge already reflect the switch.
     } catch {
       toastManager.add({ title: "Failed to switch model", variant: "error" });
     } finally {
