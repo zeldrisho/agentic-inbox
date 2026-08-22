@@ -73,7 +73,7 @@ function createMockEnv(mailboxSettings: Record<string, unknown> = {}) {
       message_id: "msg-1",
     })),
     getEmails: vi.fn(async () => []),
-    createEmail: vi.fn(async () => {}),
+    createEmail: vi.fn(async (..._args: unknown[]) => {}),
   };
   const env = {
     BUCKET: {
@@ -87,7 +87,7 @@ function createMockEnv(mailboxSettings: Record<string, unknown> = {}) {
     AI: { run: vi.fn(async () => ({ response: "NO" })) } as unknown as Ai,
     MAILBOX: {
       idFromName: vi.fn((n: string) => n as unknown as DurableObjectId),
-      get: vi.fn(() => stub as unknown as DurableObjectStub<unknown>),
+      get: vi.fn(() => stub as unknown as DurableObjectStub),
     } as unknown as DurableObjectNamespace,
     _stub: stub,
   } as unknown as Env & { _stub: typeof stub };
@@ -141,7 +141,7 @@ describe("EmailAgent.handleNewEmail gating", () => {
     expect(generateTextMock).not.toHaveBeenCalled();
     // Persisted a blocked notice to chat
     expect(agent.messages.length).toBe(2);
-    const assistantMsg = agent.messages[1] as { content: string };
+    const assistantMsg = agent.messages[1] as unknown as { content: string };
     expect(assistantMsg.content).toContain("Blocked auto-draft");
   });
 
@@ -155,12 +155,12 @@ describe("EmailAgent.handleNewEmail gating", () => {
     env._stub.getEmails = vi.fn(async () => [
       { id: "e1", sender: "a@ex.com", recipient: "b@ex.com", subject: "Hi", date: "2026-01-01", folder_id: "inbox" },
       { id: "e2", sender: "b@ex.com", recipient: "a@ex.com", subject: "Hi", date: "2026-01-02", folder_id: "inbox" },
-    ]);
+    ]) as unknown as typeof env._stub.getEmails;
     const agent = createAgent(env);
     const result = await agent.handleNewEmail(NEW_EMAIL);
     expect(result).toBeUndefined();
     expect(generateTextMock).not.toHaveBeenCalled();
-    const assistantMsg = agent.messages[1] as { content: string };
+    const assistantMsg = agent.messages[1] as unknown as { content: string };
     expect(assistantMsg.content).toContain("Blocked auto-draft");
   });
 
@@ -247,9 +247,9 @@ describe("EmailAgent inline draft fallback", () => {
     const result = await agent.handleNewEmail(NEW_EMAIL);
     expect(result).toMatchObject({ status: "draft_generated" });
     expect(env._stub.createEmail).toHaveBeenCalled();
-    const created = env._stub.createEmail.mock.calls[0];
-    expect(created[0]).toBe("draft");
-    expect(created[1].in_reply_to).toBe("e1");
+    const [folder, draft] = env._stub.createEmail.mock.calls[0] ?? [];
+    expect(folder).toBe("draft");
+    expect((draft as { in_reply_to?: string }).in_reply_to).toBe("e1");
   });
 
   it("skips draft save when verifyDraft returns blank (blank-save guard)", async () => {
@@ -277,7 +277,7 @@ describe("EmailAgent inline draft fallback", () => {
     // createEmail not called by the inline fallback path (tool handles it)
     expect(env._stub.createEmail).not.toHaveBeenCalled();
     // Chat persisted with simple success message
-    const assistantMsg = agent.messages[1] as { content: string };
+    const assistantMsg = agent.messages[1] as unknown as { content: string };
     expect(assistantMsg.content).toContain("Created draft reply");
   });
 });

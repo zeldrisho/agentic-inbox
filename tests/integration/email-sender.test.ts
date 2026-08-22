@@ -4,6 +4,7 @@
 
 import { describe, it, expect, vi } from "vite-plus/test";
 import { sendEmail } from "workers/email-sender";
+import type { ThreadingHeaders } from "workers/lib/email-helpers";
 
 function mockBinding() {
   return { send: vi.fn(async () => ({ messageId: "mid-1" })) } as unknown as SendEmail;
@@ -65,7 +66,7 @@ describe("sendEmail", () => {
       to: "bob@example.com",
       from: "alice@example.com",
       subject: "Hi",
-      headers: {},
+      headers: {} as ThreadingHeaders,
     });
     const sent = (binding.send as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(sent.headers).toBeUndefined();

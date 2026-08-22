@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from "vite-plus/test";
 vi.mock("cloudflare:workers", () => ({ DurableObject: class { ctx: unknown; env: unknown; constructor(state: unknown, env: unknown) { (this as unknown as { ctx: unknown }).ctx = state; (this as unknown as { env: unknown }).env = env; } } }));
 vi.mock("drizzle-orm/durable-sqlite", () => ({ drizzle: vi.fn(() => ({})) }));
 import { MailboxDO } from "workers/durableObject";
+import type { Env } from "workers/types";
 import { Folders } from "shared/folders";
 
 // Helpers to build a mock SqlStorage.exec that records queries
@@ -62,7 +63,7 @@ function createMailboxDO(sqlExec?: ReturnType<typeof createMockSql>["exec"]) {
   const { exec } = createMockSql(sqlExec);
   const storage = createMockStorage(exec);
   const state = { storage } as unknown as DurableObjectState;
-  const env = {} as unknown as Cloudflare.Env;
+  const env = {} as unknown as Env;
   // Bypass migrations by mocking applyMigrations? The constructor calls applyMigrations which will call sql.exec.
   // Our exec is already mocked to handle migration queries.
   const instance = new MailboxDO(state, env);
@@ -566,7 +567,7 @@ describe("MailboxDO folder CRUD", () => {
           { id: "inbox", name: "Inbox", unreadCount: 3 },
         ]) })) })),
       })),
-    }));
+    })) as unknown as typeof db.select;
     const { instance } = createMailboxDO();
     (instance as unknown as { db: unknown }).db = db as unknown as typeof instance.db;
     expect(await instance.getFolders()).toEqual([{ id: "inbox", name: "Inbox", unreadCount: 3 }]);

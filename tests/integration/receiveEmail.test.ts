@@ -65,7 +65,7 @@ describe("receiveEmail size cap", () => {
     } as unknown as Env;
     const bytes = new Uint8Array(10);
     const stream = makeStream(bytes);
-    await expect(receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: 26 * 1024 * 1024 }, env as unknown as Env, { waitUntil: vi.fn() } as unknown as ExecutionContext)).rejects.toThrow(/too large/i);
+    await expect(receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: 26 * 1024 * 1024 }, env as unknown as Parameters<typeof receiveEmail>[1], { waitUntil: vi.fn() } as unknown as ExecutionContext)).rejects.toThrow(/too large/i);
   });
 
   it("throws on invalid stream size", async () => {
@@ -76,7 +76,7 @@ describe("receiveEmail size cap", () => {
     } as unknown as Env;
     const bytes = new Uint8Array(10);
     const stream = makeStream(bytes);
-    await expect(receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: 0 }, env as unknown as Env, { waitUntil: vi.fn() } as unknown as ExecutionContext)).rejects.toThrow(/Invalid stream size/i);
+    await expect(receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: 0 }, env as unknown as Parameters<typeof receiveEmail>[1], { waitUntil: vi.fn() } as unknown as ExecutionContext)).rejects.toThrow(/Invalid stream size/i);
   });
 
   it("throws when stream exceeds declared size", async () => {
@@ -90,7 +90,7 @@ describe("receiveEmail size cap", () => {
       MAILBOX: createMockMailboxStore().ns,
       EMAIL_ADDRESSES: [],
     } as unknown as Env;
-    await expect(receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: 10 }, env as unknown as Env, { waitUntil: vi.fn() } as unknown as ExecutionContext)).rejects.toThrow(/exceeds declared size/i);
+    await expect(receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: 10 }, env as unknown as Parameters<typeof receiveEmail>[1], { waitUntil: vi.fn() } as unknown as ExecutionContext)).rejects.toThrow(/exceeds declared size/i);
   });
 });
 
@@ -106,7 +106,7 @@ describe("receiveEmail allowlist", () => {
     } as unknown as Env;
     const raw = buildRawEmail("From: sender@ex.com\r\nTo: other@example.com\r\nSubject: hi\r\nMessage-ID: <m1@ex.com>", "hello");
     const stream = makeStream(raw);
-    await receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: raw.length }, env as unknown as Env, { waitUntil: vi.fn() } as unknown as ExecutionContext);
+    await receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: raw.length }, env as unknown as Parameters<typeof receiveEmail>[1], { waitUntil: vi.fn() } as unknown as ExecutionContext);
     expect(stub.createEmail).not.toHaveBeenCalled();
   });
 
@@ -122,7 +122,7 @@ describe("receiveEmail allowlist", () => {
     // also need mailbox existence for effective mailbox check: bucket head for allowed mailbox returns truthy
     const raw = buildRawEmail("From: sender@ex.com\r\nTo: allowed@example.com\r\nSubject: hi", "hello");
     const stream = makeStream(raw);
-    await receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: raw.length }, env as unknown as Env, { waitUntil: vi.fn(async (p: Promise<unknown>) => { await p; }) } as unknown as ExecutionContext);
+    await receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: raw.length }, env as unknown as Parameters<typeof receiveEmail>[1], { waitUntil: vi.fn(async (p: Promise<unknown>) => { await p; }) } as unknown as ExecutionContext);
     expect(stub.createEmail).toHaveBeenCalled();
   });
 
@@ -132,7 +132,7 @@ describe("receiveEmail allowlist", () => {
     const env = { BUCKET: bucket, MAILBOX: ns, EMAIL_ADDRESSES: [] } as unknown as Env;
     const raw = buildRawEmail("From: sender@ex.com\r\nSubject: hi", "hello");
     const stream = makeStream(raw);
-    await expect(receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: raw.length }, env as unknown as Env, { waitUntil: vi.fn() } as unknown as ExecutionContext)).rejects.toThrow(/empty to/i);
+    await expect(receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: raw.length }, env as unknown as Parameters<typeof receiveEmail>[1], { waitUntil: vi.fn() } as unknown as ExecutionContext)).rejects.toThrow(/empty to/i);
   });
 });
 
@@ -161,7 +161,7 @@ describe("receiveEmail admin mirror + agentAutoDraft matrix", () => {
   it("catch-all routes unknown recipient to admin", async () => {
     const { bucket, ns, adminStore } = setupMirror();
     // unknown@example.com does NOT exist, so head returns null; admin exists
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ status: "ok" })));
+    const fetchMock = vi.fn(async (_req: Request) => new Response(JSON.stringify({ status: "ok" })));
     const agentNs = {
       idFromName: vi.fn((name: string) => name),
       get: vi.fn(() => ({ fetch: fetchMock })),
@@ -178,7 +178,7 @@ describe("receiveEmail admin mirror + agentAutoDraft matrix", () => {
     const raw = buildRawEmail("From: sender@ex.com\r\nTo: unknown@example.com\r\nSubject: test", "body");
     const stream = makeStream(raw);
     const waitUntil = vi.fn((p: Promise<unknown>) => p.catch(() => {}));
-    await receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: raw.length }, env as unknown as Env, { waitUntil: waitUntil as unknown as (p: Promise<unknown>) => void } as unknown as ExecutionContext);
+    await receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: raw.length }, env as unknown as Parameters<typeof receiveEmail>[1], { waitUntil: waitUntil as unknown as (p: Promise<unknown>) => void } as unknown as ExecutionContext);
     // admin stub should have been called for primary delivery (effectiveMailboxId is admin)
     expect(adminStore.stub.createEmail).toHaveBeenCalled();
     // When effectiveMailboxId === adminMailboxId, no separate mirror should be created
@@ -203,7 +203,7 @@ describe("receiveEmail admin mirror + agentAutoDraft matrix", () => {
         return adminStore.stub;
       }),
     };
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ status: "ok" })));
+    const fetchMock = vi.fn(async (_req: Request) => new Response(JSON.stringify({ status: "ok" })));
     const env = {
       BUCKET: bucket,
       MAILBOX: ns,
@@ -214,7 +214,7 @@ describe("receiveEmail admin mirror + agentAutoDraft matrix", () => {
     const raw = buildRawEmail("From: sender@ex.com\r\nTo: user@example.com\r\nSubject: test", "body");
     const stream = makeStream(raw);
     const waitUntil = vi.fn((p: Promise<unknown>) => p.catch(() => {}));
-    await receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: raw.length }, env as unknown as Env, { waitUntil: waitUntil as unknown as (p: Promise<unknown>) => void } as unknown as ExecutionContext);
+    await receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: raw.length }, env as unknown as Parameters<typeof receiveEmail>[1], { waitUntil: waitUntil as unknown as (p: Promise<unknown>) => void } as unknown as ExecutionContext);
     // user mailbox should receive the email directly (recipient mailbox exists)
     expect(userStore.stub.createEmail).toHaveBeenCalled();
     // no catch-all routing occurred, so no mirror copy should be created for admin
@@ -224,7 +224,7 @@ describe("receiveEmail admin mirror + agentAutoDraft matrix", () => {
   it("does not trigger agent when agentAutoDraft is false", async () => {
     const bucket = createMockBucket({ "mailboxes/user@example.com.json": { agentAutoDraft: false } });
     const { ns, stub } = createMockMailboxStore();
-    const fetchMock = vi.fn(async () => new Response("ok"));
+    const fetchMock = vi.fn(async (_req: Request) => new Response("ok"));
     const env = {
       BUCKET: bucket,
       MAILBOX: ns,
@@ -234,7 +234,7 @@ describe("receiveEmail admin mirror + agentAutoDraft matrix", () => {
     const raw = buildRawEmail("From: sender@ex.com\r\nTo: user@example.com\r\nSubject: hi", "hello");
     const stream = makeStream(raw);
     const waitUntil = vi.fn();
-    await receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: raw.length }, env as unknown as Env, { waitUntil: waitUntil as unknown as (p: Promise<unknown>) => void } as unknown as ExecutionContext);
+    await receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: raw.length }, env as unknown as Parameters<typeof receiveEmail>[1], { waitUntil: waitUntil as unknown as (p: Promise<unknown>) => void } as unknown as ExecutionContext);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(waitUntil).not.toHaveBeenCalled();
   });
@@ -242,7 +242,7 @@ describe("receiveEmail admin mirror + agentAutoDraft matrix", () => {
   it("triggers agent when agentAutoDraft is true", async () => {
     const bucket = createMockBucket({ "mailboxes/user@example.com.json": { agentAutoDraft: true } });
     const { ns } = createMockMailboxStore();
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ status: "draft_generated" })));
+    const fetchMock = vi.fn(async (_req: Request) => new Response(JSON.stringify({ status: "draft_generated" })));
     const env = {
       BUCKET: bucket,
       MAILBOX: ns,
@@ -253,7 +253,7 @@ describe("receiveEmail admin mirror + agentAutoDraft matrix", () => {
     const stream = makeStream(raw);
     const waitUntilCalls: Promise<unknown>[] = [];
     const waitUntil = vi.fn((p: Promise<unknown>) => { waitUntilCalls.push(p); });
-    await receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: raw.length }, env as unknown as Env, { waitUntil: waitUntil as unknown as (p: Promise<unknown>) => void } as unknown as ExecutionContext);
+    await receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: raw.length }, env as unknown as Parameters<typeof receiveEmail>[1], { waitUntil: waitUntil as unknown as (p: Promise<unknown>) => void } as unknown as ExecutionContext);
     // waitUntil should have been called at least once and fetch invoked
     expect(waitUntil).toHaveBeenCalled();
     // Allow microtasks to flush
@@ -274,7 +274,7 @@ describe("receiveEmail admin mirror + agentAutoDraft matrix", () => {
     } as unknown as Env;
     const raw = buildRawEmail("From: sender@ex.com\r\nTo: ghost@unknown-domain.com\r\nSubject: hi", "body");
     const stream = makeStream(raw);
-    await receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: raw.length }, env as unknown as Env, { waitUntil: vi.fn() } as unknown as ExecutionContext);
+    await receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: raw.length }, env as unknown as Parameters<typeof receiveEmail>[1], { waitUntil: vi.fn() } as unknown as ExecutionContext);
     expect(stub.createEmail).not.toHaveBeenCalled();
   });
 });

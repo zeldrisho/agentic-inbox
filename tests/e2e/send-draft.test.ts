@@ -72,7 +72,7 @@ describe("E2E: send→draft flow", () => {
       } as unknown as R2Bucket,
       MAILBOX: {
         idFromName: vi.fn((n: string) => n as unknown as DurableObjectId),
-        get: vi.fn(() => stub as unknown as DurableObjectStub<unknown>),
+        get: vi.fn(() => stub as unknown as DurableObjectStub),
       } as unknown as DurableObjectNamespace,
       EMAIL: { send: vi.fn() } as unknown as SendEmail,
       AI: { run: vi.fn() } as unknown as Ai,
@@ -142,7 +142,7 @@ describe("E2E: instant model switch in chat", () => {
       MAILBOX: {
         idFromName: vi.fn((n: string) => n as unknown as DurableObjectId),
         get: vi.fn(
-          () => ({ getFolders: vi.fn(async () => []) }) as unknown as DurableObjectStub<unknown>,
+          () => ({ getFolders: vi.fn(async () => []) }) as unknown as DurableObjectStub,
         ),
       } as unknown as DurableObjectNamespace,
     } as unknown as Cloudflare.Env;

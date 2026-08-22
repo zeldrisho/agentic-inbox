@@ -25,7 +25,7 @@ describe("storeAttachments", () => {
 
   it("decodes base64, sanitizes filename, and stores under per-email key", async () => {
     const bucket = mockBucket();
-    const content = Buffer.from("hello world").toString("base64");
+    const content = "aGVsbG8gd29ybGQ=";
     const result = await storeAttachments(bucket as unknown as R2Bucket, "email-1", [
       {
         content,
@@ -50,7 +50,7 @@ describe("storeAttachments", () => {
 
   it("sanitizes path traversal characters in filename", async () => {
     const bucket = mockBucket();
-    const content = Buffer.from("x").toString("base64");
+    const content = "eA==";
     const result = await storeAttachments(bucket as unknown as R2Bucket, "email-1", [
       {
         content,
@@ -67,7 +67,7 @@ describe("storeAttachments", () => {
 
   it("defaults empty filename to untitled", async () => {
     const bucket = mockBucket();
-    const content = Buffer.from("x").toString("base64");
+    const content = "eA==";
     const result = await storeAttachments(bucket as unknown as R2Bucket, "email-1", [
       {
         content,

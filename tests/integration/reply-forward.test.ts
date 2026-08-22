@@ -50,7 +50,7 @@ function mockEnv(bucket: ReturnType<typeof mockBucket>, stub: ReturnType<typeof 
     BUCKET: bucket as unknown as R2Bucket,
     MAILBOX: {
       idFromName: vi.fn((n: string) => n as unknown as DurableObjectId),
-      get: vi.fn(() => stub as unknown as DurableObjectStub<unknown>),
+      get: vi.fn(() => stub as unknown as DurableObjectStub),
     },
     EMAIL: { send: vi.fn(async () => {}) } as unknown as SendEmail,
     AI: { run: vi.fn(async () => ({ response: "clean" })) } as unknown as Ai,

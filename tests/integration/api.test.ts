@@ -59,7 +59,7 @@ function mockEnv(bucket: ReturnType<typeof mockBucket>, mailboxStub?: ReturnType
     BUCKET: bucket as unknown as R2Bucket,
     MAILBOX: {
       idFromName: vi.fn((n: string) => n as unknown as DurableObjectId),
-      get: vi.fn(() => stub as unknown as DurableObjectStub<unknown>),
+      get: vi.fn(() => stub as unknown as DurableObjectStub),
     },
     EMAIL: { send: vi.fn(async () => {}) } as unknown as SendEmail,
     AI: { run: vi.fn(async () => ({ response: "clean" })) } as unknown as Ai,
@@ -74,7 +74,7 @@ function mockEnv(bucket: ReturnType<typeof mockBucket>, mailboxStub?: ReturnType
 }
 
 type EnvWithStub = Env & { _stub: ReturnType<typeof mockMailboxStub> };
-type Env = Cloudflare.Env & { BUCKET: R2Bucket; MAILBOX: DurableObjectNamespace; EMAIL: SendEmail; AI: Ai; EMAIL_AGENT: DurableObjectNamespace; DOMAINS: string; EMAIL_ADDRESSES: string[] };
+type Env = Omit<Cloudflare.Env, "EMAIL_ADDRESSES"> & { BUCKET: R2Bucket; MAILBOX: DurableObjectNamespace; EMAIL: SendEmail; AI: Ai; EMAIL_AGENT: DurableObjectNamespace; DOMAINS: string; EMAIL_ADDRESSES: string[] };
 
 async function requestApp(env: EnvWithStub, method: string, path: string, body?: unknown, headers: Record<string,string> = {}) {
   const init: RequestInit = { method, headers: { "Content-Type": "application/json", ...headers } };
