@@ -56,7 +56,7 @@ async function composeAndSaveDraft(page: Page, mailboxUrl: string): Promise<void
   const toInput = page.getByPlaceholder("recipient@example.com");
   await expect(toInput).toBeVisible();
   await toInput.fill(RECIPIENT);
-  await page.getByRole("textbox", { name: "Email subject" }).fill(DRAFT_SUBJECT);
+  await page.getByPlaceholder("Email subject").fill(DRAFT_SUBJECT);
   await page.locator(".ProseMirror").click();
   await page.keyboard.type(DRAFT_BODY);
 
