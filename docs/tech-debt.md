@@ -108,7 +108,7 @@ Completed — details in `docs/upgrade-notes.md`. Highlights:
 
 ## Remaining items (details)
 
-No remaining planned items — `docs/plan.md` is empty. Future majors staged one per quarter; patch/minor anytime.
+`docs/plan.md` has no remaining planned items. Future majors staged one per quarter; patch/minor anytime.
 
 ## Explicitly out of scope
 

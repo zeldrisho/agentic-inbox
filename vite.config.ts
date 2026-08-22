@@ -48,18 +48,42 @@ console.log = (...args: unknown[]) => {
 /* oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-unsafe-argument, anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion */
 const _origStderrWrite = process.stderr.write.bind(process.stderr);
 // SAFETY: filtering Vite's deprecated envFile warning at stderr level; forwarding otherwise preserves original semantics.
-process.stderr.write = ((chunk: unknown, ...args: unknown[]) => {
-  if (String(chunk).includes("envFile")) return true;
+process.stderr.write = ((
+  chunk: unknown,
+  encoding?: unknown,
+  callback?: (error?: Error) => void,
+) => {
+  const str = String(chunk);
+  if (str.includes("envFile") && str.includes("deprecated")) {
+    callback?.();
+    return true;
+  }
   // oxlint-disable-next-line anti-slop/no-unsafe-argument -- forwarding original args
-  return (_origStderrWrite as unknown as (...a: unknown[]) => boolean)(chunk as unknown, ...args);
+  return (_origStderrWrite as (c: unknown, e?: unknown, cb?: (error?: Error) => void) => boolean)(
+    chunk,
+    encoding,
+    callback,
+  );
 }) as typeof process.stderr.write;
 const _origStdoutWrite = process.stdout.write.bind(process.stdout);
 // SAFETY: same filtering for stdout (Vite may log to stdout in some environments).
-process.stdout.write = ((chunk: unknown, ...args: unknown[]) => {
-  if (String(chunk).includes("envFile")) return true;
+process.stdout.write = ((
+  chunk: unknown,
+  encoding?: unknown,
+  callback?: (error?: Error) => void,
+) => {
+  const str = String(chunk);
+  if (str.includes("envFile") && str.includes("deprecated")) {
+    callback?.();
+    return true;
+  }
   // oxlint-disable-next-line anti-slop/no-unsafe-argument -- forwarding original args
-  return (_origStdoutWrite as unknown as (...a: unknown[]) => boolean)(chunk as unknown, ...args);
-}) as typeof process.stdout.write;
+  return (_origStdoutWrite as (c: unknown, e?: unknown, cb?: (error?: Error) => void) => boolean)(
+    chunk,
+    encoding,
+    callback,
+  );
+}) as typeof process.stderr.write;
 /* oxlint-enable anti-slop/no-unknown-parameters, anti-slop/no-unsafe-argument, anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion */
 
 export default defineConfig(({ mode }) => ({

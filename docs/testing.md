@@ -54,9 +54,10 @@ libdrm, libXcomposite/Xdamage/Xrandr/Xcursor/Xi, mesa-libgbm, pango,
 alsa-lib, libxkbcommon).
 
 Minimal local set (verified by removal testing on Fedora WSL): `fontconfig`
-plus nss/nspr, libdrm, mesa-libgbm, the X11 core family (X11/Xcb/Xext/
-Xfixes/Xcomposite/Xdamage/Xrandr), libxkbcommon. `cups-libs`, `pango`,
-`libXcursor` proved removable headlessly. Caveat: `ldd` alone cannot vet
+plus nss/nspr, libdrm, mesa-libgbm, the X11 core family (libX11/libxcb/libXext/
+libXfixes/libXcomposite/libXdamage/libXrandr), libxkbcommon. `cups-libs`, `pango`,
+`libXcursor`, `atk`, `at-spi2-core`, `at-spi2-atk`, `libXi`, and `alsa-lib`
+proved removable headlessly. Caveat: `ldd` alone cannot vet
 this — Chromium dlopens fontconfig and reads /etc/fonts/fonts.conf at
 runtime, so a missing config crashes the renderer (SIGTRAP) while ldd
 stays clean. Diagnose with `DEBUG=pw:browser vp run test:e2e`.
