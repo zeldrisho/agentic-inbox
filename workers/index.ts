@@ -254,8 +254,14 @@ app.delete("/api/v1/mailboxes/:mailboxId", async (c) => {
   // 1. Wipe the mailbox DO's emails/attachments/custom folders; collect blob keys.
   const stub = asMailboxRpc(c.env.MAILBOX.get(c.env.MAILBOX.idFromName(mailboxId)));
   const blobs = await stub.destroy();
-  // 2. Delete every stored attachment blob from R2 (delete() accepts up to 1000 keys).
-  if (blobs.length > 0) await c.env.BUCKET.delete(blobs.map((b) => b.key));
+  // 2. Delete every stored attachment blob from R2 in batches (delete() accepts up to 1000 keys).
+  if (blobs.length > 0) {
+    const keys = blobs.map((b) => b.key);
+    for (let i = 0; i < keys.length; i += 1000) {
+      const batch = keys.slice(i, i + 1000);
+      await c.env.BUCKET.delete(batch);
+    }
+  }
   // 3. Best-effort: destroy the per-mailbox agent DO (chat history, schedules).
   const agentDestroyed = c.env.EMAIL_AGENT.get(c.env.EMAIL_AGENT.idFromName(mailboxId)).destroy();
   c.executionCtx.waitUntil(

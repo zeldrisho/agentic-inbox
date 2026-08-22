@@ -36,8 +36,9 @@ The `/api/*` CORS policy allows same-origin requests (no `Origin` header) and `l
 
 ## Secrets & configuration
 
-- Production secrets `POLICY_AUD` and `TEAM_DOMAIN` are provided via `wrangler secret put` (see `.dev.vars.example`). They must never be committed.
-- `DOMAINS` and `EMAIL_ADDRESSES` are non-secret vars in `wrangler.jsonc`. `EMAIL_ADDRESSES` is an optional allowlist restricting mailbox creation and inbound receipt.
+- Production secrets `POLICY_AUD`, `TEAM_DOMAIN`, and `DOMAINS` are provided via `wrangler secret put` (see `.dev.vars.example`). They must never be committed.
+- `DOMAINS` is a comma-separated list of Email Routing domains configured as a secret to prevent deploys/dashboard edits from overriding it.
+- `EMAIL_ADDRESSES` is a non-secret var in `wrangler.jsonc`. It is an optional allowlist restricting mailbox creation and inbound receipt.
 - No hardcoded credentials or signing keys exist in the source.
 
 ## Output handling
@@ -48,10 +49,9 @@ The `/api/*` CORS policy allows same-origin requests (no `Origin` header) and `l
 ## Known risks / accepted limitations
 
 - Unvalidated `CreateMailboxBody.settings` flows into `agentSystemPrompt` and is sent straight to the AI. Treat as trusted-tenant input only; do not expose it to untrusted actors.
-- `DELETE /mailboxes/:id` deletes the settings blob but **not** the Durable Object data or R2 attachment blobs (TODO in `workers/index.ts`). Orphaned data persists until a full cleanup is implemented.
 - Draft create-then-delete is not atomic (`workers/index.ts` comment).
 - Several Durable Object methods are currently reached via `(stub as any)` casts because they are not yet on the typed interface; tighten these as the typed API grows.
-- Mailbox deletion (`DELETE /mailboxes/:id`) now cascades: it wipes the mailbox DO's emails/attachments, deletes R2 attachment blobs in one batched call, best-effort destroys the per-mailbox agent DO (chat history) via `ctx.waitUntil`, then removes the settings blob. If the agent destroy fails, only chat history is orphaned — email data is fully cleaned.
+- Mailbox deletion (`DELETE /mailboxes/:id`) performs a full cascade: wipes the mailbox DO's emails and attachments, deletes R2 attachment blobs in batched requests (up to 1,000 keys each), best-effort destroys the per-mailbox agent DO (chat history) via `ctx.waitUntil`, then removes the settings blob. If the agent destroy fails, only chat history is orphaned — email data is fully cleaned.
 
 ## Review guidance
 

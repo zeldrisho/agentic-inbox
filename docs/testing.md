@@ -32,7 +32,7 @@ outside the gate.
 | `tests/shared/`, `tests/workers/lib/`, `tests/app/lib/` | Unit tests, mirroring source layout                                                                           |
 | `tests/integration/`                                    | API routes (Hono `app.fetch()`), MailboxDO, tools, MCP wiring, agent gating, inbound email, Access middleware |
 | `tests/components/`                                     | jsdom + React Testing Library component renders                                                               |
-| `tests/e2e/`                                            | jsdom simulation of critical flows                                                                            |
+| `tests/e2e/`                                            | `*.test.ts`: jsdom simulation of critical flows; `*.spec.ts`: Playwright real-browser E2E                     |
 | `tests/setup.ts`                                        | Global setup (registered as `setupFiles` in `vite.config.ts`)                                                 |
 
 Environments: `node` by default; `jsdom` via `environmentMatchGlobs` for

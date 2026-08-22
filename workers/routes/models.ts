@@ -137,29 +137,31 @@ export async function handleGetModels(c: Context<{ Bindings: Env }>) {
   };
   if (warning) payload.warning = warning;
 
-  // Write caches (best-effort)
-  try {
-    await c.env.BUCKET.put(CACHE_R2_KEY, JSON.stringify(payload));
-  } catch {
-    // ignore
-  }
-  try {
-    // SAFETY: caches global may be absent outside Workers; guard via optional chaining.
-    // eslint-disable-next-line anti-slop/require-safety-comment-for-type-assertion, anti-slop/no-chained-type-assertions
-    const defaultCache2 = (globalThis as unknown as { caches?: { default: Cache } }).caches
-      ?.default;
-    if (defaultCache2) {
-      const cacheRes = new Response(JSON.stringify(payload), {
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "public, max-age=10",
-        },
-      });
-      const cacheKey = new Request(url.origin + url.pathname);
-      void defaultCache2.put(cacheKey, cacheRes);
+  // Write caches (best-effort) — but only for live data to avoid masking recovery from transient failures
+  if (source === "ai-models-search") {
+    try {
+      await c.env.BUCKET.put(CACHE_R2_KEY, JSON.stringify(payload));
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
+    try {
+      // SAFETY: caches global may be absent outside Workers; guard via optional chaining.
+      // eslint-disable-next-line anti-slop/require-safety-comment-for-type-assertion, anti-slop/no-chained-type-assertions
+      const defaultCache2 = (globalThis as unknown as { caches?: { default: Cache } }).caches
+        ?.default;
+      if (defaultCache2) {
+        const cacheRes = new Response(JSON.stringify(payload), {
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "public, max-age=10",
+          },
+        });
+        const cacheKey = new Request(url.origin + url.pathname);
+        void defaultCache2.put(cacheKey, cacheRes);
+      }
+    } catch {
+      // ignore
+    }
   }
 
   return c.json(payload);

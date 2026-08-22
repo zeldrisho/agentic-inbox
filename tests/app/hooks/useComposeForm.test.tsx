@@ -65,8 +65,8 @@ describe("useComposeForm", () => {
   });
 
   it("blocks send when no mailbox is selected and sets the error", async () => {
-    mailboxData = { data: null } as unknown as Record<string, unknown>;
-    const { result } = renderHook(() => useComposeForm(undefined));
+    mailboxData = null;
+    const { result } = renderHook(() => useComposeForm("alice@example.com"));
     await act(async () => {
       await result.current.handleSend({ preventDefault } as React.FormEvent, noop);
     });

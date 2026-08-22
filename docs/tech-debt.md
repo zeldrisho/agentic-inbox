@@ -66,8 +66,8 @@ Implemented as a strict-order cascade in `workers/index.ts`:
    attachment's R2 key, then wipes attachments, emails, and custom folders.
    Seeded default folders are preserved so the same address can be re-created
    cleanly (migrations only run once per DO).
-2. Attachment blobs deleted from R2 in one batched call (`delete()` accepts up
-   to 1000 keys).
+2. Attachment blobs deleted from R2 in batched calls (`delete()` accepts up
+   to 1000 keys; large mailboxes are split into multiple requests).
 3. Best-effort destroy of the per-mailbox agent DO via `ctx.waitUntil`
    (non-fatal; failure orphans only chat history).
 4. Settings blob removed last — it is the existence marker.
@@ -92,9 +92,6 @@ Implementation notes worth keeping:
   (`paramsSchema | ToolAnnotations`) defeats generic type inference when the
   shape is built from a spread. Use `registerTool(name, { description,
 inputSchema: z.object({...}) }, cb)` instead — inference works there.
-- `tsc -b` has ~49 pre-existing errors in `tests/` on vanilla main; CI's
-  `vp check` doesn't surface them because it excludes test files. Fixing these
-  is folded into the maintenance item in `docs/plan.md`.
 - Tests updated for the cascade: `MailboxDO.destroy()` unit tests
   (`tests/integration/mailbox.test.ts`), DELETE-cascade API test plus an
   R2-batch-aware bucket mock (`tests/integration/api.test.ts`), and a
