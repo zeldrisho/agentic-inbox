@@ -65,7 +65,7 @@ Deploying provisions R2, Durable Objects, and Workers AI. After deploying, follo
 ## Configuration
 
 - **`wrangler.jsonc`** defines:
-  - `vars`: `DOMAINS` (Email Routing domain), `EMAIL_ADDRESSES` (optional allowlist for mailbox creation/receipt)
+  - `vars`: `EMAIL_ADDRESSES` (optional allowlist for mailbox creation/receipt)
   - `send_email`: `EMAIL` binding (remote)
   - `r2_buckets`: `BUCKET` (`agentic-inbox`)
   - `ai`: `AI` binding
@@ -73,6 +73,7 @@ Deploying provisions R2, Durable Objects, and Workers AI. After deploying, follo
 - **Production secrets** (set via `wrangler secret put` or the deploy modal — see `.dev.vars.example`):
   - `POLICY_AUD` — Cloudflare Access policy audience
   - `TEAM_DOMAIN` — Access team URL or full `/cdn-cgi/access/certs` URL
+  - `DOMAINS` — comma-separated Email Routing domains (secret so deploys/dashboard edits never override it)
 - The worker **fails closed** in production if `POLICY_AUD` / `TEAM_DOMAIN` are unset (`workers/app.ts`).
 
 ## Workflow conventions
