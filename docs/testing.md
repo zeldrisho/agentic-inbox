@@ -53,6 +53,14 @@ dnf equivalents manually instead: nss, nspr, atk, at-spi2*, cups-libs,
 libdrm, libXcomposite/Xdamage/Xrandr/Xcursor/Xi, mesa-libgbm, pango,
 alsa-lib, libxkbcommon).
 
+Minimal local set (verified by removal testing on Fedora WSL): `fontconfig`
+plus nss/nspr, libdrm, mesa-libgbm, the X11 core family (X11/Xcb/Xext/
+Xfixes/Xcomposite/Xdamage/Xrandr), libxkbcommon. `cups-libs`, `pango`,
+`libXcursor` proved removable headlessly. Caveat: `ldd` alone cannot vet
+this — Chromium dlopens fontconfig and reads /etc/fonts/fonts.conf at
+runtime, so a missing config crashes the renderer (SIGTRAP) while ldd
+stays clean. Diagnose with `DEBUG=pw:browser vp run test:e2e`.
+
 Selector notes learned while writing the specs:
 
 - Kumo `Input` renders a truncated placeholder on the DOM node even when a

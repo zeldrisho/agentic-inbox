@@ -3,9 +3,11 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { Loader } from "@cloudflare/kumo";
-import { PlugsIcon, RobotIcon } from "@phosphor-icons/react";
+import { PlugsIcon, RobotIcon, XIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import MCPPanel from "./MCPPanel";
+import { SquareButton } from "~/components/ui/SquareButton";
+import { useUIStore } from "~/hooks/useUIStore";
 
 /**
  * Loads and renders the agent panel with loading and error states.
@@ -50,6 +52,7 @@ function LazyAgentPanel() {
  */
 export default function AgentSidebar() {
   const [activeTab, setActiveTab] = useState<"agent" | "mcp">("agent");
+  const { toggleAgentPanel } = useUIStore();
 
   return (
     <div className="flex flex-col h-full">
@@ -79,6 +82,15 @@ export default function AgentSidebar() {
           <PlugsIcon size={14} weight={activeTab === "mcp" ? "fill" : "regular"} />
           MCP
         </button>
+        <div className="ml-auto pr-2 lg:hidden">
+          <SquareButton
+            variant="ghost"
+            size="sm"
+            icon={<XIcon size={16} />}
+            onClick={toggleAgentPanel}
+            aria-label="Close agent panel"
+          />
+        </div>
       </div>
 
       {/* Tab content — keep agent mounted so chat isn't lost */}

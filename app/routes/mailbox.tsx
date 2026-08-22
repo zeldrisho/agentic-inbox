@@ -40,6 +40,16 @@ export default function MailboxRoute() {
     prevMailboxIdRef.current = mailboxId;
   }, [mailboxId, closeComposeModal, closePanel, closeSidebar]);
 
+  // Allow Esc to dismiss the mobile full-screen agent panel.
+  useEffect(() => {
+    if (!isAgentPanelOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") toggleAgentPanel();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isAgentPanelOpen, toggleAgentPanel]);
+
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Mobile sidebar overlay backdrop */}
@@ -71,21 +81,26 @@ export default function MailboxRoute() {
         </main>
       </div>
 
-      {/* Agent + MCP sidebar — full-screen overlay on mobile, docked panel on desktop */}
+      {/* Agent + MCP sidebar — sheet overlay on mobile, docked panel on desktop */}
       {isAgentPanelOpen && (
-        <div
-          className="fixed inset-0 z-40 flex flex-col bg-kumo-base overflow-hidden lg:relative lg:inset-auto lg:z-auto lg:w-[380px] lg:shrink-0 lg:border-l border-kumo-line"
-          role="dialog"
-          aria-modal="true"
-          onKeyDown={(e) => {
-            if (e.key === "Escape" && window.innerWidth < 1024) {
-              toggleAgentPanel();
-            }
-          }}
-          tabIndex={-1}
-        >
-          <AgentSidebar />
-        </div>
+        <>
+          {/* Mobile backdrop — tap to dismiss */}
+          <div
+            className="fixed inset-0 z-30 bg-black/30 lg:hidden"
+            onClick={toggleAgentPanel}
+            role="button"
+            tabIndex={-1}
+            aria-label="Close agent panel"
+          />
+          <div
+            className="fixed inset-y-0 right-0 z-40 flex w-full max-w-[100vw] flex-col bg-kumo-base overflow-hidden shadow-xl sm:w-[380px] sm:max-w-[85vw] lg:relative lg:inset-auto lg:z-auto lg:w-[380px] lg:max-w-none lg:shrink-0 lg:shadow-none border-l border-kumo-line"
+            role="dialog"
+            aria-modal="true"
+            tabIndex={-1}
+          >
+            <AgentSidebar />
+          </div>
+        </>
       )}
 
       <ComposeEmail />
