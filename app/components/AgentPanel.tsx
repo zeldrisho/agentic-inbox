@@ -246,17 +246,20 @@ function AgentChatConnected({
                 <Button
                   variant="secondary"
                   size="sm"
-                  icon={<CaretDownIcon size={12} />}
                   disabled={isSwitchingModel}
                   loading={isSwitchingModel}
-                  aria-label="Agent model"
-                  className="flex-1 min-w-0 justify-between"
+                  aria-label={`Agent model: ${modelLabel}`}
+                  className="flex-1 min-w-0"
                 >
-                  <span className="truncate">{modelLabel}</span>
+                  <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                    <span className="truncate">{modelLabel}</span>
+                    <CaretDownIcon size={12} className="shrink-0 opacity-60" />
+                  </span>
                 </Button>
               }
             />
-            <DropdownMenu.Content align="start" className="w-64">
+            {/* Cap height + scroll: kumo 1.x content does not auto-limit tall lists */}
+            <DropdownMenu.Content align="start" className="w-72 max-h-72 overflow-y-auto">
               <DropdownMenu.RadioGroup
                 value={currentModel}
                 onValueChange={(value) => void handleModelChange(value)}

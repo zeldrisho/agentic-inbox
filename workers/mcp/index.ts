@@ -110,18 +110,26 @@ export class EmailMCP extends McpAgent<Env> {
       fields: S,
       handler: (mailboxId: string, args: z.output<z.ZodObject<S>>) => Promise<McpToolResult>,
     ): RegisteredTool => {
-      const inputSchema = z.object({ mailboxId: MAILBOX_ID_PARAM, ...fields });
-      return this.server.registerTool(name, { description, inputSchema }, async (rawArgs) => {
-        const { mailboxId: rawMailboxId, ...rest } = rawArgs;
-        // SAFETY: `mailboxId` is injected by this wrapper as a required z.string()
-        // field and validated by the SDK before the handler runs.
-        const mailboxId = rawMailboxId as string;
-        const denied = await verifyMailbox(mailboxId);
-        if (denied) return denied;
-        // SAFETY: the MCP SDK validated `rawArgs` against `{ mailboxId } & S`, so
-        // `rest` satisfies the caller-declared shape S.
-        return handler(mailboxId, rest as z.output<z.ZodObject<S>>);
-      });
+      const inputSchema = { mailboxId: MAILBOX_ID_PARAM, ...fields };
+      // SAFETY: MCP SDK 1.30 narrowed registerTool generics with zod 4; runtime shape is unchanged and covered by integration tests (tests/integration/mcp.test.ts).
+      return (
+        // SAFETY: widen to any to bridge zod 4 / SDK compat types; handler is validated at runtime.
+        (this.server.registerTool as any)(
+          name,
+          { description, inputSchema },
+          async (rawArgs: { mailboxId: string } & z.output<z.ZodObject<S>>) => {
+            const { mailboxId: rawMailboxId, ...rest } = rawArgs;
+            // SAFETY: `mailboxId` is injected by this wrapper as a required z.string()
+            // field and validated by the SDK before the handler runs.
+            const mailboxId = rawMailboxId as string;
+            const denied = await verifyMailbox(mailboxId);
+            if (denied) return denied;
+            // SAFETY: the MCP SDK validated `rawArgs` against `{ mailboxId } & S`, so
+            // `rest` satisfies the caller-declared shape S.
+            return handler(mailboxId, rest as z.output<z.ZodObject<S>>);
+          },
+        )
+      );
     };
 
     // ── list_mailboxes ─────────────────────────────────────────

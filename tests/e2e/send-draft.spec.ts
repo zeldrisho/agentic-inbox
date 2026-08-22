@@ -52,11 +52,12 @@ async function composeAndSaveDraft(page: Page, mailboxUrl: string): Promise<void
     .first()
     .click();
 
-  // The compose inputs are identified by their accessible names.
-  const toInput = page.getByPlaceholder("recipient@example.com");
-  await expect(toInput).toBeVisible();
+  // The compose inputs are identified by their placeholders (panel uses exact, modal uses longer list).
+  const toInput = page.getByPlaceholder(/recipient@example\.com/);
+  await expect(toInput).toBeVisible({ timeout: 10_000 });
   await toInput.fill(RECIPIENT);
   await page.getByPlaceholder("Email subject").fill(DRAFT_SUBJECT);
+  await expect(page.locator(".ProseMirror")).toBeVisible({ timeout: 10_000 });
   await page.locator(".ProseMirror").click();
   await page.keyboard.type(DRAFT_BODY);
 

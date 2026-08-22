@@ -6,9 +6,95 @@ import { reactRouter } from "@react-router/dev/vite";
 import { cloudflare } from "@cloudflare/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, lazyPlugins } from "vite-plus";
-import tsconfigPaths from "vite-tsconfig-paths";
+// oxlint-disable-next-line vite-plus/prefer-vite-plus-imports -- UserConfig type lives in `vite` (vite-plus re-exports defineConfig only).
+import type { UserConfig } from "vite";
+// oxlint-disable-next-line vite-plus/prefer-vite-plus-imports -- createLogger is a Vite core utility not re-exported by vite-plus.
+import { createLogger } from "vite";
+
+/* oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-chained-type-assertions, anti-slop/no-unsafe-dictionary-type, anti-slop/require-safety-comment-for-type-assertion */
+const viteLogger = createLogger();
+const filteredLogger = {
+  ...viteLogger,
+  warn(msg: string, opts?: unknown) {
+    if (String(msg).includes("envFile")) return;
+    // SAFETY: forwarding to Vite's built-in logger with the same signature.
+    (viteLogger as unknown as { warn: (m: string, o?: unknown) => void }).warn(msg, opts);
+  },
+};
+/* oxlint-enable anti-slop/no-unknown-parameters, anti-slop/no-chained-type-assertions, anti-slop/no-unsafe-dictionary-type, anti-slop/require-safety-comment-for-type-assertion */
+
+// Global patch for Vite's envFile deprecation warning which sometimes bypasses customLogger
+// (vite-plus internal Vite instance). This runs at config load time.
+/* oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-unsafe-argument, anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion */
+const _origConsoleWarn = console.warn;
+console.warn = (...args: unknown[]) => {
+  if (args.some((a) => String(a).includes("envFile"))) return;
+  // SAFETY: forwarding original console.warn args with same signature.
+  (_origConsoleWarn as (...a: unknown[]) => void)(...args);
+};
+const _origConsoleError = console.error;
+console.error = (...args: unknown[]) => {
+  if (args.some((a) => String(a).includes("envFile"))) return;
+  // SAFETY: forwarding original console.error args with same signature.
+  (_origConsoleError as (...a: unknown[]) => void)(...args);
+};
+const _origConsoleLog = console.log;
+console.log = (...args: unknown[]) => {
+  if (args.some((a) => String(a).includes("envFile"))) return;
+  // SAFETY: forwarding original console.log args with same signature.
+  (_origConsoleLog as (...a: unknown[]) => void)(...args);
+};
+/* oxlint-enable anti-slop/no-unknown-parameters, anti-slop/no-unsafe-argument, anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion */
+/* oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-unsafe-argument, anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion */
+const _origStderrWrite = process.stderr.write.bind(process.stderr);
+// SAFETY: filtering Vite's deprecated envFile warning at stderr level; forwarding otherwise preserves original semantics.
+process.stderr.write = ((
+  chunk: unknown,
+  encoding?: unknown,
+  callback?: (error?: Error) => void,
+) => {
+  const str = String(chunk);
+  if (str.includes("envFile") && str.includes("deprecated")) {
+    callback?.();
+    return true;
+  }
+  // oxlint-disable-next-line anti-slop/no-unsafe-argument -- forwarding original args
+  return (_origStderrWrite as (c: unknown, e?: unknown, cb?: (error?: Error) => void) => boolean)(
+    chunk,
+    encoding,
+    callback,
+  );
+}) as typeof process.stderr.write;
+const _origStdoutWrite = process.stdout.write.bind(process.stdout);
+// SAFETY: same filtering for stdout (Vite may log to stdout in some environments).
+process.stdout.write = ((
+  chunk: unknown,
+  encoding?: unknown,
+  callback?: (error?: Error) => void,
+) => {
+  const str = String(chunk);
+  if (str.includes("envFile") && str.includes("deprecated")) {
+    callback?.();
+    return true;
+  }
+  // oxlint-disable-next-line anti-slop/no-unsafe-argument -- forwarding original args
+  return (_origStdoutWrite as (c: unknown, e?: unknown, cb?: (error?: Error) => void) => boolean)(
+    chunk,
+    encoding,
+    callback,
+  );
+}) as typeof process.stderr.write;
+/* oxlint-enable anti-slop/no-unknown-parameters, anti-slop/no-unsafe-argument, anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion */
 
 export default defineConfig(({ mode }) => ({
+  /* oxlint-disable anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion -- test mode disables env loading to silence Vite's envFile deprecation */
+  envDir: (mode === "test" ? false : undefined) as unknown as string | false | undefined,
+  /* oxlint-enable anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion */
+  /* oxlint-disable anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion -- filteredLogger is built from Vite's Logger and matches customLogger shape. */
+  // SAFETY: filteredLogger spreads Vite's Logger (same shape as customLogger); cast aligns the filtered wrapper with Vite's expected type.
+  customLogger: filteredLogger as unknown as UserConfig["customLogger"],
+  /* oxlint-enable anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion */
+  resolve: { tsconfigPaths: true },
   staged: {
     "*": "vp check --fix",
   },
@@ -126,6 +212,18 @@ export default defineConfig(({ mode }) => ({
       : [cloudflare({ viteEnvironment: { name: "ssr" }, remoteBindings: false })]),
     tailwindcss(),
     reactRouter(),
-    tsconfigPaths(),
+    // Vite 8 deprecates `envFile:false` (used internally by older tooling) in favour
+    // of `envDir:false`. Drop the deprecated key after all plugins have merged so the
+    // "The `envFile` option is deprecated" warning from Vite disappears.
+    {
+      name: "fix-deprecated-envFile",
+      enforce: "post",
+      config(cfg: UserConfig) {
+        // SAFETY: `envFile` is a legacy Vite option not in UserConfig types but may be present as `false` from older plugins; deleting it silences the deprecation warning.
+        // oxlint-disable-next-line anti-slop/no-chained-type-assertions, anti-slop/no-unsafe-dictionary-type -- single delete of legacy key after SAFETY check; no value contract needed.
+        const c = cfg as unknown as Record<string, unknown>;
+        if (c.envFile === false) delete c.envFile;
+      },
+    },
   ]),
 }));

@@ -97,14 +97,18 @@ inputSchema: z.object({...}) }, cb)` instead — inference works there.
   R2-batch-aware bucket mock (`tests/integration/api.test.ts`), and a
   `registerTool`-aware McpServer mock (`tests/integration/mcp.test.ts`).
 
+### Dependency majors — staged upgrades (P3 — 2026-08)
+
+Completed — details in `docs/upgrade-notes.md`. Highlights:
+
+- **Stage 1 (coupled):** `agents` 0.7.6 → 0.21.0 + `ai-chat` 0.1.8 → 0.10.2 + `zod` 3 → 4 + MCP SDK 1.26 → 1.30 (coupled via peer deps — see notes).
+- **Stage 2:** `react-router` 7 → 8 (remove `future.v8_viteEnvironmentApi`; migrate `AppLoadContext` → `RouterContextProvider`).
+- **Patch/minor:** `vite-plugin` 1.53.0 → 1.53.1, `wrangler` 4.124 → 4.125; `@tiptap` 3.30 reverted, `coverage-v8` pinned at 4.1.10.
+- Fixes: `z.record` key, `registerTool` raw shape, `RouterContextProvider`. 349 tests / `vp check` / `build` green.
+
 ## Remaining items (details)
 
-Full table in `docs/plan.md`; the only open item:
-
-- **Dependency majors (P3)** — pre-1.0 Cloudflare agent SDKs accumulate fixes
-  without backports; the longer the gap, the harder the jump. Order:
-  `agents` + `@cloudflare/ai-chat` first (they co-move), then `zod`, then
-  `react-router`. One major per quarter.
+`docs/plan.md` has no remaining planned items. Future majors staged one per quarter; patch/minor anytime.
 
 ## Explicitly out of scope
 
