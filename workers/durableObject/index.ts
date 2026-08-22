@@ -9,6 +9,7 @@ import type { SQL } from "drizzle-orm";
 import * as schema from "../db/schema";
 import { Folders } from "../../shared/folders";
 import type { Env } from "../types";
+import type { MailboxRpc } from "../lib/mailbox-rpc";
 import { applyMigrations, mailboxMigrations } from "./migrations";
 
 /**
@@ -71,7 +72,11 @@ interface GetEmailsOptions {
   sortDirection?: "ASC" | "DESC";
 }
 
-interface EmailData {
+/**
+ * Payload for creating an email. Part of the caller-facing `MailboxRpc`
+ * contract — see workers/lib/mailbox-rpc.ts.
+ */
+export interface EmailData {
   id: string;
   subject: string;
   sender: string;
@@ -89,7 +94,11 @@ interface EmailData {
   raw_headers?: string | null;
 }
 
-interface AttachmentData {
+/**
+ * Payload for storing attachment metadata alongside a created email. Part of
+ * the caller-facing `MailboxRpc` contract — see workers/lib/mailbox-rpc.ts.
+ */
+export interface AttachmentData {
   id: string;
   email_id: string;
   filename: string;
@@ -103,6 +112,22 @@ interface EmailUpdateData {
   read?: number;
   starred?: number;
 }
+
+/**
+ * Compile-time guard: `MailboxDO` must keep every method of the caller-facing
+ * `MailboxRpc` contract, callable with the arguments the contract declares.
+ * Renaming or removing a DO method — or changing its parameter shape — now
+ * fails here instead of compiling silently at every `asMailboxRpc` call site.
+ */
+type _MailboxDOImplementsRpc = {
+  [K in keyof MailboxRpc]: MailboxRpc[K] extends (...args: infer Args) => never
+    ? MailboxDO[K] extends (...args: Args) => never
+      ? K
+      : never
+    : never;
+}[keyof MailboxRpc];
+
+export type { _MailboxDOImplementsRpc };
 
 export class MailboxDO extends DurableObject<Env> {
   declare __DURABLE_OBJECT_BRAND: never;

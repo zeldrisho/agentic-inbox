@@ -3,10 +3,16 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { AIChatAgent } from "@cloudflare/ai-chat";
-import { streamText, generateText, convertToModelMessages, stepCountIs } from "ai";
+import {
+  streamText,
+  generateText,
+  convertToModelMessages,
+  stepCountIs,
+  type StreamTextOnFinishCallback,
+  type ToolSet,
+} from "ai";
 import { createWorkersAI } from "workers-ai-provider";
 import { z } from "zod";
-import type { EmailFull, EmailMetadata } from "../lib/schemas";
 import { verifyDraft, isPromptInjection } from "../lib/ai";
 import { getMailboxStub, stripHtmlToText, textToHtml } from "../lib/email-helpers";
 import {
@@ -200,7 +206,7 @@ function resolveModelWithFallback(primaryId: string) {
  * @param mailboxId - The mailbox whose emails the tools can access
  * @returns An object containing the configured email tools
  */
-function createEmailTools(env: Env, mailboxId: string) {
+function createEmailTools(env: Env, mailboxId: string): ToolSet {
   return {
     list_emails: defineTool({
       description:
@@ -330,13 +336,11 @@ function createEmailTools(env: Env, mailboxId: string) {
   };
 }
 
-// Use `any` for the Env generic to avoid type conflicts between the custom
-// SEND_EMAIL binding shape and the AIChatAgent constraint.  The actual env
-// is fully typed inside the tools via the closure.
-export class EmailAgent extends AIChatAgent<any> {
-  async onChatMessage(onFinish: any) {
-    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
-    const env = this.env as Env;
+// The Env generic is our workers/types.ts Env (extends Cloudflare.Env), so the
+// binding shapes satisfy AIChatAgent's constraint; tools close over the typed env.
+export class EmailAgent extends AIChatAgent<Env> {
+  async onChatMessage(onFinish: StreamTextOnFinishCallback<ToolSet>) {
+    const env = this.env;
     const mailboxId = this.name;
     const workersai = createWorkersAI({ binding: env.AI });
     const tools = createEmailTools(env, mailboxId);
@@ -403,8 +407,7 @@ export class EmailAgent extends AIChatAgent<any> {
     subject: string;
     threadId: string;
   }) {
-    // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
-    const env = this.env as Env;
+    const env = this.env;
     if (!(await isAutoDraftEnabled(env, emailData.mailboxId))) {
       return { status: "skipped", reason: "auto_draft_disabled" };
     }
@@ -419,8 +422,7 @@ export class EmailAgent extends AIChatAgent<any> {
     let emailBody = "";
     let threadContext = "";
     try {
-      // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
-      const email = (await stub.getEmail(emailData.emailId)) as EmailFull | null;
+      const email = await stub.getEmail(emailData.emailId);
       if (email?.body) {
         const isInjection = await isPromptInjection(env.AI, email.body);
         if (isInjection) {
@@ -463,15 +465,13 @@ export class EmailAgent extends AIChatAgent<any> {
       }
 
       // Load thread for conversation context
-      // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
-      const threadEmails = (await stub.getEmails({
+      const threadEmails = await stub.getEmails({
         thread_id: emailData.threadId,
-      })) as EmailMetadata[];
+      });
       if (threadEmails.length > 1) {
         const fullThread = await Promise.all(
           threadEmails.map(async (e) => {
-            // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
-            const full = (await stub.getEmail(e.id)) as EmailFull | null;
+            const full = await stub.getEmail(e.id);
             const text = full?.body ? stripHtmlToText(full.body) : "";
             return {
               id: e.id,

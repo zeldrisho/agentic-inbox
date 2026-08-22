@@ -5,7 +5,6 @@
 import type { Context } from "hono";
 import { sendEmail } from "../email-sender";
 import { storeAttachments } from "../lib/attachments";
-import type { EmailFull } from "../lib/schemas";
 import {
   validateSender,
   SenderValidationError,
@@ -32,8 +31,7 @@ export async function handleReplyEmail(c: AppContext) {
   const { to, cc, bcc, from, subject, html, text, attachments } = body;
 
   const stub = c.var.mailboxStub;
-  // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
-  const rawOriginal = (await stub.getEmail(id)) as EmailFull | null;
+  const rawOriginal = await stub.getEmail(id);
 
   if (!rawOriginal) {
     return c.json({ error: "Original email not found" }, 404);
@@ -52,8 +50,7 @@ export async function handleReplyEmail(c: AppContext) {
 
   const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
 
-  // SAFETY: `checkSendRateLimit` is part of the DO's dynamic runtime API; the full DurableObjectStub<MailboxDO> type is too heavy to instantiate.
-  const rateLimitError = await (stub as any).checkSendRateLimit();
+  const rateLimitError = await stub.checkSendRateLimit();
   if (rateLimitError) {
     return c.json({ error: rateLimitError }, 429);
   }
@@ -132,8 +129,7 @@ export async function handleForwardEmail(c: AppContext) {
   const { to, cc, bcc, from, subject, html, text, attachments } = body;
 
   const stub = c.var.mailboxStub;
-  // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
-  const rawOriginal = (await stub.getEmail(id)) as EmailFull | null;
+  const rawOriginal = await stub.getEmail(id);
 
   if (!rawOriginal) {
     return c.json({ error: "Original email not found" }, 404);
@@ -151,8 +147,7 @@ export async function handleForwardEmail(c: AppContext) {
 
   const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
 
-  // SAFETY: `checkSendRateLimit` is part of the DO's dynamic runtime API; the full DurableObjectStub<MailboxDO> type is too heavy to instantiate.
-  const rateLimitError = await (stub as any).checkSendRateLimit();
+  const rateLimitError = await stub.checkSendRateLimit();
   if (rateLimitError) {
     return c.json({ error: rateLimitError }, 429);
   }

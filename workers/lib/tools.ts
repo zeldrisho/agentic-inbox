@@ -14,7 +14,6 @@
  * are reused directly — this module covers the remaining shared operations.
  */
 
-import type { EmailFull } from "./schemas";
 import {
   getMailboxStub,
   getFullEmail,
@@ -106,8 +105,7 @@ export async function toolSearchEmails(
   params: { query: string; folder?: string },
 ) {
   const stub = getMailboxStub(env, mailboxId);
-  // SAFETY: `searchEmails` is part of the DO's dynamic runtime API; the full DurableObjectStub<MailboxDO> type is too heavy to instantiate.
-  return (stub as any).searchEmails({
+  return stub.searchEmails({
     query: params.query,
     folder: params.folder,
   });
@@ -165,7 +163,7 @@ export async function toolDraftReply(
 
   // Get the original email for thread_id and quoted text
   // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
-  const original = (await stub.getEmail(params.originalEmailId)) as EmailFull | null;
+  const original = await stub.getEmail(params.originalEmailId);
   const threadId = original?.thread_id || params.originalEmailId;
 
   // Append quoted original message
@@ -260,7 +258,7 @@ export async function toolDraftEmail(
   let resolvedThreadId = params.thread_id;
   if (!resolvedThreadId && params.in_reply_to) {
     // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
-    const original = (await stub.getEmail(params.in_reply_to)) as EmailFull | null;
+    const original = await stub.getEmail(params.in_reply_to);
     resolvedThreadId = original?.thread_id || params.in_reply_to;
   }
   if (!resolvedThreadId) {
@@ -319,7 +317,7 @@ export async function toolUpdateDraft(
   const stub = getMailboxStub(env, mailboxId);
 
   // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
-  const oldDraft = (await stub.getEmail(params.draftId)) as EmailFull | null;
+  const oldDraft = await stub.getEmail(params.draftId);
   if (!oldDraft) {
     return { error: "Draft not found" };
   }
@@ -462,14 +460,12 @@ export async function toolSendReply(
   const stub = getMailboxStub(env, mailboxId);
 
   // Check send rate limit
-  // SAFETY: `checkSendRateLimit` is part of the DO's dynamic runtime API; the full DurableObjectStub<MailboxDO> type is too heavy to instantiate.
-  const rateLimitError = await (stub as any).checkSendRateLimit();
+  const rateLimitError = await stub.checkSendRateLimit();
   if (rateLimitError) {
     return { error: rateLimitError };
   }
 
-  // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
-  const originalEmail = (await stub.getEmail(params.originalEmailId)) as EmailFull | null;
+  const originalEmail = await stub.getEmail(params.originalEmailId);
   if (!originalEmail) {
     return { error: "Original email not found" };
   }
@@ -549,8 +545,7 @@ export async function toolSendEmail(
   const stub = getMailboxStub(env, mailboxId);
 
   // Check send rate limit
-  // SAFETY: `checkSendRateLimit` is part of the DO's dynamic runtime API; the full DurableObjectStub<MailboxDO> type is too heavy to instantiate.
-  const rateLimitError = await (stub as any).checkSendRateLimit();
+  const rateLimitError = await stub.checkSendRateLimit();
   if (rateLimitError) {
     return { error: rateLimitError };
   }
