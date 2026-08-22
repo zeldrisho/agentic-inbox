@@ -2,7 +2,6 @@
 
 > Conventions and mock recipes for tests: `docs/testing.md`.
 > Audit details, scoring, and resolved items: `docs/tech-debt.md`.
+> Upgrade implementation details: `docs/upgrade-notes.md`.
 
-| Priority        | Item                          | Detail                                                                                                                     |
-| --------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| P3 — dep majors | Staged major-version upgrades | `agents` + `@cloudflare/ai-chat` first, then `zod`, then `react-router`. One major per quarter; patch/minor bumps anytime. |
+No remaining planned tech-debt items. Future dependency majors are staged one per quarter; patch/minor bumps may be applied anytime.
