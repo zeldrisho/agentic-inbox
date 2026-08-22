@@ -61,10 +61,9 @@ export function hasDraftReplyTool(message: UIMessage): boolean {
 }
 
 /**
- * Finds the saved-draft payload produced by a `draft_reply` tool call, if any.
+ * Extracts the first valid draft payload from a `draft_reply` tool call.
  *
- * @param message - The assistant message to inspect
- * @returns The draft data from the first completed `draft_reply` call, or `null`
+ * @returns The draft data, or `null` when no valid payload is found.
  */
 export function extractDraftReplyResult(message: UIMessage): DraftReplyResult | null {
   for (const part of message.parts) {

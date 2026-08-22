@@ -120,7 +120,7 @@ export async function handleReplyEmail(c: AppContext) {
 /**
  * Forwards an existing email to the specified recipients.
  *
- * @returns A `202` response containing the sent message ID, or an error response when the original email is missing, the sender is invalid, or sending is rate-limited.
+ * @returns A response containing the sent message ID and `"sent"` status, or an error response when the original email is unavailable, the sender is invalid, or sending is rate-limited.
  */
 export async function handleForwardEmail(c: AppContext) {
   const mailboxId = c.req.param("mailboxId") ?? "";

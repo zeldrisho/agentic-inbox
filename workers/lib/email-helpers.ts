@@ -18,8 +18,10 @@ import { formatQuotedDate } from "../../shared/dates";
 // ── DO Stub ────────────────────────────────────────────────────────
 
 /**
- * Resolve the caller-facing RPC contract for a mailbox's Durable Object.
- * Replaces the repeated 3-line ns.idFromName / ns.get pattern.
+ * Resolves the RPC contract for a mailbox Durable Object.
+ *
+ * @param mailboxId - The mailbox identifier used to locate the Durable Object
+ * @returns The mailbox RPC contract
  */
 export function getMailboxStub(env: Env, mailboxId: string): MailboxRpc {
   const ns = env.MAILBOX;
