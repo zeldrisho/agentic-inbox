@@ -7,6 +7,55 @@ Scoring: priority = (impact + risk) × (6 − effort), each 1–5 (lower effort 
 
 ## Resolved
 
+### P1 — typed DO RPC, P2 — branch coverage, maintenance tsc errors (2026)
+
+Implemented from `docs/plan.md`:
+
+- **Typed DO RPC boundary.** New `workers/lib/mailbox-rpc.ts`: a narrow
+  `MailboxRpc` interface listing only the methods callers use, with serialized
+  shapes (`EmailFull`, `EmailListItem`) instead of raw Drizzle rows; a single
+  `asMailboxRpc()` assertion replaces every `stub as any`; `requireMailbox`
+  and `getMailboxStub` hand out `MailboxRpc` directly; `workers/index.ts`'s
+  ad-hoc `ExtendedMailboxStub`/`asExtended` removed. A compile-time guard
+  (`_MailboxDOImplementsRpc`) in the DO fails the build when a `MailboxRpc`
+  member is renamed or its parameters drift.
+- **`AIChatAgent<any>`** → `AIChatAgent<Env>` (workers/types Env extends
+  `Cloudflare.Env`, satisfying the constraint); `onFinish: any` →
+  `StreamTextOnFinishCallback<ToolSet>` from `ai`.
+- **Branch coverage.** Added error-path suites: reply/forward recipient-shape
+  branches, Zod→400 via `app.onError`, search filter parsing, inbound email
+  with attachments/cc/bcc (`tests/integration/error-paths.test.ts`), and hook
+  tests for `useComposeForm` send/save-draft failure paths
+  (`tests/app/hooks/useComposeForm.test.tsx`). Gates raised in
+  `vite.config.ts` (global branches ≥75% plus per-file floors) and documented
+  in `docs/testing.md`.
+- **Dead code found by coverage work:** the catch-all "mirror" block in
+  `receiveEmail` was unreachable — `routedByCatchAll` is only set when
+  `effectiveMailboxId` has already become `adminMailboxId`, so its own guard
+  (`adminMailboxId !== effectiveMailboxId`) could never hold, and primary
+  delivery already lands in the admin DO. Removed; catch-all mail is re-filed
+  into newly created mailboxes by `migrateCatchAllMail`.
+- **Pre-existing `tests/` tsc errors (~49)** fixed: global-vs-workers `Env`
+  mismatches, `DurableObjectStub<unknown>` brand violations, Kumo/React type
+  mismatches in component tests, union narrowing in tool-result assertions.
+  `vp exec tsc -b` is clean.
+
+### Browser E2E ported to Playwright (P4)
+
+`tests/e2e/send-draft.spec.ts` drives send→draft and agent model-switch flows
+in real Chromium against `vp run dev` (`playwright.config.ts`,
+`vp run test:e2e`). The jsdom file stays as the CI-fast fallback; the
+Selector quirks are recorded in `docs/testing.md`. CI runs the suite as a
+separate non-blocking job (`.github/workflows/ci.yml`, `continue-on-error`)
+until it has soaked; flip it to required afterwards.
+
+### AgentPanel split (P5)
+
+649-line hotspot split into `app/components/agent/`: `tool-parts.ts`
+(centralized dynamic-tool typing via AI SDK guards — no more `as any`),
+`ToolCallBadge.tsx`, and `MessageBubble.tsx`. `AgentPanel.tsx` keeps only chat
+state, model switching, and panel wiring.
+
 ### Mailbox deletion cascade (was P28 — highest priority)
 
 `DELETE /api/v1/mailboxes/:id` previously deleted only the R2 settings blob,
@@ -53,27 +102,12 @@ inputSchema: z.object({...}) }, cb)` instead — inference works there.
 
 ## Remaining items (details)
 
-Full table in `docs/plan.md`; context per item:
+Full table in `docs/plan.md`; the only open item:
 
-- **Typed DO RPC boundary** — six `stub as any` casts (`tools.ts`,
-  `email-helpers.ts`, `reply-forward.ts`) plus `AIChatAgent<any>` /
-  `onFinish: any` (`agent/index.ts`). Renaming a DO method compiles silently at
-  every call site. Fix: narrow `MailboxRpc` interface listing only the methods
-  callers use, cast once to that; type `onFinish` with the AI SDK callback.
-- **Branch coverage** (~65% vs 80% statement gate) — error paths are where
-  production incidents live; statements can pass while every failure branch is
-  untested. Gaps: `workers/index.ts` CORS/error branches,
-  `reply-forward.ts` attachment branches, `useComposeForm.ts`.
-- **Dependency majors** — pre-1.0 Cloudflare agent SDKs accumulate fixes
+- **Dependency majors (P3)** — pre-1.0 Cloudflare agent SDKs accumulate fixes
   without backports; the longer the gap, the harder the jump. Order:
   `agents` + `@cloudflare/ai-chat` first (they co-move), then `zod`, then
   `react-router`. One major per quarter.
-- **Browser E2E** — current `tests/e2e/send-draft.test.ts` simulates
-  send→draft in jsdom; real-browser Playwright covers rendering/streaming
-  regressions it cannot see.
-- **AgentPanel split** — 649 lines mixing chat state, streaming-part
-  rendering, four `(part as any)` dynamic-tool casts, and draft handling;
-  highest-change file in the app. Fold into the next agent-UI feature.
 
 ## Explicitly out of scope
 

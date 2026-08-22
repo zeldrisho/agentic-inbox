@@ -10,15 +10,20 @@ test Workers-runtime code under Vitest.
 | Single run                 | `vp test`                |
 | Watch mode                 | `vp test watch`          |
 | Run with coverage **gate** | `vp test run --coverage` |
+| Real-browser E2E           | `vp run test:e2e`        |
 
 The coverage run is a hard gate in CI (`.github/workflows/ci.yml`) and fails
 below the thresholds configured in `vite.config.ts:test.coverage.thresholds`:
 
-- global: statements / functions / lines ≥ 80%
+- global: statements / functions / lines ≥ 80%, branches ≥ 75%
 - `workers/lib/ai.ts`: statements / lines ≥ 90% (security-critical)
+- P2 error-path floors (docs/plan.md): `workers/index.ts` branches ≥ 68%,
+  `workers/routes/reply-forward.ts` branches ≥ 75%,
+  `app/hooks/useComposeForm.ts` branches ≥ 82%
 
-Coverage measures modules executed by tests (v8 provider). Untested UI shells
-(route components rendered only by the SPA entry) are outside the gate.
+Coverage measures the four gated modules when executed by tests (v8 provider).
+Untested UI shells (route components rendered only by the SPA entry) are
+outside the gate.
 
 ## Layout
 
@@ -33,6 +38,30 @@ Coverage measures modules executed by tests (v8 provider). Untested UI shells
 Environments: `node` by default; `jsdom` via `environmentMatchGlobs` for
 `tests/components/**` and `tests/e2e/**` (or a `// @vitest-environment jsdom`
 pragma). Config lives only in `vite.config.ts:test` — no separate vitest config.
+
+## Real-browser E2E (Playwright)
+
+`tests/e2e/send-draft.spec.ts` ports the jsdom send→draft simulation to real
+Chromium against `vp run dev` (local Durable Objects/R2, Access skipped), plus
+an agent model-switch flow. Config: `playwright.config.ts` (starts the dev
+server itself). Vitest never picks the spec up — its include pattern only
+matches `*.test.{ts,tsx}`. The jsdom file (`tests/e2e/send-draft.test.ts`)
+stays as the CI-fast fallback; the Playwright suite runs explicitly via
+`vp run test:e2e`. One-time setup: `vp exec playwright install chromium
+--with-deps` (on Fedora WSL the deps tooling falls back to apt — install the
+dnf equivalents manually instead: nss, nspr, atk, at-spi2*, cups-libs,
+libdrm, libXcomposite/Xdamage/Xrandr/Xcursor/Xi, mesa-libgbm, pango,
+alsa-lib, libxkbcommon).
+
+Selector notes learned while writing the specs:
+
+- Kumo `Input` renders a truncated placeholder on the DOM node even when a
+  longer one is passed — select by `getByPlaceholder` with the short form or
+  by accessible name from the ARIA snapshot.
+- Kumo `Dialog` does not expose `role="dialog"`; scope compose-panel fields
+  by placeholder instead.
+- Kumo `DropdownMenu.RadioItem` renders as `menuitemradio`; wait for the menu
+  animation with `expect(...).toBeVisible()` before counting items.
 
 ## Testing Workers-runtime code
 
