@@ -11,6 +11,7 @@ import {
   MagnifyingGlassIcon,
   PaperPlaneTiltIcon,
   TrashIcon,
+  WarningCircleIcon,
   WrenchIcon,
 } from "@phosphor-icons/react";
 
@@ -67,13 +68,18 @@ export function ToolCallBadge({ toolName, state }: { toolName: string; state: st
     icon: <WrenchIcon size={14} weight="bold" />,
   };
   const isDone = state === "output-available" || state === "result" || state === "output-error";
+  const isError = state === "output-error";
 
   return (
     <div className="flex items-center gap-1.5 py-1 px-2 rounded bg-kumo-fill/50 text-xs">
       <span className="text-kumo-brand">{info.icon}</span>
       <span className="text-kumo-strong">{info.label}</span>
       {isDone ? (
-        <CheckCircleIcon size={12} weight="fill" className="text-kumo-success ml-auto" />
+        isError ? (
+          <WarningCircleIcon size={12} weight="fill" className="text-kumo-error ml-auto" />
+        ) : (
+          <CheckCircleIcon size={12} weight="fill" className="text-kumo-success ml-auto" />
+        )
       ) : (
         <Loader size="sm" className="ml-auto" />
       )}

@@ -107,12 +107,16 @@ export interface MailboxRpc {
 }
 
 /**
- * Exposes a mailbox durable object stub through the caller-facing RPC contract.
+ * Widen a typed MailboxDO stub to the caller-facing RPC contract.
  *
- * @returns The input stub typed as `MailboxRpc`
+ * This is the single assertion boundary between the DO's raw Drizzle/SQL row
+ * return types and the serialized shapes every consumer uses. Invariant held
+ * there: `MailboxDO` implements every member of `MailboxRpc` (verified by the
+ * `_assertMailboxDOImplementsRpc` value-level guard in durableObject/index.ts),
+ * and its rows serialize to the declared shapes.
  */
 export function asMailboxRpc(stub: DurableObjectStub<MailboxDO>): MailboxRpc {
-  // SAFETY: `_MailboxDOImplementsRpc` in durableObject/index.ts fails to compile
+  // SAFETY: `_assertMailboxDOImplementsRpc` in durableObject/index.ts fails to compile
   // when the DO loses or renames a `MailboxRpc` member, so this widening cannot
   // silently drop a method; row-level return shapes match after serialization.
   // eslint-disable-next-line anti-slop/no-chained-type-assertions

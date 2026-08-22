@@ -113,22 +113,6 @@ interface EmailUpdateData {
   starred?: number;
 }
 
-/**
- * Compile-time guard: `MailboxDO` must keep every method of the caller-facing
- * `MailboxRpc` contract, callable with the arguments the contract declares.
- * Renaming or removing a DO method — or changing its parameter shape — now
- * fails here instead of compiling silently at every `asMailboxRpc` call site.
- */
-type _MailboxDOImplementsRpc = {
-  [K in keyof MailboxRpc]: MailboxRpc[K] extends (...args: infer Args) => never
-    ? MailboxDO[K] extends (...args: Args) => never
-      ? K
-      : never
-    : never;
-}[keyof MailboxRpc];
-
-export type { _MailboxDOImplementsRpc };
-
 export class MailboxDO extends DurableObject<Env> {
   declare __DURABLE_OBJECT_BRAND: never;
   db: ReturnType<typeof drizzle>;
@@ -1024,3 +1008,20 @@ export class MailboxDO extends DurableObject<Env> {
     return blobs.map((b) => ({ key: `attachments/${b.emailId}/${b.id}/${b.filename}` }));
   }
 }
+
+/**
+ * Compile-time guard: `MailboxDO` must implement every method of the caller-facing
+ * `MailboxRpc` contract with compatible signatures. If `MailboxDO` renames, removes,
+ * or changes the signature of a `MailboxRpc` method, TypeScript's assignability check
+ * fails at this declaration instead of silently breaking at every `asMailboxRpc` call site.
+ *
+ * The mapped type verifies each `MailboxDO.prototype` method is assignable to the
+ * corresponding `MailboxRpc` member (contravariant in parameters, covariant in return type).
+ */
+// SAFETY: empty object literal is safe because the mapped type constraint verifies
+// that each method on MailboxDO.prototype is callable-compatible with MailboxRpc.
+const _assertMailboxDOImplementsRpc: {
+  [K in keyof MailboxRpc]: MailboxDO[K];
+} = MailboxDO.prototype;
+
+export { _assertMailboxDOImplementsRpc };

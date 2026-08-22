@@ -165,4 +165,35 @@ describe("handleGetModels", () => {
     expect(payload.source).toBe("fallback");
     expect(ai.models).toHaveBeenCalled();
   });
+
+  it("does not cache fallback data, allowing recovery from transient AI binding failures", async () => {
+    const bucket = mockBucket();
+    // First request: AI binding fails, returns fallback
+    const ai1 = mockAi(undefined, true);
+    const c1 = mockContext(bucket, "http://localhost/api/v1/models", ai1);
+    await handleGetModels(c1);
+    const payload1 = (c1.json as ReturnType<typeof vi.fn>).mock.calls[0][0] as Record<
+      string,
+      unknown
+    >;
+    expect(payload1.source).toBe("fallback");
+    expect(payload1.warning).toBe("using fallback list");
+    // Fallback should not have been cached to R2
+    expect(bucket._store.has("cache/models.json")).toBe(false);
+
+    // Second request: AI binding succeeds, returns live catalog
+    const ai2 = mockAi([makeModel("@cf/test/recovered")]);
+    const c2 = mockContext(bucket, "http://localhost/api/v1/models", ai2);
+    await handleGetModels(c2);
+    const payload2 = (c2.json as ReturnType<typeof vi.fn>).mock.calls[0][0] as Record<
+      string,
+      unknown
+    >;
+    // Should get fresh live data, not stuck on fallback
+    expect(payload2.source).toBe("ai-models-search");
+    expect(payload2.warning).toBeUndefined();
+    expect((payload2.models as { id: string }[]).map((m) => m.id)).toEqual(["@cf/test/recovered"]);
+    // Live data should now be cached
+    expect(bucket._store.has("cache/models.json")).toBe(true);
+  });
 });

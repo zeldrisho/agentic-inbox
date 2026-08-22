@@ -67,7 +67,7 @@ export function hasDraftReplyTool(message: UIMessage): boolean {
  */
 export function extractDraftReplyResult(message: UIMessage): DraftReplyResult | null {
   for (const part of message.parts) {
-    if (!isDynamicToolUIPart(part) || part.toolName !== "draft_reply") continue;
+    if (getToolNameFromPart(part) !== "draft_reply") continue;
     // SAFETY: the streamed result field is named `output` per the AI SDK types
     // but older stream chunks carry it as `result`; accept either shape.
     const output =
