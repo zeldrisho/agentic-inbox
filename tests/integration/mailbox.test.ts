@@ -479,6 +479,50 @@ describe("MailboxDO single email ops", () => {
   });
 });
 
+// ── Destruction ────────────────────────────────────────────
+
+describe("MailboxDO destroy", () => {
+  function destroyDb(attachmentRows: unknown[]) {
+    const deleteRun = vi.fn();
+    const folderWhereRun = vi.fn();
+    const db = {
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({ all: vi.fn(() => attachmentRows) })),
+      })),
+      delete: vi.fn(() => ({
+        run: deleteRun,
+        where: vi.fn(() => ({ run: folderWhereRun })),
+      })),
+    };
+    return { db, deleteRun, folderWhereRun };
+  }
+
+  it("returns R2 blob keys for all attachments and wipes data tables", async () => {
+    const { db, deleteRun, folderWhereRun } = destroyDb([
+      { emailId: "e1", id: "att1", filename: "a.txt" },
+      { emailId: "e2", id: "att2", filename: "b.pdf" },
+    ]);
+    const { instance } = createMailboxDO();
+    (instance as unknown as { db: unknown }).db = db as unknown as typeof instance.db;
+
+    await expect(instance.destroy()).resolves.toEqual([
+      { key: "attachments/e1/att1/a.txt" },
+      { key: "attachments/e2/att2/b.pdf" },
+    ]);
+    // attachments + emails + custom folders are wiped
+    expect(db.delete).toHaveBeenCalledTimes(3);
+    expect(deleteRun).toHaveBeenCalledTimes(2);
+    expect(folderWhereRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns an empty key list when the mailbox has no attachments", async () => {
+    const { db } = destroyDb([]);
+    const { instance } = createMailboxDO();
+    (instance as unknown as { db: unknown }).db = db as unknown as typeof instance.db;
+    await expect(instance.destroy()).resolves.toEqual([]);
+  });
+});
+
 // ── Folder CRUD ────────────────────────────────────────────────────
 
 describe("MailboxDO folder CRUD", () => {

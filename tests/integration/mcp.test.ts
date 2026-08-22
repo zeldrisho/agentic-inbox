@@ -23,6 +23,9 @@ vi.mock("@modelcontextprotocol/sdk/server/mcp.js", () => ({
     tool(name: string, _desc: string, _schema: unknown, handler: ToolHandler) {
       registeredTools.set(name, handler);
     }
+    registerTool(name: string, _config: unknown, handler: ToolHandler) {
+      registeredTools.set(name, handler);
+    }
   },
 }));
 

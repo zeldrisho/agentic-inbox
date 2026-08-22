@@ -899,4 +899,32 @@ export class MailboxDO extends DurableObject<Env> {
       this.db.insert(schema.attachments).values(attachments).run();
     }
   }
+
+  // ── Destruction ────────────────────────────────────────────────
+
+  /**
+   * Wipe all mailbox data ahead of deletion.
+   *
+   * Removes every email, attachment row, and custom folder so the DO can be
+   * safely re-created later under the same address (the seeded default folders
+   * are preserved for that purpose). Returns the R2 keys of every stored
+   * attachment blob so the caller can delete them from the bucket.
+   */
+  async destroy(): Promise<{ key: string }[]> {
+    const blobs = this.db
+      .select({
+        emailId: schema.attachments.email_id,
+        id: schema.attachments.id,
+        filename: schema.attachments.filename,
+      })
+      .from(schema.attachments)
+      .all();
+
+    // Explicit deletes rather than relying on FK cascade semantics.
+    this.db.delete(schema.attachments).run();
+    this.db.delete(schema.emails).run();
+    this.db.delete(schema.folders).where(eq(schema.folders.is_deletable, 1)).run();
+
+    return blobs.map((b) => ({ key: `attachments/${b.emailId}/${b.id}/${b.filename}` }));
+  }
 }

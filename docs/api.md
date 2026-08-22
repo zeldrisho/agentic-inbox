@@ -10,13 +10,13 @@ The Hono API (`workers/index.ts`) serves `/api/v1/...`. All routes sit behind th
 
 ## Mailboxes
 
-| Method   | Path                           | Description                                                                                                                     |
-| -------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `GET`    | `/api/v1/mailboxes`            | List all mailboxes (R2 `mailboxes/*.json`).                                                                                     |
-| `POST`   | `/api/v1/mailboxes`            | Create a mailbox. Body: `{ email, name, settings? }`. Respects `EMAIL_ADDRESSES` allowlist (`403` if blocked, `409` if exists). |
-| `GET`    | `/api/v1/mailboxes/:mailboxId` | Get mailbox settings.                                                                                                           |
-| `PUT`    | `/api/v1/mailboxes/:mailboxId` | Replace mailbox settings. Body: `{ settings }`.                                                                                 |
-| `DELETE` | `/api/v1/mailboxes/:mailboxId` | Delete mailbox settings blob (`404` if missing). Does **not** yet delete DO/R2 data.                                            |
+| Method   | Path                           | Description                                                                                                                                                                                        |
+| -------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/api/v1/mailboxes`            | List all mailboxes (R2 `mailboxes/*.json`).                                                                                                                                                        |
+| `POST`   | `/api/v1/mailboxes`            | Create a mailbox. Body: `{ email, name, settings? }`. Respects `EMAIL_ADDRESSES` allowlist (`403` if blocked, `409` if exists).                                                                    |
+| `GET`    | `/api/v1/mailboxes/:mailboxId` | Get mailbox settings.                                                                                                                                                                              |
+| `PUT`    | `/api/v1/mailboxes/:mailboxId` | Replace mailbox settings. Body: `{ settings }`.                                                                                                                                                    |
+| `DELETE` | `/api/v1/mailboxes/:mailboxId` | Full deletion cascade (`404` if missing): wipes the mailbox DO's emails/attachments, deletes R2 attachment blobs, best-effort destroys the agent DO (chat history), and removes the settings blob. |
 
 ## Emails
 

@@ -51,6 +51,7 @@ The `/api/*` CORS policy allows same-origin requests (no `Origin` header) and `l
 - `DELETE /mailboxes/:id` deletes the settings blob but **not** the Durable Object data or R2 attachment blobs (TODO in `workers/index.ts`). Orphaned data persists until a full cleanup is implemented.
 - Draft create-then-delete is not atomic (`workers/index.ts` comment).
 - Several Durable Object methods are currently reached via `(stub as any)` casts because they are not yet on the typed interface; tighten these as the typed API grows.
+- Mailbox deletion (`DELETE /mailboxes/:id`) now cascades: it wipes the mailbox DO's emails/attachments, deletes R2 attachment blobs in one batched call, best-effort destroys the per-mailbox agent DO (chat history) via `ctx.waitUntil`, then removes the settings blob. If the agent destroy fails, only chat history is orphaned — email data is fully cleaned.
 
 ## Review guidance
 

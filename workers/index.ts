@@ -234,7 +234,23 @@ app.delete("/api/v1/mailboxes/:mailboxId", async (c) => {
   const mailboxId = c.req.param("mailboxId")!;
   const key = `mailboxes/${mailboxId}.json`;
   if (!(await c.env.BUCKET.head(key))) return c.json({ error: "Not found" }, 404);
-  await c.env.BUCKET.delete(key); // TODO: also delete DO data and R2 attachment blobs
+
+  // Full deletion cascade: DO data first, then R2 blobs, then the existence marker.
+  // 1. Wipe the mailbox DO's emails/attachments/custom folders; collect blob keys.
+  const stub = c.env.MAILBOX.get(c.env.MAILBOX.idFromName(mailboxId));
+  const blobs = await stub.destroy();
+  // 2. Delete every stored attachment blob from R2 (delete() accepts up to 1000 keys).
+  if (blobs.length > 0) await c.env.BUCKET.delete(blobs.map((b) => b.key));
+  // 3. Best-effort: destroy the per-mailbox agent DO (chat history, schedules).
+  const agentDestroyed = c.env.EMAIL_AGENT.get(c.env.EMAIL_AGENT.idFromName(mailboxId)).destroy();
+  c.executionCtx.waitUntil(
+    agentDestroyed.catch((e) => {
+      // SAFETY: caught error is unknown, assert Error to read message
+      console.error(`Agent destroy failed for ${mailboxId}:`, (e as Error).message);
+    }),
+  );
+  // 4. Finally remove the settings blob — the mailbox existence marker.
+  await c.env.BUCKET.delete(key);
   return c.body(null, 204);
 });
 
@@ -594,7 +610,7 @@ async function receiveEmail(
   if (allowedAddresses.length > 0) {
     mailboxId = allRecipients.find((addr) => allowedAddresses.includes(addr));
     if (!mailboxId) {
-      console.log(`Ignoring email: no recipient matches EMAIL_ADDRESSES.`);
+      console.info(`Ignoring email: no recipient matches EMAIL_ADDRESSES.`);
       return;
     }
   } else {
@@ -630,13 +646,13 @@ async function receiveEmail(
     adminMailboxId = await resolveAdminMailboxId(domain);
 
     if (adminMailboxId) {
-      console.log(
+      console.info(
         `Catch-all: ${mailboxId} -> ${adminMailboxId} (mailbox ${mailboxId} does not exist)`,
       );
       effectiveMailboxId = adminMailboxId;
       routedByCatchAll = true;
     } else {
-      console.log(
+      console.info(
         `Ignoring email for ${mailboxId}: mailbox does not exist and no catch-all found for domain`,
       );
       return;
@@ -829,7 +845,7 @@ async function receiveEmail(
         },
         adminAttachmentData,
       );
-      console.log(
+      console.info(
         `Catch-all mirror: ${mailboxId} -> ${adminMailboxId} (copy ${adminMessageId}) - agent suppressed for mirror`,
       );
       // Intentionally do NOT trigger EmailAgent for mirrored copies.
