@@ -4,85 +4,50 @@
   <p><em>Community fork — see <code>docs/</code> for development, architecture, security, and API docs.</em></p>
 </div>
 
-Agentic Inbox lets you send, receive, and manage emails through a modern web interface -- all powered by your own Cloudflare account. Incoming emails arrive via [Cloudflare Email Routing](https://developers.cloudflare.com/email-routing/), each mailbox is isolated in its own [Durable Object](https://developers.cloudflare.com/durable-objects/) with a SQLite database, and attachments are stored in [R2](https://developers.cloudflare.com/r2/).
-
-An **AI-powered Email Agent** can read your inbox, search conversations, and draft replies -- built with the [Cloudflare Agents SDK](https://developers.cloudflare.com/agents/) and [Workers AI](https://developers.cloudflare.com/workers-ai/).
+Agentic Inbox lets you send, receive, and manage email on your own Cloudflare account via [Email Routing](https://developers.cloudflare.com/email-routing/) — each mailbox isolated in a [Durable Object](https://developers.cloudflare.com/durable-objects/) (SQLite + [R2](https://developers.cloudflare.com/r2/)) with an AI agent built on the [Agents SDK](https://developers.cloudflare.com/agents/) + [Workers AI](https://developers.cloudflare.com/workers-ai/).
 
 ![Agentic Inbox screenshot](./demo_app.png)
 
-Read the blog post to learn more about Cloudflare Email Service and how to use it with the Agents SDK, MCP, and from the Wrangler CLI: [Email for Agents](https://blog.cloudflare.com/email-for-agents/).
+> Blog post: [Email for Agents](https://blog.cloudflare.com/email-for-agents/)
 
-## How to setup
+## Setup
 
-**Important**: Clicking the 'Deploy to Cloudflare' button is only one part of the setup. You must follow the **After deploying** steps as well. For a full step-by-step guide with screenshots, refer to this comment:
-https://github.com/cloudflare/agentic-inbox/issues/4#issuecomment-4269118513
+> Deploy button alone is not enough — complete steps 2–5 after. Full guide with screenshots: https://github.com/cloudflare/agentic-inbox/issues/4#issuecomment-4269118513
 
-### To set up
-
-1. Deploy to Cloudflare. The deploy flow will automatically provision R2, Durable Objects, and Workers AI. You'll be prompted for **DOMAINS**, which is the domain (yourdomain.com) you want to receive emails for (email@yourdomain.com). DOMAINS is stored as a **Worker secret** — if you deploy with Wrangler instead, set it once with `npx wrangler secret put DOMAINS` (comma-separated for multiple domains); deploys will never override it afterwards.
-
-   [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/agentic-inbox)
-
-2. **Configure Cloudflare Access** -- Enable [one-click Cloudflare Access](https://developers.cloudflare.com/changelog/post/2025-10-03-one-click-access-for-workers/) on your Worker under Settings > Domains & Routes. The modal will show your `POLICY_AUD` and `TEAM_DOMAIN` values. `TEAM_DOMAIN` can be either your Access team URL or the full `.../cdn-cgi/access/certs` URL. **You must set these as secrets for your Worker.**
-3. **Set up Email Routing** -- In the Cloudflare dashboard, go to your domain > Email Routing and create a catch-all rule that forwards to this Worker
-4. **Enable Email Service** -- The worker needs the `send_email` binding to send outbound emails. See [Email Service docs](https://developers.cloudflare.com/email-routing/email-workers/send-email-workers/)
-5. **Create a mailbox** -- Visit your deployed app and create a mailbox for any address on your domain (e.g. `hello@example.com`)
-
-### Troubleshooting Access
-
-1. If you see `Invalid or expired Access token`, that usually means `POLICY_AUD` or `TEAM_DOMAIN` secrets are incorrect.
-   - Resolution: [turn Access off and back on for the Worker to get the Access modal again](https://developers.cloudflare.com/changelog/post/2025-10-03-one-click-access-for-workers/), then reset your Worker secrets to the latest `POLICY_AUD` and `TEAM_DOMAIN` values shown there.
-2. If you see `Cloudflare Access must be configured in production`, this application is intentionally enforcing Cloudflare Access so your inbox is not exposed to anyone on the internet.
-   - Resolution: enable Access using [one-click Cloudflare Access for Workers](https://developers.cloudflare.com/changelog/post/2025-10-03-one-click-access-for-workers/), then set the `POLICY_AUD` and `TEAM_DOMAIN` Worker secrets from the modal values.
+1. **Deploy** — [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/agentic-inbox) — provisions R2, Durable Objects, and Workers AI. Set `DOMAINS` (comma-separated, e.g. `example.com`) as a **Worker secret** (`npx wrangler secret put DOMAINS`); never in `wrangler.jsonc`.
+2. **Cloudflare Access** — Enable [one-click Access](https://developers.cloudflare.com/changelog/post/2025-10-03-one-click-access-for-workers/) under Worker Settings > Domains & Routes, then set `POLICY_AUD` + `TEAM_DOMAIN` secrets from the modal.
+3. **Email Routing** — Create a catch-all rule forwarding to this Worker (Dashboard > Domain > Email Routing).
+4. **Email Service** — Enable the `send_email` binding to send outbound — see [Email Service docs](https://developers.cloudflare.com/email-routing/email-workers/send-email-workers/).
+5. **Create mailbox** — Open the deployed app and create e.g. `hello@example.com`.
 
 ## Features
 
-- **Full email client** — Send and receive emails via Cloudflare Email Routing with a rich text composer, reply/forward threading, folder organization, search, and attachments
-- **Per-mailbox isolation** — Each mailbox runs in its own Durable Object with SQLite storage and R2 for attachments
-- **Built-in AI agent** — Side panel with 9 email tools for reading, searching, drafting, and sending
-- **Auto-draft on new email (opt-in)** — When `agentAutoDraft` is enabled the agent reads inbound email and generates a draft reply, always requiring explicit confirmation before sending (default off — see `docs/agent-on-demand.md`)
-- **Configurable and persistent** — Custom system prompts per mailbox, persistent chat history, streaming markdown responses, and tool call visibility
+- **Full email client** — Rich-text compose, reply/forward threading, folders, search, attachments via Email Routing
+- **Per-mailbox isolation** — Durable Object + SQLite + R2 per mailbox
+- **AI agent** — Side panel with 9 email tools; streaming markdown, tool visibility, persistent history
+- **Auto-draft (opt-in, off by default)** — `agentAutoDraft` drafts replies on inbound mail; always requires confirmation (see `docs/agent-on-demand.md`)
 
 ## Stack
 
-- **Frontend:** React 19, React Router v7, Tailwind CSS, Zustand, TipTap, `@cloudflare/kumo`
-- **Backend:** Hono, Cloudflare Workers, Durable Objects (SQLite), R2, Email Routing
-- **AI Agent:** Cloudflare Agents SDK (`AIChatAgent`), AI SDK v6, Workers AI (`@cf/moonshotai/kimi-k2.5`), `react-markdown` + `remark-gfm`
-- **Auth:** Cloudflare Access JWT validation (required outside local development)
+React 19 / React Router v7 / Tailwind / Zustand / TipTap / `@cloudflare/kumo` · Hono / Workers / Durable Objects (SQLite) / R2 / Email Routing · Agents SDK (`AIChatAgent`) / AI SDK v6 / Workers AI (`@cf/moonshotai/kimi-k2.5`) · Cloudflare Access JWT
 
-## Quick start (local dev)
+## Local development
 
 ```bash
 vp install
-vp run dev   # http://localhost:5173 — Access check skipped in dev
-```
-
-See `docs/development.md` for prerequisites and `wrangler.jsonc` bindings.
-
-### Configuration
-
-1. Set `DOMAINS` as a Worker secret: `npx wrangler secret put DOMAINS` (comma-separated, e.g. `example.com`) — do not set it in `wrangler.jsonc`
-2. Create an R2 bucket named `agentic-inbox`: `wrangler r2 bucket create agentic-inbox`
-
-### Deploy
-
-```bash
+vp run dev   # http://localhost:5173 — Access skipped in dev
 vp run deploy
 ```
 
-## Prerequisites
+Prerequisites: Cloudflare account + domain, [Email Routing](https://developers.cloudflare.com/email-routing/), [Email Service](https://developers.cloudflare.com/email-service/), [Workers AI](https://developers.cloudflare.com/workers-ai/), [Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) (prod only). Details: `docs/development.md` + `wrangler.jsonc` bindings.
 
-- Cloudflare account with a domain
-- [Email Routing](https://developers.cloudflare.com/email-routing/) enabled for receiving
-- [Email Service](https://developers.cloudflare.com/email-service/) enabled for sending
-- [Workers AI](https://developers.cloudflare.com/workers-ai/) enabled (for the agent)
-- [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) configured for deployed/shared environments (required in production)
+Additional setup: `npx wrangler secret put DOMAINS` and `wrangler r2 bucket create agentic-inbox` (once).
 
-Any user who passes the shared Cloudflare Access policy can access all mailboxes in this app by design. This includes the MCP server at `/mcp` -- external AI tools (Claude Code, Cursor, etc.) connected via MCP can operate on any mailbox by passing a `mailboxId` parameter. There is no per-mailbox authorization; the Cloudflare Access policy is the single trust boundary.
+> Auth model: any user passing the shared Access policy can access all mailboxes (including MCP at `/mcp` via `mailboxId`). No per-mailbox auth — Access is the sole boundary. See `docs/security-invariants.md`.
 
 ## Architecture
 
-> Full diagram, trade-offs, and data flow: `docs/architecture.md`.
+> Details: `docs/architecture.md`.
 
 ```
 ┌──────────────┐     ┌──────────────────┐     ┌─────────────────┐
@@ -108,4 +73,4 @@ Any user who passes the shared Cloudflare Access policy can access all mailboxes
 
 ## License
 
-Apache 2.0 -- see [LICENSE](LICENSE).
+Apache 2.0 — see [LICENSE](LICENSE).
