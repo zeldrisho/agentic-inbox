@@ -11,9 +11,9 @@
 import type { EmailFull } from "./schemas";
 import type { MailboxRpc } from "./mailbox-rpc";
 import { asMailboxRpc } from "./mailbox-rpc";
-import { Folders } from "../../shared/folders";
+import { Folders } from "shared/folders";
 import type { Env } from "../types";
-import { formatQuotedDate } from "../../shared/dates";
+import { formatQuotedDate } from "shared/dates";
 
 // ── DO Stub ────────────────────────────────────────────────────────
 

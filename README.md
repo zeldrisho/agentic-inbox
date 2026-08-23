@@ -6,7 +6,7 @@
 
 Agentic Inbox lets you send, receive, and manage email on your own Cloudflare account via [Email Routing](https://developers.cloudflare.com/email-routing/) — each mailbox isolated in a [Durable Object](https://developers.cloudflare.com/durable-objects/) (SQLite + [R2](https://developers.cloudflare.com/r2/)) with an AI agent built on the [Agents SDK](https://developers.cloudflare.com/agents/) + [Workers AI](https://developers.cloudflare.com/workers-ai/).
 
-![Agentic Inbox screenshot](./demo_app.png)
+![Agentic Inbox screenshot](./docs/assets/demo.png)
 
 > Blog post: [Email for Agents](https://blog.cloudflare.com/email-for-agents/)
 

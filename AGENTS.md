@@ -6,16 +6,17 @@
 
 ## Project Layout
 
-| Path                     | Purpose                                                                     |
-| ------------------------ | --------------------------------------------------------------------------- |
-| `app/`                   | React Router v7 SPA — UI, routes, components, services, hooks               |
-| `workers/`               | Hono API (`index.ts`), Worker entry (`app.ts`), Durable Objects, agent, MCP |
-| `workers/durableObject/` | `MailboxDO` — per-mailbox SQLite + R2 storage                               |
-| `workers/agent/`         | `EmailAgent` (`AIChatAgent`) — 9 email tools, auto-draft                    |
-| `workers/mcp/`           | `EmailMCP` — exposes the same tools over MCP at `/mcp`                      |
-| `shared/`                | Types/utilities shared by client and worker (`folders.ts`, `dates.ts`)      |
-| `tests/`                 | Vitest suite (`tests/**/*.test.ts`) — mirrors `shared/`, `workers/`, `app/` |
-| `wrangler.jsonc`         | Bindings, Durable Object migrations, and secrets                            |
+| Path                     | Purpose                                                                                        |
+| ------------------------ | ---------------------------------------------------------------------------------------------- |
+| `app/`                   | React Router v7 SPA — UI, routes, components, services, hooks                                  |
+| `workers/`               | Hono API (`index.ts`), Worker entry (`app.ts`), Durable Objects, agent, MCP                    |
+| `workers/durableObject/` | `MailboxDO` — per-mailbox SQLite + R2 storage                                                  |
+| `workers/agent/`         | `EmailAgent` (`AIChatAgent`) — 9 email tools, auto-draft                                       |
+| `workers/mcp/`           | `EmailMCP` — exposes the same tools over MCP at `/mcp`                                         |
+| `packages/shared/`       | Types/utilities shared by client and worker (`folders.ts`, `dates.ts`) — aliased as `shared/*` |
+| `config/`                | Tooling configs (`tsconfig.app.json`, `tsconfig.node.json`)                                    |
+| `tests/`                 | Vitest suite (`tests/**/*.test.ts`) — mirrors `packages/shared/`, `workers/`, `app/`           |
+| `wrangler.jsonc`         | Bindings, Durable Object migrations, and secrets                                               |
 
 ## Commands
 

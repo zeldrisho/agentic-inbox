@@ -3,7 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import type { Context } from "hono";
-import { FALLBACK_MODELS } from "../../shared/models";
+import { FALLBACK_MODELS } from "shared/models";
 import type { Env } from "../types";
 
 const CACHE_R2_KEY = "cache/models.json";

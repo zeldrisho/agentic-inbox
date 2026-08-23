@@ -1,6 +1,6 @@
 # Development
 
-How to build, run, and contribute to this fork of **agentic-inbox**.
+How to build, run, and contribute to this fork.
 
 ## Prerequisites
 
@@ -33,7 +33,7 @@ vp run cf-typegen   # generate worker-configuration.d.ts + env types from wrangl
 vp run typecheck    # cf-typegen + react-router typegen + tsc -b
 ```
 
-`tsconfig.json` uses project references (`tsconfig.node.json`, `tsconfig.cloudflare.json`). Run `typecheck` after changing bindings, routes, `shared/` types, or `worker-configuration.d.ts`.
+`tsconfig.json` uses project references (`config/tsconfig.node.json`, `config/tsconfig.app.json`). Run `typecheck` after changing bindings, routes, `packages/shared/` types, or `worker-configuration.d.ts`.
 
 ## Build & deploy
 
@@ -46,21 +46,22 @@ Deploying provisions R2, Durable Objects, and Workers AI. After deploying, follo
 
 ## Project layout
 
-| Path                     | Purpose                                                                                                 |
-| ------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `app/`                   | React Router v7 SPA — `routes/`, `components/`, `services/api.ts`, `lib/`, `hooks/`, `types/`           |
-| `workers/index.ts`       | Hono API routes (`/api/v1/...`)                                                                         |
-| `workers/app.ts`         | Worker entry — Access middleware, `/mcp`, `/agents/*`, SPA fallback, `email` handler                    |
-| `workers/durableObject/` | `MailboxDO` (SQLite + R2) and SQL migrations                                                            |
-| `workers/agent/`         | `EmailAgent` — `AIChatAgent` with 9 email tools and auto-draft                                          |
-| `workers/mcp/`           | `EmailMCP` — same tools over the Model Context Protocol                                                 |
-| `workers/routes/`        | Compose helpers (`reply-forward.ts`)                                                                    |
-| `workers/lib/`           | `mailbox.ts` (auth middleware), `tools.ts`, `ai.ts`, `email-helpers.ts`, `schemas.ts`, `attachments.ts` |
-| `workers/db/`            | Drizzle schema                                                                                          |
-| `shared/`                | `folders.ts`, `dates.ts` — shared client/worker constants & helpers                                     |
-| `tests/`                 | Vitest suite — `tests/**/*.test.ts` mirrors `shared/`, `workers/`, `app/` (`vite.config.ts: test`)      |
-| `wrangler.jsonc`         | Bindings, Durable Object migrations (v1–v3), secrets                                                    |
-| `.dev.vars.example`      | Template for local `POLICY_AUD` / `TEAM_DOMAIN`                                                         |
+| Path                     | Purpose                                                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `app/`                   | React Router v7 SPA — `routes/`, `components/`, `services/api.ts`, `lib/`, `hooks/`, `types/`                       |
+| `workers/index.ts`       | Hono API routes (`/api/v1/...`)                                                                                     |
+| `workers/app.ts`         | Worker entry — Access middleware, `/mcp`, `/agents/*`, SPA fallback, `email` handler                                |
+| `workers/durableObject/` | `MailboxDO` (SQLite + R2) and SQL migrations                                                                        |
+| `workers/agent/`         | `EmailAgent` — `AIChatAgent` with 9 email tools and auto-draft                                                      |
+| `workers/mcp/`           | `EmailMCP` — same tools over the Model Context Protocol                                                             |
+| `workers/routes/`        | Compose helpers (`reply-forward.ts`)                                                                                |
+| `workers/lib/`           | `mailbox.ts` (auth middleware), `tools.ts`, `ai.ts`, `email-helpers.ts`, `schemas.ts`, `attachments.ts`             |
+| `workers/db/`            | Drizzle schema                                                                                                      |
+| `packages/shared/`       | `folders.ts`, `dates.ts`, `models.ts`, `json.ts` — shared client/worker constants & helpers (aliased as `shared/*`) |
+| `config/`                | Tooling configs (`tsconfig.app.json`, `tsconfig.node.json`)                                                         |
+| `tests/`                 | Vitest suite — `tests/**/*.test.ts` mirrors `packages/shared/`, `workers/`, `app/` (`vite.config.ts: test`)         |
+| `wrangler.jsonc`         | Bindings, Durable Object migrations (v1–v3), secrets                                                                |
+| `.dev.vars.example`      | Template for local `POLICY_AUD` / `TEAM_DOMAIN`                                                                     |
 
 ## Configuration
 
@@ -82,8 +83,9 @@ Deploying provisions R2, Durable Objects, and Workers AI. After deploying, follo
 - Lint/format/test is managed by Vite+ (`vp check`, `vp test` via `vite.config.ts:test`). Gate changes with `vp check` + `vp test` + `typecheck`/`build`.
 - **Toolchain pinning (intentional, do not remove):** `vite` is aliased to `npm:@voidzero-dev/vite-plus-core` and `oxlint`/`@oxlint/plugins` are pinned at `1.79.0` in `package.json` even though `vite-plus` bundles its own copies. `vp` resolves packages with `cwd` **first**, then falls back to its bundled copy, so the top-level pins are what `vp check`/`vp lint` actually run. The `vite` alias is required because `@react-router/dev`, `@cloudflare/vite-plugin`, and `@tailwindcss/vite` import the bare `vite` specifier and peer-depend on it (pnpm's strict isolation would otherwise fail to resolve it). The `oxlint`/`@oxlint/plugins` pins keep the linter in sync with the custom rules in `tools/oxlint/anti-slop/**`, which import `@oxlint/plugins@1.79.0`. Removing them would silently downgrade `vp` to `vite-plus`'s bundled `oxlint@1.77.0`/`@oxlint/plugins@1.73.0` and risk breaking those rules. See _Known gaps_ for the latent version gap.
 - Keep `workers/index.ts` route handlers thin; business logic lives in the Durable Objects (`workers/durableObject`, `workers/agent`, `workers/mcp`) and `workers/lib`.
-- Shared client/worker code belongs in `shared/`.
+- Shared client/worker code belongs in `packages/shared/` (import as `shared/*`).
 - API request bodies are validated with Zod schemas in `workers/lib/schemas.ts` and inline in `workers/index.ts`.
+- Assets: `docs/assets/demo.png` (moved from root `demo_app.png`).
 
 ## Known gaps
 
