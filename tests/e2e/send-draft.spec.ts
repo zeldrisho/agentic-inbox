@@ -12,15 +12,18 @@
  * reachable without an identity provider.
  */
 
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 
 /** Unique-per-run mailbox addresses so reruns never collide with stale data. */
 const RUN_ID = Date.now();
 const DRAFT_MAILBOX = `e2e-draft-${RUN_ID}@example.com`;
+const SEND_MAILBOX = `e2e-send-${RUN_ID}@example.com`;
 const AGENT_MAILBOX = `e2e-agent-${RUN_ID}@example.com`;
 
 const DRAFT_SUBJECT = "E2E draft subject";
 const DRAFT_BODY = "E2E draft body text";
+const SENT_SUBJECT = "E2E sent subject";
+const SENT_BODY = "E2E sent body text";
 const RECIPIENT = "recipient@example.com";
 
 /**
@@ -39,13 +42,19 @@ async function createMailbox(
 }
 
 /**
- * Fills and saves a draft through the compose panel.
+ * Cold-start headroom: "webServer ready" only means port 5173 answers — Vite
+ * still compiles routes on demand inside the first test, so first-interaction
+ * waits need generous timeouts.
  */
+const COLD_START_TIMEOUT = 20_000;
+
 /**
- * Fills and saves a draft through the compose panel.
+ * Opens the mailbox inbox and the compose panel.
+ *
+ * @returns The recipient input locator.
  */
-async function composeAndSaveDraft(page: Page, mailboxUrl: string): Promise<void> {
-  await page.goto(`${mailboxUrl}/emails/inbox`);
+async function openCompose(page: Page, mailboxUrl: string): Promise<Locator> {
+  await page.goto(`${mailboxUrl}/emails/inbox`, { waitUntil: "networkidle" });
   // The empty inbox offers a Compose button; on later runs the toolbar one is used.
   await page
     .getByRole("button", { name: /compose/i })
@@ -54,12 +63,32 @@ async function composeAndSaveDraft(page: Page, mailboxUrl: string): Promise<void
 
   // The compose inputs are identified by their placeholders (panel uses exact, modal uses longer list).
   const toInput = page.getByPlaceholder(/recipient@example\.com/);
-  await expect(toInput).toBeVisible({ timeout: 10_000 });
+  await expect(toInput).toBeVisible({ timeout: COLD_START_TIMEOUT });
+  return toInput;
+}
+
+/**
+ * Fills recipient, subject, and body through the open compose panel.
+ */
+async function fillComposeFields(
+  page: Page,
+  toInput: Locator,
+  subject: string,
+  body: string,
+): Promise<void> {
   await toInput.fill(RECIPIENT);
-  await page.getByPlaceholder("Email subject").fill(DRAFT_SUBJECT);
-  await expect(page.locator(".ProseMirror")).toBeVisible({ timeout: 10_000 });
+  await page.getByPlaceholder("Email subject").fill(subject);
+  await expect(page.locator(".ProseMirror")).toBeVisible();
   await page.locator(".ProseMirror").click();
-  await page.keyboard.type(DRAFT_BODY);
+  await page.keyboard.type(body);
+}
+
+/**
+ * Fills and saves a draft through the compose panel.
+ */
+async function composeAndSaveDraft(page: Page, mailboxUrl: string): Promise<void> {
+  const toInput = await openCompose(page, mailboxUrl);
+  await fillComposeFields(page, toInput, DRAFT_SUBJECT, DRAFT_BODY);
 
   await page.getByRole("button", { name: /save as draft/i }).click();
   await expect(page.getByText("Draft saved!")).toBeVisible();
@@ -85,10 +114,35 @@ test.describe("send→draft flow", () => {
   });
 });
 
+test.describe("send→sent flow", () => {
+  test("sending an email files it in the Sent folder", async ({ page, request }) => {
+    const { mailboxUrl } = await createMailbox(request, SEND_MAILBOX);
+    const toInput = await openCompose(page, mailboxUrl);
+    await fillComposeFields(page, toInput, SENT_SUBJECT, SENT_BODY);
+
+    // Exact match so we hit "Send", not the loading-state "Sending..." or "Save as Draft".
+    await page.getByRole("button", { name: "Send", exact: true }).click();
+    await expect(page.getByText("Email sent!")).toBeVisible({ timeout: COLD_START_TIMEOUT });
+
+    // Navigate to the Sent folder via the sidebar.
+    await page.goto(`${mailboxUrl}/emails/sent`);
+    await expect(page.getByText(SENT_SUBJECT)).toBeVisible();
+
+    // The stored email carries the right recipient and folder (API cross-check).
+    const res = await request.get(`/api/v1/mailboxes/${SEND_MAILBOX}/emails?folder=sent`);
+    expect(res.ok()).toBeTruthy();
+    // SAFETY: our own API returns a JSON array of stored email rows.
+    const body = (await res.json()) as { emails: { recipient: string; subject: string }[] };
+    expect(body.emails.some((e) => e.subject === SENT_SUBJECT && e.recipient === RECIPIENT)).toBe(
+      true,
+    );
+  });
+});
+
 test.describe("agent model switch", () => {
   test("switching model updates mailbox settings instantly", async ({ page, request }) => {
     const { mailboxUrl } = await createMailbox(request, AGENT_MAILBOX);
-    await page.goto(`${mailboxUrl}/emails/inbox`);
+    await page.goto(`${mailboxUrl}/emails/inbox`, { waitUntil: "networkidle" });
 
     // Open the agent panel (lazy-loads agents/react + @cloudflare/ai-chat/react).
     const toggle = page.getByRole("button", { name: "Toggle agent panel" });
