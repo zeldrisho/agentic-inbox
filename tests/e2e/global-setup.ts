@@ -21,28 +21,43 @@ const WARMUP_MAILBOX = "e2e-warmup@example.com";
 export default async function globalSetup(): Promise<void> {
   // Scratch mailbox so the warm-up drives a real route payload. A stale one
   // from a previous run is fine — creation failures are ignored either way.
-  const api = await request.newContext({ baseURL: BASE_URL });
-  await api.post("/api/v1/mailboxes", {
-    data: { email: WARMUP_MAILBOX, name: "E2E warmup" },
-  });
-  await api.dispose();
+  let api: Awaited<ReturnType<typeof request.newContext>> | undefined;
+  try {
+    api = await request.newContext({ baseURL: BASE_URL });
+    await api.post("/api/v1/mailboxes", {
+      data: { email: WARMUP_MAILBOX, name: "E2E warmup" },
+    });
+  } catch {
+    // Warmup is best-effort; tests create their own mailboxes.
+  } finally {
+    await api?.dispose();
+  }
 
   const inboxUrl = `/mailbox/${encodeURIComponent(WARMUP_MAILBOX)}/emails/inbox`;
 
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage();
-    // Note: pages created here don't inherit use.baseURL — that's a fixture default.
-    await page.goto(`${BASE_URL}${inboxUrl}`, { waitUntil: "networkidle" });
+    // Use domcontentloaded — Vite's HMR websocket keeps networkidle from settling.
+    await page.goto(`${BASE_URL}${inboxUrl}`, {
+      waitUntil: "domcontentloaded",
+      timeout: 60_000,
+    });
 
-    // Warm the compose-panel chunk (Kumo inputs + TipTap editor).
-    await page
-      .getByRole("button", { name: /compose/i })
-      .first()
-      .click();
-    await page
-      .getByPlaceholder(/recipient@example\.com/)
-      .waitFor({ state: "visible", timeout: 60_000 });
+    // Warm the compose-panel chunk (Kumo inputs + TipTap editor). Best-effort:
+    // if Vite is still compiling the chunk, tests have their own COLD_START_TIMEOUT waits.
+    try {
+      const composeBtn = page.getByRole("button", { name: /compose/i }).first();
+      await composeBtn.waitFor({ state: "visible", timeout: 30_000 });
+      await composeBtn.click();
+      await page
+        .getByPlaceholder(/recipient@example\.com/)
+        .waitFor({ state: "visible", timeout: 60_000 });
+    } catch (warmupError) {
+      console.warn("[global-setup] warmup incomplete — continuing to tests:", warmupError);
+    }
+  } catch (error) {
+    console.warn("[global-setup] warmup failed — continuing to tests:", error);
   } finally {
     await browser.close();
   }
