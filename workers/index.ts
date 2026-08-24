@@ -18,8 +18,8 @@ import {
 import { SendEmailRequestSchema } from "./lib/schemas";
 import { handleReplyEmail, handleForwardEmail } from "./routes/reply-forward";
 import { handleGetModels } from "./routes/models";
-import { Folders } from "../shared/folders";
-import type { JsonValue } from "../shared/json";
+import { Folders } from "shared/folders";
+import type { JsonValue } from "shared/json";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
 import { asMailboxRpc, type MailboxRpc } from "./lib/mailbox-rpc";

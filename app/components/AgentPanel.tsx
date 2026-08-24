@@ -23,7 +23,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router";
 import { useUIStore } from "~/hooks/useUIStore";
 import { useMailbox, useUpdateMailbox } from "~/queries/mailboxes";
-import { AUTOROUTE_SENTINEL, FALLBACK_MODELS } from "../../shared/models";
+import { AUTOROUTE_SENTINEL, FALLBACK_MODELS } from "shared/models";
 import type { MailboxSettings } from "~/types";
 import type { UIMessage } from "ai";
 import { MessageBubble } from "~/components/agent/MessageBubble";

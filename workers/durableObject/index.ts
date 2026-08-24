@@ -7,7 +7,7 @@ import { drizzle } from "drizzle-orm/durable-sqlite";
 import { eq, and, or, asc, desc, sql, inArray } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import * as schema from "../db/schema";
-import { Folders } from "../../shared/folders";
+import { Folders } from "shared/folders";
 import type { Env } from "../types";
 import type { MailboxRpc } from "../lib/mailbox-rpc";
 import { applyMigrations, mailboxMigrations } from "./migrations";

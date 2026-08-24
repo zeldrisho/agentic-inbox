@@ -14,7 +14,7 @@ import {
   resolveOriginalEmail,
 } from "../lib/email-helpers";
 import { SendEmailRequestSchema } from "../lib/schemas";
-import { Folders } from "../../shared/folders";
+import { Folders } from "shared/folders";
 import type { MailboxContext } from "../lib/mailbox";
 
 type AppContext = Context<MailboxContext>;

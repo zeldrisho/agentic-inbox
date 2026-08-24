@@ -42,7 +42,8 @@ Implemented from `docs/plan.md`:
 
 ### Browser E2E ported to Playwright (P4)
 
-`tests/e2e/send-draft.spec.ts` drives send→draft and agent model-switch flows
+`tests/e2e/send-draft.spec.ts` drives send→draft, send→sent, and agent
+model-switch flows
 in real Chromium against `vp run dev` (`playwright.config.ts`,
 `vp run test:e2e`). The jsdom file stays as the CI-fast fallback; the
 Selector quirks are recorded in `docs/testing.md`. CI runs the suite as a

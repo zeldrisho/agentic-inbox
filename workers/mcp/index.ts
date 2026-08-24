@@ -21,11 +21,7 @@ import {
   toolMarkEmailRead,
   toolMoveEmail,
 } from "../lib/tools";
-import {
-  Folders,
-  FOLDER_TOOL_DESCRIPTION,
-  MOVE_FOLDER_TOOL_DESCRIPTION,
-} from "../../shared/folders";
+import { Folders, FOLDER_TOOL_DESCRIPTION, MOVE_FOLDER_TOOL_DESCRIPTION } from "shared/folders";
 import type { Env } from "../types";
 
 /** Wrap a plain result object into MCP content format. */

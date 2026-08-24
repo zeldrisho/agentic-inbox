@@ -17,6 +17,9 @@ export default defineConfig({
   testDir: "./tests/e2e",
   // Only the Playwright specs — the sibling *.test.ts is the Vitest/jsdom fallback.
   testMatch: /\.spec\.ts$/,
+  // Warm Vite's module graph (routes + compose chunk) before any test runs,
+  // so lazy compilation never eats into a test's assertion window.
+  globalSetup: "./tests/e2e/global-setup.ts",
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",

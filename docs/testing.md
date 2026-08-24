@@ -43,7 +43,7 @@ pragma). Config lives only in `vite.config.ts:test` — no separate vitest confi
 
 `tests/e2e/send-draft.spec.ts` ports the jsdom send→draft simulation to real
 Chromium against `vp run dev` (local Durable Objects/R2, Access skipped), plus
-an agent model-switch flow. Config: `playwright.config.ts` (starts the dev
+send→sent and an agent model-switch flow. Config: `playwright.config.ts` (starts the dev
 server itself). Vitest never picks the spec up — its include pattern only
 matches `*.test.{ts,tsx}`. The jsdom file (`tests/e2e/send-draft.test.ts`)
 stays as the CI-fast fallback; the Playwright suite runs explicitly via
@@ -61,6 +61,11 @@ proved removable headlessly. Caveat: `ldd` alone cannot vet
 this — Chromium dlopens fontconfig and reads /etc/fonts/fonts.conf at
 runtime, so a missing config crashes the renderer (SIGTRAP) while ldd
 stays clean. Diagnose with `DEBUG=pw:browser vp run test:e2e`.
+
+Cold starts are handled structurally: `tests/e2e/global-setup.ts` (wired via
+`globalSetup` in `playwright.config.ts`) visits the inbox route and opens the
+compose panel once after the webServer is up, so Vite's on-demand module
+compilation happens before any test's assertion window instead of inside it.
 
 Selector notes learned while writing the specs:
 

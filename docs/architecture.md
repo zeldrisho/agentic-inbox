@@ -54,7 +54,7 @@ The `requireMailbox` middleware (`workers/lib/mailbox.ts`) verifies the mailbox 
 
 ### EmailAgent (`workers/agent`)
 
-An `AIChatAgent` with 9 email tools (defined in `workers/lib/tools.ts`): reading, searching, drafting, and sending. On new inbound email, `receiveEmail` triggers `onNewEmail`, which scans for **prompt injection** (`isPromptInjection` in `workers/lib/ai.ts`) and, if clean, auto-generates a draft — always requiring explicit human confirmation before send. Drafts are cleaned by `verifyDraft` to strip AI/system artifacts.
+An `AIChatAgent` with 9 email tools (defined in `workers/lib/tools.ts`): reading, searching, drafting, and sending. On new inbound email, `receiveEmail` triggers `onNewEmail` **only when `agentAutoDraft === true`** (default off — see `docs/agent-on-demand.md`; `workers/agent/index.ts:handleNewEmail` returns `skipped/auto_draft_disabled` and `workers/index.ts:receiveEmail` gates `waitUntil(agent.fetch(/onNewEmail))` behind the R2 setting). When enabled, it scans for **prompt injection** (`isPromptInjection` in `workers/lib/ai.ts`) and, if clean, auto-generates a draft — always requiring explicit human confirmation before send. Drafts are cleaned by `verifyDraft` to strip AI/system artifacts.
 
 ### EmailMCP (`workers/mcp`)
 
@@ -66,7 +66,7 @@ Exposes the same tools over MCP at `/mcp` so external AI tools (Claude Code, Cur
 2. Parse with `postal-mime`.
 3. Resolve the target mailbox (respecting `EMAIL_ADDRESSES` allowlist if set); ignore mail with no matching/known mailbox.
 4. Store attachments to R2, write the email to `MailboxDO`, compute threading.
-5. `waitUntil` a fire-and-forget call to `EmailAgent.onNewEmail` to trigger the auto-draft.
+5. `waitUntil` a fire-and-forget call to `EmailAgent.onNewEmail` — gated on `agentAutoDraft === true` (default off); otherwise the step is skipped with `0` AI calls.
 
 ## Data model & storage
 

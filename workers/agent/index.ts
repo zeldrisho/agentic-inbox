@@ -26,12 +26,8 @@ import {
   toolMoveEmail,
   toolDiscardDraft,
 } from "../lib/tools";
-import {
-  Folders,
-  FOLDER_TOOL_DESCRIPTION,
-  MOVE_FOLDER_TOOL_DESCRIPTION,
-} from "../../shared/folders";
-import { AUTOROUTE_FALLBACKS, AUTOROUTE_SENTINEL, DEFAULT_AGENT_MODEL } from "../../shared/models";
+import { Folders, FOLDER_TOOL_DESCRIPTION, MOVE_FOLDER_TOOL_DESCRIPTION } from "shared/folders";
+import { AUTOROUTE_FALLBACKS, AUTOROUTE_SENTINEL, DEFAULT_AGENT_MODEL } from "shared/models";
 import type { Env } from "../types";
 
 // AI SDK v6 changed tool() overloads significantly. We define tools as plain
