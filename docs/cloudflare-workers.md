@@ -67,8 +67,10 @@ Inbound email arrives through the `receiveEmail` email handler in
 - `vars.EMAIL_ADDRESSES` defaults to `[]`; production also requires
   `POLICY_AUD`, `TEAM_DOMAIN`, and the `DOMAINS` secret
   (`wrangler secret put DOMAINS`, comma-separated Email Routing domains).
-- `send_email` binding `EMAIL` with `remote: true` — sending only works against
-  a real Cloudflare deployment, not local dev.
+- `send_email` binding `EMAIL` with `remote: true` — local `wrangler dev` sends
+  real emails through Cloudflare Email Service and may reach real recipients
+  (use test addresses). Without `remote: true`, Wrangler simulates delivery
+  and logs the email locally.
 - `r2_buckets` binding `BUCKET` (`agentic-inbox`) — per-mailbox blobs and
   `mailboxes/<id>.json` markers.
 - `ai` binding `AI` with `remote: true` — Workers AI inference for the agent.

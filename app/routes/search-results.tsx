@@ -23,7 +23,7 @@ import type { Email } from "~/types";
  * @param query - The search query containing free-text terms and optional structured operators
  * @returns The text with matching terms highlighted, or the original text when no free-text terms remain or highlighting cannot be applied
  */
-function highlightTerms(text: string, query: string): React.ReactNode {
+export function highlightTerms(text: string, query: string): React.ReactNode {
   if (!query || !text) return text;
   const freeText = query
     .replace(/\b(?:from|to|subject|in|is|has|before|after):"[^"]*"/gi, "")
@@ -34,23 +34,40 @@ function highlightTerms(text: string, query: string): React.ReactNode {
   // surface): literal case-insensitive substring scan with indexOf.
   const term = freeText.slice(0, 200);
   if (!term) return text;
-  const lowerText = text.toLowerCase();
   const lowerTerm = term.toLowerCase();
+  // Map case-folded offsets back to source offsets: lowercasing can expand
+  // (e.g. "İ" -> 2 units), so lower-space positions can't slice `text` directly.
+  const lowerChars: string[] = [];
+  const lowerToSource: number[] = [];
+  for (let i = 0; i < text.length; i++) {
+    const folded = text[i]!.toLowerCase();
+    for (let j = 0; j < folded.length; j++) {
+      lowerChars.push(folded[j]!);
+      lowerToSource.push(i);
+    }
+  }
+  lowerToSource.push(text.length);
+  const lowerText = lowerChars.join("");
   const nodes: React.ReactNode[] = [];
-  let idx = 0;
+  let lowerIdx = 0;
+  let sourceIdx = 0;
   let key = 0;
   let pos: number;
-  while ((pos = lowerText.indexOf(lowerTerm, idx)) !== -1) {
-    if (pos > idx) nodes.push(text.slice(idx, pos));
+  while ((pos = lowerText.indexOf(lowerTerm, lowerIdx)) !== -1) {
+    const sourceStart = lowerToSource[pos]!;
+    const rawEnd = lowerToSource[pos + lowerTerm.length]!;
+    const sourceEnd = Math.max(rawEnd, sourceStart + 1);
+    if (sourceStart > sourceIdx) nodes.push(text.slice(sourceIdx, sourceStart));
     nodes.push(
       <mark key={key++} className="bg-kumo-warning-muted text-kumo-default rounded-sm px-0.5">
-        {text.slice(pos, pos + term.length)}
+        {text.slice(sourceStart, sourceEnd)}
       </mark>,
     );
-    idx = pos + term.length;
+    lowerIdx = pos + lowerTerm.length;
+    sourceIdx = sourceEnd;
   }
-  if (idx === 0) return text;
-  if (idx < text.length) nodes.push(text.slice(idx));
+  if (lowerIdx === 0) return text;
+  if (sourceIdx < text.length) nodes.push(text.slice(sourceIdx));
   return nodes;
 }
 
