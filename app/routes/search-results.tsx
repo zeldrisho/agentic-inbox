@@ -23,33 +23,52 @@ import type { Email } from "~/types";
  * @param query - The search query containing free-text terms and optional structured operators
  * @returns The text with matching terms highlighted, or the original text when no free-text terms remain or highlighting cannot be applied
  */
-function highlightTerms(text: string, query: string): React.ReactNode {
+export function highlightTerms(text: string, query: string): React.ReactNode {
   if (!query || !text) return text;
   const freeText = query
     .replace(/\b(?:from|to|subject|in|is|has|before|after):"[^"]*"/gi, "")
     .replace(/\b(?:from|to|subject|in|is|has|before|after):\S+/gi, "")
     .trim();
   if (!freeText) return text;
-  try {
-    const escaped = freeText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const regex = new RegExp(`(${escaped})`, "gi");
-    const parts = text.split(regex);
-    if (parts.length === 1) return text;
-    // Use case-insensitive string comparison instead of regex.test() with g flag,
-    // which has stateful lastIndex causing alternating true/false results.
-    const lowerEscaped = escaped.toLowerCase();
-    return parts.map((part, i) =>
-      part.toLowerCase() === lowerEscaped ? (
-        <mark key={i} className="bg-kumo-warning-muted text-kumo-default rounded-sm px-0.5">
-          {part}
-        </mark>
-      ) : (
-        part
-      ),
-    );
-  } catch {
-    return text;
+  // Bound highlight work and avoid RegExp entirely (no ReDoS / pattern-injection
+  // surface): literal case-insensitive substring scan with indexOf.
+  const term = freeText.slice(0, 200);
+  if (!term) return text;
+  const lowerTerm = term.toLowerCase();
+  // Map case-folded offsets back to source offsets: lowercasing can expand
+  // (e.g. "İ" -> 2 units), so lower-space positions can't slice `text` directly.
+  const lowerChars: string[] = [];
+  const lowerToSource: number[] = [];
+  for (let i = 0; i < text.length; i++) {
+    const folded = text[i]!.toLowerCase();
+    for (let j = 0; j < folded.length; j++) {
+      lowerChars.push(folded[j]!);
+      lowerToSource.push(i);
+    }
   }
+  lowerToSource.push(text.length);
+  const lowerText = lowerChars.join("");
+  const nodes: React.ReactNode[] = [];
+  let lowerIdx = 0;
+  let sourceIdx = 0;
+  let key = 0;
+  let pos: number;
+  while ((pos = lowerText.indexOf(lowerTerm, lowerIdx)) !== -1) {
+    const sourceStart = lowerToSource[pos]!;
+    const rawEnd = lowerToSource[pos + lowerTerm.length]!;
+    const sourceEnd = Math.max(rawEnd, sourceStart + 1);
+    if (sourceStart > sourceIdx) nodes.push(text.slice(sourceIdx, sourceStart));
+    nodes.push(
+      <mark key={key++} className="bg-kumo-warning-muted text-kumo-default rounded-sm px-0.5">
+        {text.slice(sourceStart, sourceEnd)}
+      </mark>,
+    );
+    lowerIdx = pos + lowerTerm.length;
+    sourceIdx = sourceEnd;
+  }
+  if (lowerIdx === 0) return text;
+  if (sourceIdx < text.length) nodes.push(text.slice(sourceIdx));
+  return nodes;
 }
 
 /**

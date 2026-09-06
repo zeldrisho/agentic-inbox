@@ -109,6 +109,9 @@ RULES:
 
 /**
  * Split an HTML body into the reply portion and the quoted block.
+ *
+ * @param html - The HTML body to split
+ * @returns An object containing the reply portion and the quoted block
  */
 function splitQuotedBlock(html: string) {
   const match = html.match(/(\s*(?:<br\s*\/?>)\s*)?(<blockquote[\s\S]*<\/blockquote>)\s*$/i);
