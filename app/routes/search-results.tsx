@@ -30,26 +30,28 @@ function highlightTerms(text: string, query: string): React.ReactNode {
     .replace(/\b(?:from|to|subject|in|is|has|before|after):\S+/gi, "")
     .trim();
   if (!freeText) return text;
-  try {
-    const escaped = freeText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const regex = new RegExp(`(${escaped})`, "gi");
-    const parts = text.split(regex);
-    if (parts.length === 1) return text;
-    // Use case-insensitive string comparison instead of regex.test() with g flag,
-    // which has stateful lastIndex causing alternating true/false results.
-    const lowerEscaped = escaped.toLowerCase();
-    return parts.map((part, i) =>
-      part.toLowerCase() === lowerEscaped ? (
-        <mark key={i} className="bg-kumo-warning-muted text-kumo-default rounded-sm px-0.5">
-          {part}
-        </mark>
-      ) : (
-        part
-      ),
+  // Bound highlight work and avoid RegExp entirely (no ReDoS / pattern-injection
+  // surface): literal case-insensitive substring scan with indexOf.
+  const term = freeText.slice(0, 200);
+  if (!term) return text;
+  const lowerText = text.toLowerCase();
+  const lowerTerm = term.toLowerCase();
+  const nodes: React.ReactNode[] = [];
+  let idx = 0;
+  let key = 0;
+  let pos: number;
+  while ((pos = lowerText.indexOf(lowerTerm, idx)) !== -1) {
+    if (pos > idx) nodes.push(text.slice(idx, pos));
+    nodes.push(
+      <mark key={key++} className="bg-kumo-warning-muted text-kumo-default rounded-sm px-0.5">
+        {text.slice(pos, pos + term.length)}
+      </mark>,
     );
-  } catch {
-    return text;
+    idx = pos + term.length;
   }
+  if (idx === 0) return text;
+  if (idx < text.length) nodes.push(text.slice(idx));
+  return nodes;
 }
 
 /**

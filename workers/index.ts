@@ -217,7 +217,7 @@ app.post("/api/v1/mailboxes", async (c) => {
     migratedInbox = await migrateCatchAllMail(c.env, email);
   } catch (e) {
     // SAFETY: caught error is unknown, assert Error to read message
-    console.error(`Catch-all migration failed for ${email}:`, (e as Error).message);
+    console.error("Catch-all migration failed for", email, (e as Error).message);
   }
   return c.json({ id: email, email, name, settings: finalSettings, migratedInbox }, 201);
 });
@@ -261,7 +261,7 @@ app.delete("/api/v1/mailboxes/:mailboxId", async (c) => {
   c.executionCtx.waitUntil(
     agentDestroyed.catch((e) => {
       // SAFETY: caught error is unknown, assert Error to read message
-      console.error(`Agent destroy failed for ${mailboxId}:`, (e as Error).message);
+      console.error("Agent destroy failed for", mailboxId, (e as Error).message);
     }),
   );
   // 4. Finally remove the settings blob — the mailbox existence marker.

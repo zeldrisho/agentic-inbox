@@ -188,7 +188,26 @@ export function buildQuotedReplyBlock(
  *
  * @param attachments - Attachments whose inline content IDs should be rewritten.
  * @returns The email body with matching inline image references replaced.
+ *
+ * Case-insensitive literal string replacement without RegExp.
+ *
+ * Avoids `new RegExp(userInput)` (ReDoS / pattern-injection risk) by scanning
+ * with `indexOf` on lowercased copies while splicing the original string.
  */
+function replaceAllCaseInsensitive(haystack: string, needle: string, replacement: string): string {
+  if (!needle) return haystack;
+  const lowerHay = haystack.toLowerCase();
+  const lowerNeedle = needle.toLowerCase();
+  let out = "";
+  let idx = 0;
+  let pos: number;
+  while ((pos = lowerHay.indexOf(lowerNeedle, idx)) !== -1) {
+    out += haystack.slice(idx, pos) + replacement;
+    idx = pos + needle.length;
+  }
+  return out + haystack.slice(idx);
+}
+
 export function rewriteInlineImages(
   body: string,
   mailboxId: string,
@@ -202,10 +221,7 @@ export function rewriteInlineImages(
       const url = `/api/v1/mailboxes/${mailboxId}/emails/${emailId}/attachments/${att.id}`;
       // Strip angle brackets from content_id if present
       const cid = att.content_id.startsWith("<") ? att.content_id.slice(1, -1) : att.content_id;
-      result = result.replace(
-        new RegExp(`cid:${cid.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "gi"),
-        url,
-      );
+      result = replaceAllCaseInsensitive(result, `cid:${cid}`, url);
     }
   }
   return result;

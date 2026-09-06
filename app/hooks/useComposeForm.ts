@@ -3,6 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { useKumoToastManager } from "@cloudflare/kumo";
+import DOMPurify from "dompurify";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   buildQuotedReplyBlock,
@@ -93,7 +94,10 @@ function buildForwardBody(
   const safeSubject = escapeHtml(original.subject);
   const safeBody = escapeHtml(stripHtml(original.body || "")).replace(/\n/g, "<br>");
 
-  return `<p><br></p>${sigBlock ? `${sigBlock}<br>` : ""}<div style="border: 1px solid #ddd; padding: 1em; background-color: #f9f9f9; margin: 1em 0;"><strong>Forwarded message:</strong><br><strong>From:</strong> ${safeSender}<br><strong>Date:</strong> ${formatComposeDate(original.date)}<br><strong>Subject:</strong> ${safeSubject}<br><br>${safeBody}</div>`;
+  const raw = `<p><br></p>${sigBlock ? `${sigBlock}<br>` : ""}<div style="border: 1px solid #ddd; padding: 1em; background-color: #f9f9f9; margin: 1em 0;"><strong>Forwarded message:</strong><br><strong>From:</strong> ${safeSender}<br><strong>Date:</strong> ${formatComposeDate(original.date)}<br><strong>Subject:</strong> ${safeSubject}<br><br>${safeBody}</div>`;
+  // Defense-in-depth: DOMPurify is the final step before the HTML reaches the
+  // compose editor, so even a future caller passing unsanitized input stays safe.
+  return DOMPurify.sanitize(raw);
 }
 
 /**
