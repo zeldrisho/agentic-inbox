@@ -82,7 +82,8 @@ export function stripHtml(html: string): string {
 /**
  * Decodes numeric and common named HTML entities in text.
  *
- * @returns The text with supported HTML entities decoded.
+ * @param text - The text containing HTML entities to decode
+ * @returns The text with supported HTML entities decoded
  */
 function decodeHtmlEntities(text: string): string {
   return text
@@ -184,15 +185,15 @@ export function buildQuotedReplyBlock(
 }
 
 /**
- * Replaces inline image content-ID references with attachment API URLs.
- *
- * @param attachments - Attachments whose inline content IDs should be rewritten.
- * @returns The email body with matching inline image references replaced.
- *
- * Case-insensitive literal string replacement without RegExp.
+ * Performs case-insensitive literal string replacement without RegExp.
  *
  * Avoids `new RegExp(userInput)` (ReDoS / pattern-injection risk) by scanning
  * with `indexOf` on lowercased copies while splicing the original string.
+ *
+ * @param haystack - The string to search within
+ * @param needle - The substring to find
+ * @param replacement - The string to replace matches with
+ * @returns The string with all case-insensitive matches replaced
  */
 function replaceAllCaseInsensitive(haystack: string, needle: string, replacement: string): string {
   if (!needle) return haystack;
@@ -208,6 +209,15 @@ function replaceAllCaseInsensitive(haystack: string, needle: string, replacement
   return out + haystack.slice(idx);
 }
 
+/**
+ * Replaces inline image content-ID references with attachment API URLs.
+ *
+ * @param body - The email body HTML containing cid: references
+ * @param mailboxId - The mailbox identifier
+ * @param emailId - The email identifier
+ * @param attachments - The email attachments containing inline images
+ * @returns The email body with cid: references replaced by attachment URLs
+ */
 export function rewriteInlineImages(
   body: string,
   mailboxId: string,
