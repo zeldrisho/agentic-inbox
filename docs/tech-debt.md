@@ -116,4 +116,4 @@ Completed — details in `docs/upgrade-notes.md`. Highlights:
 - Third-party UI internals (Kumo, Tiptap) beyond provider-level renders.
 - `worker-configuration.d.ts` and generated types.
 - Per-mailbox authorization tests — Cloudflare Access is the single auth
-  boundary by design (see `docs/security-invariants.md`).
+  boundary by design (see `docs/architecture.md` Trust boundary).

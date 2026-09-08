@@ -25,7 +25,7 @@ AI, or Agents SDK task.
 - [Agents SDK documentation](https://developers.cloudflare.com/agents/)
 - [Email Routing](https://developers.cloudflare.com/email-routing/) (receiving via `receiveEmail`)
 - [Email Service](https://developers.cloudflare.com/email-service/) (sending via the `EMAIL` `send_email` binding)
-- [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) (the auth boundary — see [`security-invariants.md`](security-invariants.md))
+- [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) (the auth boundary — see [`architecture.md`](architecture.md#trust-boundary))
 - [Workers observability and errors](https://developers.cloudflare.com/workers/observability/errors/)
 
 ## Expected commands

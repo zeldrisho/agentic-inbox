@@ -43,7 +43,7 @@ Prerequisites: Cloudflare account + domain, [Email Routing](https://developers.c
 
 Additional setup: `npx wrangler secret put DOMAINS` and `wrangler r2 bucket create agentic-inbox` (once).
 
-> Auth model: any user passing the shared Access policy can access all mailboxes (including MCP at `/mcp` via `mailboxId`). No per-mailbox auth — Access is the sole boundary. See `docs/security-invariants.md`.
+> Auth model: any user passing the shared Access policy can access all mailboxes (including MCP at `/mcp` via `mailboxId`). No per-mailbox auth — Access is the sole boundary. See `docs/architecture.md` (Trust boundary).
 
 ## Architecture
 
@@ -64,12 +64,11 @@ Additional setup: `npx wrangler secret put DOMAINS` and `wrangler r2 bucket crea
 
 ## Documentation
 
-| Topic                       | File                                                         |
-| --------------------------- | ------------------------------------------------------------ |
-| Development & conventions   | [`docs/development.md`](docs/development.md)                 |
-| Architecture                | [`docs/architecture.md`](docs/architecture.md)               |
-| Security model & invariants | [`docs/security-invariants.md`](docs/security-invariants.md) |
-| REST API reference          | [`docs/api.md`](docs/api.md)                                 |
+| Topic                     | File                                           |
+| ------------------------- | ---------------------------------------------- |
+| Development & conventions | [`docs/development.md`](docs/development.md)   |
+| Architecture              | [`docs/architecture.md`](docs/architecture.md) |
+| REST API reference        | [`docs/api.md`](docs/api.md)                   |
 
 ## License
 

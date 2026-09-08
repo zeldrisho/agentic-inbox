@@ -93,4 +93,4 @@ Deploying provisions R2, Durable Objects, and Workers AI. After deploying, follo
 - Lint/format tooling is provided by Vite+ (`vp check`, Oxlint + Oxfmt); no ESLint/Prettier config. `vite-plus@0.3.0` bundles `oxlint@1.79.0`/`oxfmt@0.64.0`, so the former latent version gap (`0.2.9` bundled `1.77.0`/`1.73.0`) is now closed — `oxlint` is intentionally unpinned and resolved from the bundle. `@oxlint/plugins@1.79.0` remains pinned in `package.json` because pnpm cannot resolve the custom plugin's import from the bundled copy (see Workflow conventions).
 - Documented code-level debt: draft creation is create-then-delete (not atomic); `CreateMailboxBody.settings` is unvalidated and `agentSystemPrompt` flows straight to the AI. Mailbox deletion now performs a full cascade (see `docs/api.md`).
 
-See `docs/architecture.md` for system structure and `docs/security-invariants.md` for the trust boundary and accepted risks.
+See `docs/architecture.md` for system structure and trust boundary.

@@ -54,7 +54,7 @@ The `requireMailbox` middleware (`workers/lib/mailbox.ts`) verifies the mailbox 
 
 ### EmailAgent (`workers/agent`)
 
-An `AIChatAgent` with 9 email tools (defined in `workers/lib/tools.ts`): reading, searching, drafting, and sending. On new inbound email, `receiveEmail` triggers `onNewEmail` **only when `agentAutoDraft === true`** (default off — see `docs/agent-on-demand.md`; `workers/agent/index.ts:handleNewEmail` returns `skipped/auto_draft_disabled` and `workers/index.ts:receiveEmail` gates `waitUntil(agent.fetch(/onNewEmail))` behind the R2 setting). When enabled, it scans for **prompt injection** (`isPromptInjection` in `workers/lib/ai.ts`) and, if clean, auto-generates a draft — always requiring explicit human confirmation before send. Drafts are cleaned by `verifyDraft` to strip AI/system artifacts.
+An `AIChatAgent` with 9 email tools (defined in `workers/lib/tools.ts`): reading, searching, drafting, and sending. On new inbound email, `receiveEmail` triggers `onNewEmail` **only when `agentAutoDraft === true`** (default off — see `docs/agent-on-demand.md`; `workers/agent/index.ts:handleNewEmail` returns `skipped/auto_draft_disabled` and `workers/index.ts:receiveEmail` gates `waitUntil(agent.fetch(/onNewEmail))` behind the R2 setting). When enabled, it scans for **prompt injection** (`isPromptInjection` in `workers/lib/ai.ts`, fail-closed: errors/inconclusive skip auto-draft but the email is still stored) and, if clean, auto-generates a draft — always requiring explicit human confirmation before send. Drafts are cleaned by `verifyDraft` to strip AI/system artifacts (50% length-drop safety cutoff; on AI failure it can return an empty body, so callers must guard against saving blank drafts).
 
 ### EmailMCP (`workers/mcp`)
 
@@ -76,13 +76,14 @@ Exposes the same tools over MCP at `/mcp` so external AI tools (Claude Code, Cur
 
 ## Trust boundary
 
-Cloudflare Access is the **single** authentication/authorization boundary. Once a user passes the shared policy they can reach every mailbox and the MCP server. There is no per-mailbox authorization. See `docs/security-invariants.md`.
+Cloudflare Access is the **single** authentication/authorization boundary (`workers/app.ts` validates `cf-access-jwt-assertion` against `POLICY_AUD` / `TEAM_DOMAIN`, failing closed with `500` if unset and `403` on missing/invalid tokens; skipped only on `localhost` dev). Once a user passes the shared policy they can reach every mailbox and the MCP server. There is no per-mailbox authorization — `mailboxId` (API path param, MCP argument) is untrusted input for existence checks only (`requireMailbox` confirms `mailboxes/<id>.json` exists in R2, nothing more). Do not add a second, weaker auth path that bypasses the shared Access policy. CORS stays same-origin only (`localhost`/`127.0.0.1` allowed in dev, all other cross-origin origins blocked) — never `*` or arbitrary-origin reflection.
 
 ## Trade-offs
 
 - **Per-mailbox Durable Objects** give strong isolation and SQLite query performance, at the cost of cross-mailbox operations (search/list across mailboxes) requiring enumeration.
 - **Deferred send + auto-draft** keep the request path fast; delivery and drafting happen asynchronously, so transient failures are logged rather than blocking the user.
 - **AI draft verification** favors false negatives (keep content) over false positives (strip real content), with a 50% length drop safety cutoff.
+- **Untrusted output is sanitized:** attachment filenames are sanitized before `Content-Disposition`, and email HTML renders only through sanitized paths (`app/components/EmailIframe.tsx` + DOMPurify) — new HTML rendering paths must sanitize too.
 
 ## References
 
