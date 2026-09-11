@@ -1,45 +1,47 @@
 # Agent Instructions
 
-## Package Manager
+## Toolchain
 
-- Use **vp**: `vp install`
-
-## Project Layout
-
-| Path                     | Purpose                                                                                        |
-| ------------------------ | ---------------------------------------------------------------------------------------------- |
-| `app/`                   | React Router v7 SPA — UI, routes, components, services, hooks                                  |
-| `workers/`               | Hono API (`index.ts`), Worker entry (`app.ts`), Durable Objects, agent, MCP                    |
-| `workers/durableObject/` | `MailboxDO` — per-mailbox SQLite + R2 storage                                                  |
-| `workers/agent/`         | `EmailAgent` (`AIChatAgent`) — 9 email tools, auto-draft                                       |
-| `workers/mcp/`           | `EmailMCP` — exposes the same tools over MCP at `/mcp`                                         |
-| `packages/shared/`       | Types/utilities shared by client and worker (`folders.ts`, `dates.ts`) — aliased as `shared/*` |
-| `config/`                | Tooling configs (`tsconfig.app.json`, `tsconfig.node.json`)                                    |
-| `tests/`                 | Vitest suite (`tests/**/*.test.ts`) — mirrors `packages/shared/`, `workers/`, `app/`           |
+- Use Vite+ (`vp`) with the repository's pnpm lockfile: `vp install`.
+- Invoke project scripts with `vp run <name>`; built-ins such as `vp dev` are not equivalent.
+- Preserve intentional toolchain pins and the `vite` alias; see `docs/development.md` (Workflow conventions).
 
 ## Commands
 
-| Task                           | Command                  |
-| ------------------------------ | ------------------------ |
-| Dev server (Vite + Cloudflare) | `vp run dev`             |
-| Check (lint/format/typecheck)  | `vp check`               |
-| Generate Cloudflare types      | `vp run cf-typegen`      |
-| Tests                          | `vp test run --coverage` |
-| Production build               | `vp run build`           |
-| Build + deploy                 | `vp run deploy`          |
+| Task                       | Command                                                                                        |
+| -------------------------- | ---------------------------------------------------------------------------------------------- |
+| Dev server                 | `vp run dev`                                                                                   |
+| Test file                  | `vp test run tests/shared/folders.test.ts` (replace with the relevant test file)               |
+| Check file                 | `vp check app/services/api.ts` (replace with the changed file; typecheck remains project-wide) |
+| Generate types + typecheck | `vp run typecheck`                                                                             |
+| Browser E2E file           | `vp run test:e2e tests/e2e/send-draft.spec.ts`                                                 |
+
+- Run `vp run typecheck` after changing bindings, routes, or shared types.
+- For full CI verification, follow `.github/workflows/ci.yml`, including type generation before checks.
 
 ## Key Conventions
 
-- `requireMailbox` (`workers/lib/mailbox.ts`) enforces mailbox _existence_ only. Cloudflare Access is the single auth boundary; there is no per-mailbox authorization.
-- `mailboxId` is user-supplied for both API and MCP routes. Do not add per-mailbox auth that bypasses the shared Access policy.
-- Keep `workers/index.ts` route handlers thin; push business logic into the Durable Objects and `workers/lib`.
+- Keep `workers/index.ts` handlers thin; put business logic in `workers/lib/` and Durable Objects.
+- Put client/worker shared code in `packages/shared/` and import it as `shared/*`.
+- Cloudflare Access is the sole auth boundary; `requireMailbox` checks existence, not per-mailbox authorization. Preserve the trust boundary in `docs/architecture.md`.
+- Keep `DOMAINS`, `POLICY_AUD`, and `TEAM_DOMAIN` as secrets, not values committed in `wrangler.jsonc`.
+- Regenerate `worker-configuration.d.ts` with `vp run cf-typegen`; do not edit it by hand.
+- Generate `.react-router/` types with `vp exec react-router typegen`; do not edit generated files.
+- Use `*.test.ts` / `*.test.tsx` for Vitest and `*.spec.ts` for Playwright; follow `docs/testing.md` for Workers-runtime mocks.
 
 ## External References
 
-| Need                      | File                   |
-| ------------------------- | ---------------------- |
-| Overview & setup          | `README.md`            |
-| Development & conventions | `docs/development.md`  |
-| Architecture              | `docs/architecture.md` |
-| REST API reference        | `docs/api.md`          |
-| Testing & coverage        | `docs/testing.md`      |
+| Need                               | File                                               |
+| ---------------------------------- | -------------------------------------------------- |
+| Setup and deployment               | `README.md`, `.dev.vars.example`, `wrangler.jsonc` |
+| Development and toolchain pins     | `docs/development.md`                              |
+| Vite+ command behavior             | `docs/vite-plus.md`                                |
+| Architecture and security boundary | `docs/architecture.md`                             |
+| REST API contract                  | `docs/api.md`                                      |
+| Testing and coverage               | `docs/testing.md`, `playwright.config.ts`          |
+| CI checks                          | `.github/workflows/ci.yml`                         |
+| Agent behavior and auto-draft      | `docs/agent-on-demand.md`                          |
+| Model selection                    | `docs/model-switcher.md`                           |
+| Workers runtime constraints        | `docs/cloudflare-workers.md`                       |
+| Dependency upgrades                | `docs/upgrade-notes.md`                            |
+| Maintenance backlog                | `docs/tech-debt.md`, `docs/plan.md`                |
