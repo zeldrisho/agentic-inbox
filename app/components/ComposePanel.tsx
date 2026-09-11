@@ -71,6 +71,7 @@ export default function ComposePanel() {
               <div className="flex-1 flex items-center gap-2 min-w-0">
                 <Input
                   type="text"
+                  aria-label="To"
                   placeholder="recipient@example.com"
                   size="sm"
                   value={to}
@@ -95,6 +96,7 @@ export default function ComposePanel() {
                 <div className="flex-1">
                   <Input
                     type="text"
+                    aria-label="CC"
                     size="sm"
                     value={cc}
                     onChange={(e) => setCc(e.target.value)}
@@ -110,6 +112,7 @@ export default function ComposePanel() {
                 <div className="flex-1">
                   <Input
                     type="text"
+                    aria-label="BCC"
                     size="sm"
                     value={bcc}
                     onChange={(e) => setBcc(e.target.value)}
@@ -124,6 +127,7 @@ export default function ComposePanel() {
               <div className="flex-1">
                 <Input
                   type="text"
+                  aria-label="Subject"
                   placeholder="Email subject"
                   size="sm"
                   value={subject}

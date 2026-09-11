@@ -11,6 +11,7 @@
  */
 
 import type { ThreadingHeaders } from "./lib/email-helpers";
+import type { MailboxRpc } from "./lib/mailbox-rpc";
 
 export interface SendEmailParams {
   to: string | string[];
@@ -37,6 +38,25 @@ export interface SendEmailParams {
  * @param params - Email recipients, sender, subject, body, and optional message fields
  * @returns An object containing the sent message's identifier
  */
+export function queueEmailDelivery(
+  ctx: { waitUntil(promise: Promise<unknown>): void },
+  binding: SendEmail,
+  mailbox: MailboxRpc,
+  emailId: string,
+  params: SendEmailParams,
+): void {
+  ctx.waitUntil(
+    sendEmail(binding, params)
+      .then(() => mailbox.updateDeliveryStatus(emailId, "accepted"))
+      .catch(async (error) => {
+        // SAFETY: Promise rejection values are normalized before persistence.
+        const message = error instanceof Error ? error.message : String(error);
+        await mailbox.updateDeliveryStatus(emailId, "failed", message);
+        console.error("Deferred email delivery failed:", message);
+      }),
+  );
+}
+
 export async function sendEmail(
   binding: SendEmail,
   params: SendEmailParams,

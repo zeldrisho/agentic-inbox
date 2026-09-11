@@ -60,6 +60,9 @@ function mockMailboxStub(overrides: Record<string, unknown> = {}) {
     findThreadBySubject: vi.fn(async () => null),
     updateEmail: vi.fn(async () => null),
     destroy: vi.fn(async () => [] as { key: string }[]),
+    listAttachmentKeys: vi.fn(async () => [] as { key: string }[]),
+    replaceDraft: vi.fn(async () => true),
+    updateDeliveryStatus: vi.fn(async () => {}),
     ...overrides,
   };
 }
@@ -245,7 +248,7 @@ describe("error paths: workers/index.ts", () => {
     const { res } = await requestApp(env, "DELETE", "/api/v1/mailboxes/alice@example.com");
     expect(res.status).toBe(204);
     expect(stub.destroy).toHaveBeenCalled();
-    expect(bucket.delete).toHaveBeenCalledWith("mailboxes/alice@example.com.json");
+    expect(bucket.delete).toHaveBeenCalledWith(["mailboxes/alice@example.com.json", "deletions/alice%40example.com.json"]);
   });
 });
 

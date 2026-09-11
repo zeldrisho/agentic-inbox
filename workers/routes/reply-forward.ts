@@ -3,7 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import type { Context } from "hono";
-import { sendEmail } from "../email-sender";
+import { queueEmailDelivery } from "../email-sender";
 import { storeAttachments } from "../lib/attachments";
 import {
   validateSender,
@@ -72,6 +72,7 @@ export async function handleReplyEmail(c: AppContext) {
       email_references: JSON.stringify(references),
       thread_id: thread_id,
       message_id: outgoingMessageId,
+      delivery_status: "queued",
       raw_headers: JSON.stringify([
         { key: "from", value: from instanceof Object ? `${from.name} <${from.email}>` : from },
         { key: "to", value: Array.isArray(to) ? to.join(", ") : to },
@@ -91,28 +92,23 @@ export async function handleReplyEmail(c: AppContext) {
 
   await stub.markThreadRead(thread_id);
 
-  c.executionCtx.waitUntil(
-    sendEmail(c.env.EMAIL, {
-      to,
-      cc,
-      bcc,
-      from,
-      subject,
-      html,
-      text,
-      attachments: attachments?.map((att) => ({
-        content: att.content,
-        filename: att.filename,
-        type: att.type,
-        disposition: att.disposition,
-        contentId: att.contentId,
-      })),
-      headers: buildThreadingHeaders(originalMsgId, references),
-    }).catch((e) => {
-      // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
-      console.error("Deferred reply delivery failed:", (e as Error).message);
-    }),
-  );
+  queueEmailDelivery(c.executionCtx, c.env.EMAIL, stub, messageId, {
+    to,
+    cc,
+    bcc,
+    from,
+    subject,
+    html,
+    text,
+    attachments: attachments?.map((att) => ({
+      content: att.content,
+      filename: att.filename,
+      type: att.type,
+      disposition: att.disposition,
+      contentId: att.contentId,
+    })),
+    headers: buildThreadingHeaders(originalMsgId, references),
+  });
 
   return c.json({ id: messageId, status: "sent" }, 202);
 }
@@ -169,6 +165,7 @@ export async function handleForwardEmail(c: AppContext) {
       email_references: null,
       thread_id: messageId,
       message_id: outgoingMessageId,
+      delivery_status: "queued",
       raw_headers: JSON.stringify([
         { key: "from", value: from instanceof Object ? `${from.name} <${from.email}>` : from },
         { key: "to", value: Array.isArray(to) ? to.join(", ") : to },
@@ -182,27 +179,22 @@ export async function handleForwardEmail(c: AppContext) {
     attachmentData,
   );
 
-  c.executionCtx.waitUntil(
-    sendEmail(c.env.EMAIL, {
-      to,
-      cc,
-      bcc,
-      from,
-      subject,
-      html,
-      text,
-      attachments: attachments?.map((att) => ({
-        content: att.content,
-        filename: att.filename,
-        type: att.type,
-        disposition: att.disposition,
-        contentId: att.contentId,
-      })),
-    }).catch((e) => {
-      // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
-      console.error("Deferred forward delivery failed:", (e as Error).message);
-    }),
-  );
+  queueEmailDelivery(c.executionCtx, c.env.EMAIL, stub, messageId, {
+    to,
+    cc,
+    bcc,
+    from,
+    subject,
+    html,
+    text,
+    attachments: attachments?.map((att) => ({
+      content: att.content,
+      filename: att.filename,
+      type: att.type,
+      disposition: att.disposition,
+      contentId: att.contentId,
+    })),
+  });
 
   return c.json({ id: messageId, status: "sent" }, 202);
 }

@@ -357,6 +357,17 @@ export default function EmailListRoute() {
                           </span>
                         </Tooltip>
                       )}
+                      {email.delivery_status === "failed" && (
+                        <span
+                          className="text-xs text-kumo-danger shrink-0 ml-2"
+                          title={email.delivery_error ?? "Delivery failed"}
+                        >
+                          Delivery failed
+                        </span>
+                      )}
+                      {email.delivery_status === "queued" && (
+                        <span className="text-xs text-kumo-subtle shrink-0 ml-2">Sending…</span>
+                      )}
                       <span className="text-sm text-kumo-subtle shrink-0 ml-auto">
                         {formatListDate(email.date)}
                       </span>

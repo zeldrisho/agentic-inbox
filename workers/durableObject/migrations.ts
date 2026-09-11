@@ -156,4 +156,11 @@ export const mailboxMigrations: Migration[] = [
             CREATE INDEX IF NOT EXISTS idx_emails_folder_date ON emails(folder_id, date DESC);
         `,
   },
+  {
+    name: "9_add_delivery_status",
+    sql: txn(`
+            ALTER TABLE emails ADD COLUMN delivery_status TEXT;
+            ALTER TABLE emails ADD COLUMN delivery_error TEXT;
+        `),
+  },
 ];

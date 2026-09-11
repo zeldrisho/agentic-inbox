@@ -35,6 +35,8 @@ export interface EmailFull extends EmailMetadata {
   body?: string | null;
   message_id?: string | null;
   raw_headers?: string | null;
+  delivery_status?: "queued" | "accepted" | "failed" | null;
+  delivery_error?: string | null;
   attachments?: AttachmentInfo[];
 }
 

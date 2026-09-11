@@ -49,6 +49,9 @@ function mockMailboxStub(overrides: Record<string, unknown> = {}) {
     findThreadBySubject: vi.fn(async () => null),
     updateEmail: vi.fn(async () => null),
     destroy: vi.fn(async () => [] as { key: string }[]),
+    listAttachmentKeys: vi.fn(async () => [] as { key: string }[]),
+    replaceDraft: vi.fn(async () => true),
+    updateDeliveryStatus: vi.fn(async () => {}),
     ...overrides,
   };
 }
@@ -467,15 +470,14 @@ describe("POST /api/v1/mailboxes/:id/drafts", () => {
   });
 
   it("deletes prior draft when draft_id provided (edit flow)", async () => {
-    const deleteEmail = vi.fn(async () => []);
-    const { env, stub } = setupDrafts({ deleteEmail });
+    const { env, stub } = setupDrafts();
     const { res } = await requestApp(env, "POST", "/api/v1/mailboxes/alice@example.com/drafts", {
       body: "updated",
       draft_id: "old-draft",
     });
     expect(res.status).toBe(201);
-    expect(deleteEmail).toHaveBeenCalledWith("old-draft");
-    expect(stub.createEmail).toHaveBeenCalled();
+    expect(env._stub.replaceDraft).toHaveBeenCalledWith("draft", "old-draft", expect.objectContaining({ body: "updated" }));
+    expect(stub.createEmail).not.toHaveBeenCalled();
   });
 });
 

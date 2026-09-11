@@ -76,6 +76,12 @@ export interface MailboxRpc {
   getEmails(options?: ListEmailsOptions): Promise<EmailListItem[]>;
   countEmails(options?: { folder?: string; thread_id?: string }): Promise<number>;
   createEmail(folder: string, email: EmailData, attachments: AttachmentData[]): Promise<void>;
+  replaceDraft(folder: string, draftId: string, email: EmailData): Promise<boolean>;
+  updateDeliveryStatus(
+    id: string,
+    status: "queued" | "accepted" | "failed",
+    error?: string,
+  ): Promise<void>;
   updateEmail(id: string, patch: { read?: boolean; starred?: boolean }): Promise<EmailFull | null>;
   deleteEmail(id: string): Promise<{ id: string; filename: string }[] | null>;
   moveEmail(id: string, folderId: string): Promise<boolean>;
@@ -104,6 +110,7 @@ export interface MailboxRpc {
     recipient: string,
   ): Promise<{ emails: EmailData[]; attachments: AttachmentData[] } | null>;
   destroy(): Promise<{ key: string }[]>;
+  listAttachmentKeys(): Promise<{ key: string }[]>;
 }
 
 /**

@@ -21,10 +21,8 @@ import {
 import { Color } from "@tiptap/extension-color";
 import Highlight from "@tiptap/extension-highlight";
 import TiptapImage from "@tiptap/extension-image";
-import LinkExtension from "@tiptap/extension-link";
 import TextAlign from "@tiptap/extension-text-align";
 import { TextStyle } from "@tiptap/extension-text-style";
-import Underline from "@tiptap/extension-underline";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { useCallback, useEffect } from "react";
@@ -44,10 +42,8 @@ interface RichTextEditorProps {
 export default function RichTextEditor({ value, onChange }: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [
-      StarterKit,
-      Underline,
+      StarterKit.configure({ link: { openOnClick: false } }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
-      LinkExtension.configure({ openOnClick: false }),
       TiptapImage,
       TextStyle,
       Color,

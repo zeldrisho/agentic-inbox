@@ -8,8 +8,7 @@ follow-ups only; historical audits and upgrade narratives belong in git history.
 The Playwright suite is in `tests/e2e/send-draft.spec.ts` and currently runs as
 non-blocking CI coverage while it soaks.
 
-- [ ] After 3–5 green CI runs, remove `continue-on-error: true` from the E2E
-      job in `.github/workflows/ci.yml`.
+- [x] E2E is blocking in CI; retain the suite as a small smoke-test gate.
 - [ ] Add reply/forward coverage against a seeded inbound email, including
       threading and sanitized HTML rendering.
 - [ ] Add mailbox-deletion E2E coverage for the destructive cascade.

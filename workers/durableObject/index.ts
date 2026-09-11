@@ -92,6 +92,8 @@ export interface EmailData {
   thread_id?: string | null;
   message_id?: string | null;
   raw_headers?: string | null;
+  delivery_status?: "queued" | "accepted" | "failed" | null;
+  delivery_error?: string | null;
 }
 
 /**
@@ -528,6 +530,77 @@ export class MailboxDO extends DurableObject<Env> {
     return this.getEmail(id);
   }
 
+  async replaceDraft(folder: string, draftId: string, email: EmailData): Promise<boolean> {
+    const existing = this.db
+      .select({ id: schema.emails.id, folder_id: schema.emails.folder_id })
+      .from(schema.emails)
+      .where(eq(schema.emails.id, draftId))
+      .get();
+    const draftFolder = this.db
+      .select({ id: schema.folders.id })
+      .from(schema.folders)
+      .where(or(eq(schema.folders.id, Folders.DRAFT), eq(schema.folders.name, Folders.DRAFT)))
+      .get();
+    if (!existing || !draftFolder || existing.folder_id !== draftFolder.id) return false;
+    const targetFolder = this.db
+      .select({ id: schema.folders.id })
+      .from(schema.folders)
+      .where(or(eq(schema.folders.id, folder), eq(schema.folders.name, folder)))
+      .get();
+    if (!targetFolder) throw new Error(`replaceDraft: folder "${folder}" not found`);
+    this.ctx.storage.transactionSync(() => {
+      this.db.delete(schema.emails).where(eq(schema.emails.id, draftId)).run();
+      this.db
+        .insert(schema.emails)
+        .values({
+          id: email.id,
+          folder_id: targetFolder.id,
+          subject: email.subject,
+          sender: email.sender,
+          recipient: email.recipient,
+          cc: email.cc ?? null,
+          bcc: email.bcc ?? null,
+          date: email.date,
+          read: email.read ? 1 : 0,
+          starred: email.starred ? 1 : 0,
+          body: email.body,
+          in_reply_to: email.in_reply_to ?? null,
+          email_references: email.email_references ?? null,
+          thread_id: email.thread_id ?? null,
+          message_id: email.message_id ?? null,
+          raw_headers: email.raw_headers ?? null,
+          delivery_status: email.delivery_status ?? null,
+          delivery_error: email.delivery_error ?? null,
+        })
+        .run();
+    });
+    return true;
+  }
+
+  async updateDeliveryStatus(
+    id: string,
+    status: "queued" | "accepted" | "failed",
+    error?: string,
+  ): Promise<void> {
+    this.db
+      .update(schema.emails)
+      .set({ delivery_status: status, delivery_error: error ?? null })
+      .where(eq(schema.emails.id, id))
+      .run();
+  }
+
+  async listAttachmentKeys(): Promise<{ key: string }[]> {
+    return this.db
+      .select({
+        emailId: schema.attachments.email_id,
+        id: schema.attachments.id,
+        filename: schema.attachments.filename,
+      })
+      .from(schema.attachments)
+      .all()
+      .map((b) => ({ key: `attachments/${b.emailId}/${b.id}/${b.filename}` }));
+  }
+
   async markThreadRead(threadId: string) {
     this.ctx.storage.sql.exec(
       `UPDATE emails SET read = 1 WHERE thread_id = ? AND read = 0`,
@@ -901,6 +974,8 @@ export class MailboxDO extends DurableObject<Env> {
         thread_id: email.thread_id ?? null,
         message_id: email.message_id ?? null,
         raw_headers: email.raw_headers ?? null,
+        delivery_status: email.delivery_status ?? null,
+        delivery_error: email.delivery_error ?? null,
       })
       .run();
 

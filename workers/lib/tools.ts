@@ -333,22 +333,18 @@ export async function toolUpdateDraft(
     };
   }
 
-  await stub.deleteEmail(params.draftId);
-  await stub.createEmail(
-    Folders.DRAFT,
-    {
-      id: newDraftId,
-      subject: params.subject ?? oldDraft.subject,
-      sender: mailboxId.toLowerCase(),
-      recipient: (params.to ?? oldDraft.recipient).toLowerCase(),
-      date: new Date().toISOString(),
-      body: verifiedBody,
-      in_reply_to: oldDraft.in_reply_to || null,
-      email_references: oldDraft.email_references || null,
-      thread_id: oldDraft.thread_id || newDraftId,
-    },
-    [],
-  );
+  const replaced = await stub.replaceDraft(Folders.DRAFT, params.draftId, {
+    id: newDraftId,
+    subject: params.subject ?? oldDraft.subject,
+    sender: mailboxId.toLowerCase(),
+    recipient: (params.to ?? oldDraft.recipient).toLowerCase(),
+    date: new Date().toISOString(),
+    body: verifiedBody,
+    in_reply_to: oldDraft.in_reply_to || null,
+    email_references: oldDraft.email_references || null,
+    thread_id: oldDraft.thread_id || newDraftId,
+  });
+  if (!replaced) return { error: "Draft not found" };
 
   return {
     status: "draft_updated",
