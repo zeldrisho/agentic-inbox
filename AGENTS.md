@@ -35,13 +35,10 @@
 | ---------------------------------- | -------------------------------------------------- |
 | Setup and deployment               | `README.md`, `.dev.vars.example`, `wrangler.jsonc` |
 | Development and toolchain pins     | `docs/development.md`                              |
-| Vite+ command behavior             | `docs/vite-plus.md`                                |
 | Architecture and security boundary | `docs/architecture.md`                             |
 | REST API contract                  | `docs/api.md`                                      |
 | Testing and coverage               | `docs/testing.md`, `playwright.config.ts`          |
 | CI checks                          | `.github/workflows/ci.yml`                         |
-| Agent behavior and auto-draft      | `docs/agent-on-demand.md`                          |
-| Model selection                    | `docs/model-switcher.md`                           |
-| Workers runtime constraints        | `docs/cloudflare-workers.md`                       |
-| Dependency upgrades                | `docs/upgrade-notes.md`                            |
-| Maintenance backlog                | `docs/tech-debt.md`, `docs/plan.md`                |
+| Development, Vite+, Workers        | `docs/development.md`                              |
+| Agent behavior and model selection | `docs/architecture.md`                             |
+| Maintenance backlog                | `docs/plan.md`                                     |
