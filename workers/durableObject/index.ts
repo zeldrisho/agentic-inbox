@@ -175,6 +175,8 @@ export class MailboxDO extends DurableObject<Env> {
         email_references: schema.emails.email_references,
         thread_id: schema.emails.thread_id,
         folder_id: schema.emails.folder_id,
+        delivery_status: schema.emails.delivery_status,
+        delivery_error: schema.emails.delivery_error,
         snippet: sql<string>`SUBSTR(${schema.emails.body}, 1, 300)`,
       })
       .from(schema.emails)
@@ -273,6 +275,7 @@ export class MailboxDO extends DurableObject<Env> {
 					lp.id, lp.subject, lp.sender, lp.recipient, lp.date,
 					lp.read, lp.starred, lp.thread_id, lp.folder_id,
 					lp.in_reply_to, lp.email_references,
+					lp.delivery_status, lp.delivery_error,
 					SUBSTR(lp.body, 1, 300) as snippet,
 					ds.thread_count, ds.thread_unread_count, ds.participants
 				FROM latest_per_group lp
@@ -363,6 +366,7 @@ export class MailboxDO extends DurableObject<Env> {
 				lif.id, lif.subject, lif.sender, lif.recipient, lif.date,
 				lif.read, lif.starred, lif.thread_id, lif.folder_id,
 				lif.in_reply_to, lif.email_references,
+				lif.delivery_status, lif.delivery_error,
 				SUBSTR(lif.body, 1, 300) as snippet,
 				cs.thread_count, cs.thread_unread_count, cs.participants,
 				CASE WHEN lmc.folder_id != (SELECT id FROM folders WHERE name = 'sent' LIMIT 1)
@@ -810,7 +814,7 @@ export class MailboxDO extends DurableObject<Env> {
     const query = `
 			SELECT e.id, e.subject, e.sender, e.recipient, e.cc, e.bcc, e.date,
 				e.read, e.starred, e.in_reply_to, e.email_references,
-				e.thread_id, e.folder_id,
+				e.thread_id, e.folder_id, e.delivery_status, e.delivery_error,
 				SUBSTR(e.body, 1, 300) as snippet,
 				f.name as folder_name
 			FROM emails e

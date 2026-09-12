@@ -110,7 +110,7 @@ export async function handleReplyEmail(c: AppContext) {
     headers: buildThreadingHeaders(originalMsgId, references),
   });
 
-  return c.json({ id: messageId, status: "sent" }, 202);
+  return c.json({ id: messageId, status: "sent", deliveryStatus: "queued" }, 202);
 }
 
 /**
@@ -196,5 +196,5 @@ export async function handleForwardEmail(c: AppContext) {
     })),
   });
 
-  return c.json({ id: messageId, status: "sent" }, 202);
+  return c.json({ id: messageId, status: "sent", deliveryStatus: "queued" }, 202);
 }

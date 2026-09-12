@@ -47,11 +47,23 @@ export function queueEmailDelivery(
 ): void {
   ctx.waitUntil(
     sendEmail(binding, params)
-      .then(() => mailbox.updateDeliveryStatus(emailId, "accepted"))
+      .then(async () => {
+        try {
+          await mailbox.updateDeliveryStatus(emailId, "accepted");
+        } catch (error) {
+          console.error("Delivery status update failed:", error);
+        }
+      })
       .catch(async (error) => {
         // SAFETY: Promise rejection values are normalized before persistence.
         const message = error instanceof Error ? error.message : String(error);
-        await mailbox.updateDeliveryStatus(emailId, "failed", message);
+        try {
+          await mailbox.updateDeliveryStatus(emailId, "failed", message);
+        } catch (statusError) {
+          const statusMessage =
+            statusError instanceof Error ? statusError.message : String(statusError);
+          console.error("Failed to persist delivery failure status:", statusMessage);
+        }
         console.error("Deferred email delivery failed:", message);
       }),
   );

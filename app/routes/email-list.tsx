@@ -358,12 +358,15 @@ export default function EmailListRoute() {
                         </Tooltip>
                       )}
                       {email.delivery_status === "failed" && (
-                        <span
-                          className="text-xs text-kumo-danger shrink-0 ml-2"
-                          title={email.delivery_error ?? "Delivery failed"}
-                        >
-                          Delivery failed
-                        </span>
+                        <Tooltip content={email.delivery_error ?? "Delivery failed"} asChild>
+                          <span
+                            className="text-xs text-kumo-danger shrink-0 ml-2"
+                            tabIndex={0}
+                            role="status"
+                          >
+                            Delivery failed
+                          </span>
+                        </Tooltip>
                       )}
                       {email.delivery_status === "queued" && (
                         <span className="text-xs text-kumo-subtle shrink-0 ml-2">Sending…</span>

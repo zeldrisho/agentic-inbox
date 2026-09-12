@@ -254,23 +254,19 @@ app.delete("/api/v1/mailboxes/:mailboxId", async (c) => {
     : (await stub.listAttachmentKeys()).map((b) => b.key);
   if (!existingManifest) await c.env.BUCKET.put(manifestKey, JSON.stringify({ keys }));
   const destroyed = await stub.destroy();
-  // Compatibility with older stubs: production DOs provide the inventory before destroy.
-  if (!existingManifest && keys.length === 0 && destroyed.length > 0) {
-    keys = destroyed.map((b) => b.key);
+  const destroyedKeys = destroyed.map((b) => b.key);
+  const mergedKeys = [...new Set([...keys, ...destroyedKeys])];
+  if (mergedKeys.length !== keys.length) {
+    keys = mergedKeys;
     await c.env.BUCKET.put(manifestKey, JSON.stringify({ keys }));
   }
   // Delete every stored attachment blob from R2 in batches (delete() accepts up to 1000 keys).
   for (let i = 0; i < keys.length; i += 1000) {
     await c.env.BUCKET.delete(keys.slice(i, i + 1000));
   }
-  // Best-effort: destroy the per-mailbox agent DO (chat history, schedules).
-  const agentDestroyed = c.env.EMAIL_AGENT.get(c.env.EMAIL_AGENT.idFromName(mailboxId)).destroy();
-  c.executionCtx.waitUntil(
-    agentDestroyed.catch((e) => {
-      // SAFETY: caught error is unknown, assert Error to read message
-      console.error("Agent destroy failed for", mailboxId, (e as Error).message);
-    }),
-  );
+  // Destroy the per-mailbox agent DO (chat history, schedules) before removing
+  // the manifest so a failure leaves cleanup state available for retry.
+  await c.env.EMAIL_AGENT.get(c.env.EMAIL_AGENT.idFromName(mailboxId)).destroy();
   // Finally remove the settings marker and the completed deletion manifest.
   await c.env.BUCKET.delete([key, manifestKey]);
   return c.body(null, 204);
