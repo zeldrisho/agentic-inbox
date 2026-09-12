@@ -49,8 +49,6 @@ jobs:
   e2e:
     name: Browser E2E (Playwright)
     runs-on: ubuntu-latest
-    # Non-blocking while the suite soaks — flip to required once stable.
-    continue-on-error: true
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

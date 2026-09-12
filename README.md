@@ -25,7 +25,7 @@ Agentic Inbox lets you send, receive, and manage email on your own Cloudflare ac
 - **Full email client** — Rich-text compose, reply/forward threading, folders, search, attachments via Email Routing
 - **Per-mailbox isolation** — Durable Object + SQLite + R2 per mailbox
 - **AI agent** — Side panel with 9 email tools; streaming markdown, tool visibility, persistent history
-- **Auto-draft (opt-in, off by default)** — `agentAutoDraft` drafts replies on inbound mail; always requires confirmation (see `docs/agent-on-demand.md`)
+- **Auto-draft (opt-in, off by default)** — `agentAutoDraft` drafts replies on inbound mail; always requires confirmation (see `docs/architecture.md#agent-behavior`)
 
 ## Stack
 
@@ -43,7 +43,7 @@ Prerequisites: Cloudflare account + domain, [Email Routing](https://developers.c
 
 Additional setup: `npx wrangler secret put DOMAINS` and `wrangler r2 bucket create agentic-inbox` (once).
 
-> Auth model: any user passing the shared Access policy can access all mailboxes (including MCP at `/mcp` via `mailboxId`). No per-mailbox auth — Access is the sole boundary. See `docs/security-invariants.md`.
+> Auth model: any user passing the shared Access policy can access all mailboxes (including MCP at `/mcp` via `mailboxId`). No per-mailbox auth — Access is the sole boundary. See `docs/architecture.md` (Trust boundary).
 
 ## Architecture
 
@@ -64,12 +64,13 @@ Additional setup: `npx wrangler secret put DOMAINS` and `wrangler r2 bucket crea
 
 ## Documentation
 
-| Topic                       | File                                                         |
-| --------------------------- | ------------------------------------------------------------ |
-| Development & conventions   | [`docs/development.md`](docs/development.md)                 |
-| Architecture                | [`docs/architecture.md`](docs/architecture.md)               |
-| Security model & invariants | [`docs/security-invariants.md`](docs/security-invariants.md) |
-| REST API reference          | [`docs/api.md`](docs/api.md)                                 |
+| Topic                     | File                                           |
+| ------------------------- | ---------------------------------------------- |
+| Development               | [`docs/development.md`](docs/development.md)   |
+| Architecture and security | [`docs/architecture.md`](docs/architecture.md) |
+| REST API                  | [`docs/api.md`](docs/api.md)                   |
+| Testing                   | [`docs/testing.md`](docs/testing.md)           |
+| Remaining work            | [`docs/plan.md`](docs/plan.md)                 |
 
 ## License
 

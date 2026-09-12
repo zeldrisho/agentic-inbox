@@ -1,93 +1,62 @@
 # Architecture
 
-Agentic Inbox is a full email client plus an AI email agent, deployed as a single Cloudflare Worker. The Hono API and the React Router SPA are served from the same origin; per-mailbox state lives in isolated Durable Objects.
-
-## High-level design
+Agentic Inbox is a React email client and AI agent deployed as one Cloudflare
+Worker. Hono API and the SPA share an origin; each mailbox has isolated state
+in a Durable Object.
 
 ```text
-┌──────────────┐     ┌──────────────────┐     ┌───────────────────────┐
-│   Browser    │────>│  Hono Worker     │────>│  MailboxDO (per addr) │
-│  React SPA   │     │  (API + SSR)     │     │  SQLite + R2 blobs    │
-│  Agent Panel │     │                  │     └───────────────────────┘
-└──────┬───────┘     │  /agents/* ──────┼────>┌───────────────────────┐
-       │             │                  │     │  EmailAgent DO         │
-       │ WebSocket   │                  │     │  AIChatAgent + 9 tools│
-       └─────────────┤                  │────>│  Workers AI            │
-                     │                  │     └───────────────────────┘
-   Email Routing ───>│  email handler   │     ┌───────────────────────┐
-                     │  receiveEmail()  │────>│  EmailMCP DO (/mcp)    │
-                     └──────────────────┘     │  MCP tools for AI apps │
-                                              └───────────────────────┘
+Browser / SPA ──> Worker ──> MailboxDO (SQLite + R2)
+       │             ├── /agents/* ──> EmailAgent DO (AI tools)
+       │             └── /mcp ────────> EmailMCP DO
+Email Routing ──> receiveEmail ───────> MailboxDO
 ```
 
-The Worker entry (`workers/app.ts`) layers, in order:
+## Request and data flow
 
-1. **Cloudflare Access JWT middleware** — validates `cf-access-jwt-assertion` in production, fails closed if misconfigured.
-2. **`/mcp`** — Model Context Protocol server (`EmailMCP`).
-3. **`/`** — the Hono API (`workers/index.ts`).
-4. **`/agents/*`** — `routeAgentRequest` for the `EmailAgent` WebSocket.
-5. **`*`** — React Router SPA fallback.
+`workers/app.ts` applies Access middleware, then routes `/mcp`, the Hono API,
+`/agents/*`, and finally the SPA fallback. Inbound mail is parsed and stored by
+`receiveEmail`; attachments live in R2 and email, thread, folder, and draft
+records live in the mailbox's SQLite database. Outbound delivery uses the
+`EMAIL` binding and is deferred with `waitUntil`.
 
-## Components
-
-### Worker API (`workers/index.ts`)
-
-A Hono app exposing `/api/v1/...`:
-
-- Mailbox CRUD (`/mailboxes`)
-- Email list/get/create/draft/move/delete, threads, folders, search
-- Attachment download
-- Compose helpers: reply/forward (`workers/routes/reply-forward.ts`)
-- CORS middleware: same-origin only, `localhost`/`127.0.0.1` allowed in development, all other cross-origin requests blocked.
-
-`POST /mailboxes/:id/emails` validates the sender against the mailbox, enforces a send rate limit, stores attachments in R2, writes the message to the `MailboxDO`, and **defers** outbound delivery via `sendEmail` (`workers/email-sender.ts`).
-
-### MailboxDO (`workers/durableObject`)
-
-One Durable Object instance per email address (`idFromName(email)`). Holds:
-
-- A SQLite database (SQL in `workers/db/schema.ts` and `workers/durableObject/migrations.ts`) for emails, threads, folders, and drafts.
-- R2-backed attachments (`attachments/<emailId>/<attachmentId>/<filename>`), referenced from SQLite.
-- Mailbox settings in R2 (`mailboxes/<email>.json`).
-
-The `requireMailbox` middleware (`workers/lib/mailbox.ts`) verifies the mailbox exists and attaches the DO stub to the request context.
-
-### EmailAgent (`workers/agent`)
-
-An `AIChatAgent` with 9 email tools (defined in `workers/lib/tools.ts`): reading, searching, drafting, and sending. On new inbound email, `receiveEmail` triggers `onNewEmail` **only when `agentAutoDraft === true`** (default off — see `docs/agent-on-demand.md`; `workers/agent/index.ts:handleNewEmail` returns `skipped/auto_draft_disabled` and `workers/index.ts:receiveEmail` gates `waitUntil(agent.fetch(/onNewEmail))` behind the R2 setting). When enabled, it scans for **prompt injection** (`isPromptInjection` in `workers/lib/ai.ts`) and, if clean, auto-generates a draft — always requiring explicit human confirmation before send. Drafts are cleaned by `verifyDraft` to strip AI/system artifacts.
-
-### EmailMCP (`workers/mcp`)
-
-Exposes the same tools over MCP at `/mcp` so external AI tools (Claude Code, Cursor, etc.) can operate on mailboxes by passing a `mailboxId` parameter.
-
-### Inbound email (`workers/app.ts` → `receiveEmail`)
-
-1. Stream and size-limit the raw message (25 MB cap).
-2. Parse with `postal-mime`.
-3. Resolve the target mailbox (respecting `EMAIL_ADDRESSES` allowlist if set); ignore mail with no matching/known mailbox.
-4. Store attachments to R2, write the email to `MailboxDO`, compute threading.
-5. `waitUntil` a fire-and-forget call to `EmailAgent.onNewEmail` — gated on `agentAutoDraft === true` (default off); otherwise the step is skipped with `0` AI calls.
-
-## Data model & storage
-
-- **SQLite (in MailboxDO):** emails, threads, folders, drafts, search indexes.
-- **R2:** mailbox settings (`mailboxes/*.json`) and attachment blobs.
-- **Outbound:** `send_email` binding (`EMAIL`), deferred via `executionCtx.waitUntil`.
+`MailboxDO` is addressed by email and owns mailbox data. `EmailAgent` is an
+`AIChatAgent` with the email tools in `workers/lib/tools.ts`. `EmailMCP`
+exposes the same tools to external AI clients. The API also provides mailbox,
+email, draft, thread, folder, search, and attachment operations; see
+[`api.md`](api.md).
 
 ## Trust boundary
 
-Cloudflare Access is the **single** authentication/authorization boundary. Once a user passes the shared policy they can reach every mailbox and the MCP server. There is no per-mailbox authorization. See `docs/security-invariants.md`.
+Cloudflare Access is the sole authentication and authorization boundary.
+Production validates `cf-access-jwt-assertion` against `POLICY_AUD` and
+`TEAM_DOMAIN`, failing closed when configuration is missing. Localhost skips
+Access for development. A user who passes the shared policy can access every
+mailbox and MCP; there is no per-mailbox authorization. `mailboxId` is used
+only for existence checks by `requireMailbox`.
 
-## Trade-offs
+Keep CORS same-origin only (with localhost development exceptions). Do not add
+an alternate auth path or arbitrary-origin reflection.
 
-- **Per-mailbox Durable Objects** give strong isolation and SQLite query performance, at the cost of cross-mailbox operations (search/list across mailboxes) requiring enumeration.
-- **Deferred send + auto-draft** keep the request path fast; delivery and drafting happen asynchronously, so transient failures are logged rather than blocking the user.
-- **AI draft verification** favors false negatives (keep content) over false positives (strip real content), with a 50% length drop safety cutoff.
+## Agent behavior
 
-## References
+Auto-draft is opt-in: `agentAutoDraft` defaults off and inbound mail causes no
+AI call unless it is explicitly enabled. The inbound handler and agent both
+gate this behavior. When enabled, prompt-injection screening and draft
+verification remain in the path, and a human must confirm before sending.
+Manual drafts use the same verification safeguards.
 
-- Workers AI models catalog: <https://developers.cloudflare.com/workers-ai/models/index.md>
-- Workers AI docs index (llms.txt): <https://developers.cloudflare.com/workers-ai/llms.txt>
-- Kumo UI docs index (llms.txt): <https://kumo-ui.com/llms.txt>
-- Model picker API: `GET /api/v1/models` (proxies catalog with 24h R2 cache + 10s `caches.default`, `?refresh=1` bypasses cache) — switch is in chat sidebar next to send (instant session change), not Settings
-- Autoroute: Workers AI client fallback via `workers-ai-provider` `fallback: { mode: "client" }` — no AI Gateway.
+The agent model is stored per mailbox as `agentModel`: `"autoroute"` or an
+explicit `@cf/...` model. `GET /api/v1/models` fetches and caches the current
+Workers AI catalog, with a static fallback. The agent uses Workers AI client
+fallbacks; there is no AI Gateway binding.
+
+## Storage and trade-offs
+
+- SQLite in `MailboxDO`: emails, threads, folders, drafts, and search indexes.
+- R2: mailbox settings and attachment blobs.
+- `EMAIL`: deferred outbound delivery.
+
+Per-mailbox Durable Objects provide isolation and local query performance, but
+cross-mailbox operations require enumeration. Deferred delivery and drafting
+keep requests fast but are asynchronous. Email HTML and attachment filenames
+must remain sanitized on every rendering/download path.

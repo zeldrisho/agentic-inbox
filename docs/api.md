@@ -1,6 +1,6 @@
 # REST API Reference
 
-The Hono API (`workers/index.ts`) serves `/api/v1/...`. All routes sit behind the global Cloudflare Access middleware (see `docs/security-invariants.md`); routes under `/mailboxes/:mailboxId/*` additionally require the mailbox to exist (`requireMailbox`). Unless noted, requests and responses are JSON. Every request must carry a valid Cloudflare Access JWT in `cf-access-jwt-assertion` (missing/invalid → `403`); `DOMAINS`/`EMAIL_ADDRESSES` mismatches return `403`, Zod validation failures `400`, and missing mailboxes/emails `404`. Pagination on list/search endpoints: `page` (default `1`), `limit` (default `20`, max `100`).
+The Hono API (`workers/index.ts`) serves `/api/v1/...`. All routes sit behind the global Cloudflare Access middleware (see `docs/architecture.md` Trust boundary); routes under `/mailboxes/:mailboxId/*` additionally require the mailbox to exist (`requireMailbox`). Unless noted, requests and responses are JSON. Every request must carry a valid Cloudflare Access JWT in `cf-access-jwt-assertion` (missing/invalid → `403`); `DOMAINS`/`EMAIL_ADDRESSES` mismatches return `403`, Zod validation failures `400`, and missing mailboxes/emails `404`. Pagination on list/search endpoints: `page` (default `1`), `limit` (default `20`, max `100`).
 
 ## Examples
 

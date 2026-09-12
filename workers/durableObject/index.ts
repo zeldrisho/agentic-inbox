@@ -92,6 +92,8 @@ export interface EmailData {
   thread_id?: string | null;
   message_id?: string | null;
   raw_headers?: string | null;
+  delivery_status?: "queued" | "accepted" | "failed" | null;
+  delivery_error?: string | null;
 }
 
 /**
@@ -173,6 +175,8 @@ export class MailboxDO extends DurableObject<Env> {
         email_references: schema.emails.email_references,
         thread_id: schema.emails.thread_id,
         folder_id: schema.emails.folder_id,
+        delivery_status: schema.emails.delivery_status,
+        delivery_error: schema.emails.delivery_error,
         snippet: sql<string>`SUBSTR(${schema.emails.body}, 1, 300)`,
       })
       .from(schema.emails)
@@ -271,6 +275,7 @@ export class MailboxDO extends DurableObject<Env> {
 					lp.id, lp.subject, lp.sender, lp.recipient, lp.date,
 					lp.read, lp.starred, lp.thread_id, lp.folder_id,
 					lp.in_reply_to, lp.email_references,
+					lp.delivery_status, lp.delivery_error,
 					SUBSTR(lp.body, 1, 300) as snippet,
 					ds.thread_count, ds.thread_unread_count, ds.participants
 				FROM latest_per_group lp
@@ -361,6 +366,7 @@ export class MailboxDO extends DurableObject<Env> {
 				lif.id, lif.subject, lif.sender, lif.recipient, lif.date,
 				lif.read, lif.starred, lif.thread_id, lif.folder_id,
 				lif.in_reply_to, lif.email_references,
+				lif.delivery_status, lif.delivery_error,
 				SUBSTR(lif.body, 1, 300) as snippet,
 				cs.thread_count, cs.thread_unread_count, cs.participants,
 				CASE WHEN lmc.folder_id != (SELECT id FROM folders WHERE name = 'sent' LIMIT 1)
@@ -526,6 +532,77 @@ export class MailboxDO extends DurableObject<Env> {
     this.db.update(schema.emails).set(data).where(eq(schema.emails.id, id)).run();
 
     return this.getEmail(id);
+  }
+
+  async replaceDraft(folder: string, draftId: string, email: EmailData): Promise<boolean> {
+    const existing = this.db
+      .select({ id: schema.emails.id, folder_id: schema.emails.folder_id })
+      .from(schema.emails)
+      .where(eq(schema.emails.id, draftId))
+      .get();
+    const draftFolder = this.db
+      .select({ id: schema.folders.id })
+      .from(schema.folders)
+      .where(or(eq(schema.folders.id, Folders.DRAFT), eq(schema.folders.name, Folders.DRAFT)))
+      .get();
+    if (!existing || !draftFolder || existing.folder_id !== draftFolder.id) return false;
+    const targetFolder = this.db
+      .select({ id: schema.folders.id })
+      .from(schema.folders)
+      .where(or(eq(schema.folders.id, folder), eq(schema.folders.name, folder)))
+      .get();
+    if (!targetFolder) throw new Error(`replaceDraft: folder "${folder}" not found`);
+    this.ctx.storage.transactionSync(() => {
+      this.db.delete(schema.emails).where(eq(schema.emails.id, draftId)).run();
+      this.db
+        .insert(schema.emails)
+        .values({
+          id: email.id,
+          folder_id: targetFolder.id,
+          subject: email.subject,
+          sender: email.sender,
+          recipient: email.recipient,
+          cc: email.cc ?? null,
+          bcc: email.bcc ?? null,
+          date: email.date,
+          read: email.read ? 1 : 0,
+          starred: email.starred ? 1 : 0,
+          body: email.body,
+          in_reply_to: email.in_reply_to ?? null,
+          email_references: email.email_references ?? null,
+          thread_id: email.thread_id ?? null,
+          message_id: email.message_id ?? null,
+          raw_headers: email.raw_headers ?? null,
+          delivery_status: email.delivery_status ?? null,
+          delivery_error: email.delivery_error ?? null,
+        })
+        .run();
+    });
+    return true;
+  }
+
+  async updateDeliveryStatus(
+    id: string,
+    status: "queued" | "accepted" | "failed",
+    error?: string,
+  ): Promise<void> {
+    this.db
+      .update(schema.emails)
+      .set({ delivery_status: status, delivery_error: error ?? null })
+      .where(eq(schema.emails.id, id))
+      .run();
+  }
+
+  async listAttachmentKeys(): Promise<{ key: string }[]> {
+    return this.db
+      .select({
+        emailId: schema.attachments.email_id,
+        id: schema.attachments.id,
+        filename: schema.attachments.filename,
+      })
+      .from(schema.attachments)
+      .all()
+      .map((b) => ({ key: `attachments/${b.emailId}/${b.id}/${b.filename}` }));
   }
 
   async markThreadRead(threadId: string) {
@@ -737,7 +814,7 @@ export class MailboxDO extends DurableObject<Env> {
     const query = `
 			SELECT e.id, e.subject, e.sender, e.recipient, e.cc, e.bcc, e.date,
 				e.read, e.starred, e.in_reply_to, e.email_references,
-				e.thread_id, e.folder_id,
+				e.thread_id, e.folder_id, e.delivery_status, e.delivery_error,
 				SUBSTR(e.body, 1, 300) as snippet,
 				f.name as folder_name
 			FROM emails e
@@ -901,6 +978,8 @@ export class MailboxDO extends DurableObject<Env> {
         thread_id: email.thread_id ?? null,
         message_id: email.message_id ?? null,
         raw_headers: email.raw_headers ?? null,
+        delivery_status: email.delivery_status ?? null,
+        delivery_error: email.delivery_error ?? null,
       })
       .run();
 

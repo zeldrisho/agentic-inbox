@@ -42,6 +42,8 @@ export type Email = {
   email_references?: string | null;
   message_id?: string | null;
   raw_headers?: string | null;
+  delivery_status?: "queued" | "accepted" | "failed" | null;
+  delivery_error?: string | null;
   attachments?: Attachment[];
   snippet?: string | null;
   // Thread aggregate fields (only present in threaded list view)

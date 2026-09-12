@@ -6,7 +6,7 @@ import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import PostalMime from "postal-mime";
 import { z } from "zod";
-import { sendEmail } from "./email-sender";
+import { queueEmailDelivery } from "./email-sender";
 import { storeAttachments, type StoredAttachment } from "./lib/attachments";
 import {
   validateSender,
@@ -22,7 +22,7 @@ import { Folders } from "shared/folders";
 import type { JsonValue } from "shared/json";
 import type { Env } from "./types";
 import { requireMailbox, type MailboxContext } from "./lib/mailbox";
-import { asMailboxRpc, type MailboxRpc } from "./lib/mailbox-rpc";
+import { asMailboxRpc, type MailboxRpc, type EmailData } from "./lib/mailbox-rpc";
 
 type AppContext = Context<MailboxContext>;
 
@@ -244,28 +244,31 @@ app.delete("/api/v1/mailboxes/:mailboxId", async (c) => {
   const key = `mailboxes/${mailboxId}.json`;
   if (!(await c.env.BUCKET.head(key))) return c.json({ error: "Not found" }, 404);
 
-  // Full deletion cascade: DO data first, then R2 blobs, then the existence marker.
-  // 1. Wipe the mailbox DO's emails/attachments/custom folders; collect blob keys.
+  // Resumable deletion: retain the attachment inventory until every cleanup step succeeds.
   const stub = asMailboxRpc(c.env.MAILBOX.get(c.env.MAILBOX.idFromName(mailboxId)));
-  const blobs = await stub.destroy();
-  // 2. Delete every stored attachment blob from R2 in batches (delete() accepts up to 1000 keys).
-  if (blobs.length > 0) {
-    const keys = blobs.map((b) => b.key);
-    for (let i = 0; i < keys.length; i += 1000) {
-      const batch = keys.slice(i, i + 1000);
-      await c.env.BUCKET.delete(batch);
-    }
+  const manifestKey = `deletions/${encodeURIComponent(mailboxId)}.json`;
+  const existingManifest = await c.env.BUCKET.get(manifestKey);
+  // SAFETY: this manifest is written by this handler and has a stable `{keys}` shape.
+  let keys = existingManifest
+    ? ((await existingManifest.json()) as { keys: string[] }).keys
+    : (await stub.listAttachmentKeys()).map((b) => b.key);
+  if (!existingManifest) await c.env.BUCKET.put(manifestKey, JSON.stringify({ keys }));
+  const destroyed = await stub.destroy();
+  const destroyedKeys = destroyed.map((b) => b.key);
+  const mergedKeys = [...new Set([...keys, ...destroyedKeys])];
+  if (mergedKeys.length !== keys.length) {
+    keys = mergedKeys;
+    await c.env.BUCKET.put(manifestKey, JSON.stringify({ keys }));
   }
-  // 3. Best-effort: destroy the per-mailbox agent DO (chat history, schedules).
-  const agentDestroyed = c.env.EMAIL_AGENT.get(c.env.EMAIL_AGENT.idFromName(mailboxId)).destroy();
-  c.executionCtx.waitUntil(
-    agentDestroyed.catch((e) => {
-      // SAFETY: caught error is unknown, assert Error to read message
-      console.error("Agent destroy failed for", mailboxId, (e as Error).message);
-    }),
-  );
-  // 4. Finally remove the settings blob — the mailbox existence marker.
-  await c.env.BUCKET.delete(key);
+  // Delete every stored attachment blob from R2 in batches (delete() accepts up to 1000 keys).
+  for (let i = 0; i < keys.length; i += 1000) {
+    await c.env.BUCKET.delete(keys.slice(i, i + 1000));
+  }
+  // Destroy the per-mailbox agent DO (chat history, schedules) before removing
+  // the manifest so a failure leaves cleanup state available for retry.
+  await c.env.EMAIL_AGENT.get(c.env.EMAIL_AGENT.idFromName(mailboxId)).destroy();
+  // Finally remove the settings marker and the completed deletion manifest.
+  await c.env.BUCKET.delete([key, manifestKey]);
   return c.body(null, 204);
 });
 
@@ -351,6 +354,7 @@ app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
       email_references: references ? JSON.stringify(references) : null,
       thread_id: thread_id || in_reply_to || messageId,
       message_id: outgoingMessageId,
+      delivery_status: "queued",
       raw_headers: JSON.stringify([
         { key: "from", value: from instanceof Object ? `${from.name} <${from.email}>` : from },
         { key: "to", value: Array.isArray(to) ? to.join(", ") : to },
@@ -365,26 +369,24 @@ app.post("/api/v1/mailboxes/:mailboxId/emails", async (c: AppContext) => {
   );
 
   // SAFETY: the catch handler's error is an unknown thrown value; we assert Error to read `.message`.
-  c.executionCtx.waitUntil(
-    sendEmail(c.env.EMAIL, {
-      to,
-      cc,
-      bcc,
-      from,
-      subject,
-      html,
-      text,
-      attachments: attachments?.map((att) => ({
-        content: att.content,
-        filename: att.filename,
-        type: att.type,
-        disposition: att.disposition || "attachment",
-        contentId: att.contentId,
-      })),
-      headers: in_reply_to ? buildThreadingHeaders(in_reply_to, references || []) : undefined,
-    }).catch((e) => console.error("Deferred email delivery failed:", (e as Error).message)),
-  );
-  return c.json({ id: messageId, status: "sent" }, 202);
+  queueEmailDelivery(c.executionCtx, c.env.EMAIL, stub, messageId, {
+    to,
+    cc,
+    bcc,
+    from,
+    subject,
+    html,
+    text,
+    attachments: attachments?.map((att) => ({
+      content: att.content,
+      filename: att.filename,
+      type: att.type,
+      disposition: att.disposition || "attachment",
+      contentId: att.contentId,
+    })),
+    headers: in_reply_to ? buildThreadingHeaders(in_reply_to, references || []) : undefined,
+  });
+  return c.json({ id: messageId, status: "sent", deliveryStatus: "queued" }, 202);
 });
 
 app.post("/api/v1/mailboxes/:mailboxId/drafts", async (c: AppContext) => {
@@ -393,26 +395,28 @@ app.post("/api/v1/mailboxes/:mailboxId/drafts", async (c: AppContext) => {
     await c.req.json(),
   );
   const stub = c.var.mailboxStub;
-  if (draft_id) await stub.deleteEmail(draft_id); // not atomic — create-then-delete would be safer
   const messageId = crypto.randomUUID();
   const now = new Date().toISOString();
-  await stub.createEmail(
-    Folders.DRAFT,
-    {
-      id: messageId,
-      subject: subject || "",
-      sender: mailboxId.toLowerCase(),
-      recipient: (to || "").toLowerCase(),
-      cc: cc?.toLowerCase() || null,
-      bcc: bcc?.toLowerCase() || null,
-      date: now,
-      body,
-      in_reply_to: in_reply_to || null,
-      email_references: null,
-      thread_id: thread_id || in_reply_to || messageId,
-    },
-    [],
-  );
+  const draft: EmailData = {
+    id: messageId,
+    subject: subject || "",
+    sender: mailboxId.toLowerCase(),
+    recipient: (to || "").toLowerCase(),
+    cc: cc?.toLowerCase() || null,
+    bcc: bcc?.toLowerCase() || null,
+    date: now,
+    body,
+    in_reply_to: in_reply_to || null,
+    email_references: null,
+    thread_id: thread_id || in_reply_to || messageId,
+  };
+  if (draft_id) {
+    if (!(await stub.replaceDraft(Folders.DRAFT, draft_id, draft))) {
+      return c.json({ error: "Draft not found" }, 404);
+    }
+  } else {
+    await stub.createEmail(Folders.DRAFT, draft, []);
+  }
   return c.json(
     { id: messageId, status: "draft", subject: subject || "", recipient: to || "", date: now },
     201,

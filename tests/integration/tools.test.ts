@@ -68,6 +68,8 @@ function createMailboxStub(overrides: Record<string, unknown> = {}) {
     getEmails: vi.fn(async () => []),
     getThreadEmails: vi.fn(async () => []),
     createEmail: vi.fn(async () => {}),
+    replaceDraft: vi.fn(async () => true),
+    updateDeliveryStatus: vi.fn(async () => {}),
     deleteEmail: vi.fn(async () => []),
     moveEmail: vi.fn(async () => true),
     updateEmail: vi.fn(async () => null),
@@ -339,7 +341,7 @@ describe("toolUpdateDraft", () => {
     });
   });
 
-  it("verifies, deletes old, and creates new draft preserving threading", async () => {
+  it("verifies and atomically replaces the draft preserving threading", async () => {
     const stub = createMailboxStub({
       getEmail: vi.fn(async () => ({
         ...ORIGINAL_EMAIL,
@@ -354,10 +356,7 @@ describe("toolUpdateDraft", () => {
       bodyHtml: "New body content here",
     });
     expect(expectOk(result).status).toBe("draft_updated");
-    expect(stub.deleteEmail).toHaveBeenCalledWith("d1");
-    const created = (stub.createEmail as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(created[1].subject).toBe("Updated");
-    expect(created[1].thread_id).toBe("t1");
+    expect(stub.replaceDraft).toHaveBeenCalledWith("draft", "d1", expect.objectContaining({ subject: "Updated", thread_id: "t1" }));
   });
 
   it("keeps old draft when verification fails", async () => {
