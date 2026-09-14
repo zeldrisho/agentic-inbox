@@ -78,6 +78,7 @@ async function requestApp(env: unknown, method: string, path: string, body?: unk
   return { res };
 }
 
+/** Delivers a raw RFC 822 message to the inbound-email handler under test. */
 async function receiveRaw(
   raw: string,
   env: Parameters<typeof receiveEmail>[1],

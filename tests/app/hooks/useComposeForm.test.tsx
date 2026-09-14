@@ -18,6 +18,7 @@ vi.mock("app/queries/mailboxes", () => ({
   useMailbox: () => ({ data: mailboxData }),
 }));
 
+/** Creates a reusable mock mutation with both async and fire-and-forget methods. */
 function makeMutation() {
   return {
     mutateAsync: vi.fn(async () => ({})),
