@@ -5,8 +5,9 @@ browser-test coverage gaps and the maintenance approach for future work.
 
 ## Browser E2E coverage
 
-The Playwright suite is in `tests/e2e/send-draft.spec.ts` and runs as a required
-CI job. It is intentionally kept to six tests or fewer and under three minutes.
+The Playwright suite is in `tests/e2e/send-draft.spec.ts` and runs in CI. It
+currently contains three tests. Six tests or fewer and a runtime under three
+minutes are targets, not enforced requirements.
 The current smoke coverage includes saving a draft, sending an email, and
 switching the agent model.
 

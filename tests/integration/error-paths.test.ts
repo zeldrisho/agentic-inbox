@@ -240,7 +240,8 @@ describe("error paths: workers/index.ts", () => {
 
   it("routes unknown recipients to the first same-domain mailbox", async () => {
     const bucket = mockBucket();
-    bucket._store.set("mailboxes/existing@example.net.json", JSON.stringify({}));
+    bucket._store.set("mailboxes/zebra@example.net.json", JSON.stringify({}));
+    bucket._store.set("mailboxes/alpha@example.net.json", JSON.stringify({}));
     const stub = mockMailboxStub();
     const env = {
       BUCKET: bucket,
@@ -254,7 +255,7 @@ describe("error paths: workers/index.ts", () => {
       "From: sender@elsewhere.net\r\nTo: missing@example.net\r\nSubject: catch-all\r\n\r\nbody",
       env as never,
     );
-    expect(env.MAILBOX.idFromName).toHaveBeenCalledWith("existing@example.net");
+    expect(env.MAILBOX.idFromName).toHaveBeenCalledWith("alpha@example.net");
   });
 
   it("receiveEmail tolerates missing sender/subject and plain message IDs", async () => {
