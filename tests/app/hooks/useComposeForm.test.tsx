@@ -263,4 +263,44 @@ describe("useComposeForm", () => {
     expect(result.current.subject).toBe("Fwd: Hello");
     expect(result.current.body).toContain("Forwarded message:");
   });
+
+  it("sanitizes forwarded content while preserving safe signature formatting", () => {
+    mailboxData = {
+      id: "alice@example.com",
+      email: "alice@example.com",
+      name: "Alice",
+      settings: {
+        signature: {
+          enabled: true,
+          html: '<strong>Best regards</strong><img src="x" onerror="alert(1)">',
+        },
+      },
+    };
+    useUIStore.setState({
+      composeOptions: {
+        mode: "forward",
+        originalEmail: {
+          id: "e4",
+          subject: '<img src=x onerror="alert(1)">',
+          sender: '<script>alert(1)</script>attacker@example.com',
+          recipient: "alice@example.com",
+          date: "",
+          body: '<a href="javascript:alert(1)">click</a><script>alert(1)</script>',
+          read: true,
+          starred: false,
+        },
+        draftEmail: null,
+      },
+    });
+
+    const { result } = renderHook(() => useComposeForm("alice@example.com"));
+    const rendered = document.createElement("div");
+    rendered.innerHTML = result.current.body;
+
+    expect(rendered.querySelector("script")).toBeNull();
+    expect(rendered.querySelector("[onerror]")).toBeNull();
+    expect(rendered.querySelector('[href^="javascript:"]')).toBeNull();
+    expect(rendered.querySelector("strong")?.textContent).toBe("Best regards");
+    expect(result.current.body).toContain("attacker@example.com");
+  });
 });
