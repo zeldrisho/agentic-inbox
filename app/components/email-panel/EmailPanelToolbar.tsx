@@ -222,11 +222,14 @@ function MoveToFolderMenu({
 
   useEffect(() => {
     if (!open) return;
+
     const handler = (e: MouseEvent) => {
       // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
+
     document.addEventListener("mousedown", handler);
+
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 

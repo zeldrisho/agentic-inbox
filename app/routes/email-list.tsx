@@ -139,6 +139,7 @@ export default function EmailListRoute() {
     mailboxId: string;
     folder: string;
   }>();
+
   const { selectedEmailId, isComposing, selectEmail, closePanel, startCompose } = useUIStore();
   const [page, setPage] = useState(1);
 
@@ -167,7 +168,9 @@ export default function EmailListRoute() {
 
   const folderName = useMemo(() => {
     const found = folders.find((f) => f.id === folder);
+
     if (found) return found.name;
+
     return folder ? folder.charAt(0).toUpperCase() + folder.slice(1) : "Inbox";
   }, [folders, folder]);
 
@@ -189,6 +192,7 @@ export default function EmailListRoute() {
   const toggleStar = (e: React.MouseEvent, email: Email) => {
     e.preventDefault();
     e.stopPropagation();
+
     if (mailboxId)
       updateEmail.mutate({
         mailboxId,
@@ -200,10 +204,13 @@ export default function EmailListRoute() {
   const handleDelete = (e: React.MouseEvent, emailId: string) => {
     e.preventDefault();
     e.stopPropagation();
+
     if (mailboxId) {
       const confirmed = window.confirm("Are you sure you want to delete this email?");
+
       if (!confirmed) return;
       deleteEmail.mutate({ mailboxId, id: emailId });
+
       if (selectedEmailId === emailId) closePanel();
     }
   };
@@ -222,11 +229,13 @@ export default function EmailListRoute() {
     if (email.thread_unread_count !== undefined) {
       return email.thread_unread_count > 0;
     }
+
     return !email.read;
   };
 
   const handleRowClick = (email: Email) => {
     selectEmail(email.id);
+
     if (mailboxId && hasUnread(email)) {
       if (email.thread_id && email.thread_count && email.thread_count > 1) {
         markThreadRead.mutate({
@@ -249,9 +258,12 @@ export default function EmailListRoute() {
         .split(",")
         .map((p) => p.trim().split("@")[0])
         .filter((name, idx, arr) => arr.indexOf(name) === idx);
+
       if (names.length <= 3) return names.join(", ");
+
       return `${names.slice(0, 2).join(", ")} +${names.length - 2}`;
     }
+
     return email.sender.split("@")[0];
   };
 
@@ -291,6 +303,7 @@ export default function EmailListRoute() {
             {emails.map((email) => {
               const isSelected = selectedEmailId === email.id;
               const snippet = getSnippetText(email.snippet);
+
               return (
                 <div
                   key={email.id}
@@ -405,6 +418,7 @@ export default function EmailListRoute() {
                         }
                         onClick={(e) => {
                           e.stopPropagation();
+
                           if (mailboxId)
                             updateEmail.mutate({
                               mailboxId,

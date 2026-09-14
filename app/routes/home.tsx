@@ -27,11 +27,13 @@ export function meta() {
  */
 export default function HomeRoute() {
   const toastManager = useKumoToastManager();
+
   const {
     data: mailboxes = [],
     refetch: refetchMailboxes,
     isFetched: mailboxesFetched,
   } = useMailboxes();
+
   const createMailbox = useCreateMailbox();
   const deleteMailbox = useDeleteMailbox();
 
@@ -47,10 +49,12 @@ export default function HomeRoute() {
   });
 
   const rawDomains = configData?.domains ?? [];
+
   // Local dev fallback: when config succeeds but returns empty (e.g. no backend in --mode test), default to example.com so the UI remains usable
   const isLocalDev =
     globalThis.window !== undefined &&
     (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+
   const domains =
     rawDomains.length > 0
       ? rawDomains
@@ -59,8 +63,10 @@ export default function HomeRoute() {
         : isLocalDev
           ? ["example.com"]
           : [];
+
   const isLocalDomainFallback =
     rawDomains.length === 0 && !isConfigLoading && !configError && isLocalDev;
+
   const emailAddresses = configData?.emailAddresses ?? [];
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -70,10 +76,12 @@ export default function HomeRoute() {
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+
   const [mailboxToDelete, setMailboxToDelete] = useState<{
     id: string;
     email: string;
   } | null>(null);
+
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Set default domain when config loads
@@ -87,23 +95,29 @@ export default function HomeRoute() {
   const autoCreateDone = useRef(false);
   useEffect(() => {
     if (autoCreateDone.current) return;
+
     if (emailAddresses.length === 0 || !mailboxesFetched) return;
     const existingEmails = new Set(mailboxes.map((m) => m.email.toLowerCase()));
     const toCreate = emailAddresses.filter((addr) => !existingEmails.has(addr.toLowerCase()));
+
     if (toCreate.length === 0) {
       autoCreateDone.current = true;
+
       return;
     }
+
     autoCreateDone.current = true;
     let cancelled = false;
     void Promise.all(
       toCreate.map((addr) => {
         const localPart = addr.split("@")[0] || addr;
+
         return api.createMailbox(addr, localPart).catch(() => {});
       }),
     ).then(() => {
       if (!cancelled) void refetchMailboxes();
     });
+
     return () => {
       cancelled = true;
     };
@@ -112,26 +126,35 @@ export default function HomeRoute() {
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
     setCreateError(null);
+
     if (!newPrefix || !selectedDomain) {
       setCreateError("Please fill in all fields");
+
       return;
     }
 
     // Validate domain when using local fallback
     if (isLocalDomainFallback) {
       const trimmedDomain = selectedDomain.trim();
+
       if (!trimmedDomain) {
         setCreateError("Domain cannot be empty");
+
         return;
       }
+
       if (trimmedDomain !== selectedDomain) {
         setCreateError("Domain cannot contain leading or trailing whitespace");
+
         return;
       }
+
       if (trimmedDomain.includes("@")) {
         setCreateError("Domain cannot contain @ symbol");
+
         return;
       }
+
       // Basic domain validation: must contain at least one dot and valid characters
       if (
         !/^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*$/.test(
@@ -139,6 +162,7 @@ export default function HomeRoute() {
         )
       ) {
         setCreateError("Invalid domain format");
+
         return;
       }
     }
@@ -146,6 +170,7 @@ export default function HomeRoute() {
     const email = `${newPrefix}@${selectedDomain}`;
     const name = newName || newPrefix;
     setIsCreating(true);
+
     try {
       await createMailbox.mutateAsync({ email, name });
       toastManager.add({ title: "Mailbox created successfully!" });
@@ -163,6 +188,7 @@ export default function HomeRoute() {
   const handleDelete = async () => {
     if (!mailboxToDelete) return;
     setIsDeleting(true);
+
     try {
       await deleteMailbox.mutateAsync(mailboxToDelete.id);
       toastManager.add({ title: "Mailbox deleted" });
@@ -176,6 +202,7 @@ export default function HomeRoute() {
   };
 
   const isConfigured = emailAddresses.length > 0;
+
   const accounts = isConfigured
     ? emailAddresses.map((addr) => ({
         id: addr,
@@ -374,6 +401,7 @@ export default function HomeRoute() {
         open={isDeleteOpen}
         onOpenChange={(open) => {
           setIsDeleteOpen(open);
+
           if (!open) setMailboxToDelete(null);
         }}
       >

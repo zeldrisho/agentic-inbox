@@ -25,27 +25,33 @@ import type { Email } from "~/types";
  */
 export function highlightTerms(text: string, query: string): React.ReactNode {
   if (!query || !text) return text;
+
   const freeText = query
     .replace(/\b(?:from|to|subject|in|is|has|before|after):"[^"]*"/gi, "")
     .replace(/\b(?:from|to|subject|in|is|has|before|after):\S+/gi, "")
     .trim();
+
   if (!freeText) return text;
   // Bound highlight work and avoid RegExp entirely (no ReDoS / pattern-injection
   // surface): literal case-insensitive substring scan with indexOf.
   const term = freeText.slice(0, 200);
+
   if (!term) return text;
   const lowerTerm = term.toLowerCase();
   // Map case-folded offsets back to source offsets: lowercasing can expand
   // (e.g. "İ" -> 2 units), so lower-space positions can't slice `text` directly.
   const lowerChars: string[] = [];
   const lowerToSource: number[] = [];
+
   for (let i = 0; i < text.length; i++) {
     const folded = text[i]!.toLowerCase();
+
     for (let j = 0; j < folded.length; j++) {
       lowerChars.push(folded[j]!);
       lowerToSource.push(i);
     }
   }
+
   lowerToSource.push(text.length);
   const lowerText = lowerChars.join("");
   const nodes: React.ReactNode[] = [];
@@ -53,10 +59,12 @@ export function highlightTerms(text: string, query: string): React.ReactNode {
   let sourceIdx = 0;
   let key = 0;
   let pos: number;
+
   while ((pos = lowerText.indexOf(lowerTerm, lowerIdx)) !== -1) {
     const sourceStart = lowerToSource[pos]!;
     const rawEnd = lowerToSource[pos + lowerTerm.length]!;
     const sourceEnd = Math.max(rawEnd, sourceStart + 1);
+
     if (sourceStart > sourceIdx) nodes.push(text.slice(sourceIdx, sourceStart));
     nodes.push(
       <mark key={key++} className="bg-kumo-warning-muted text-kumo-default rounded-sm px-0.5">
@@ -66,8 +74,11 @@ export function highlightTerms(text: string, query: string): React.ReactNode {
     lowerIdx = pos + lowerTerm.length;
     sourceIdx = sourceEnd;
   }
+
   if (lowerIdx === 0) return text;
+
   if (sourceIdx < text.length) nodes.push(text.slice(sourceIdx));
+
   return nodes;
 }
 
@@ -104,11 +115,14 @@ export default function SearchResultsRoute() {
 
   const handleRowClick = (email: Email) => {
     selectEmail(email.id);
+
     if (!email.read && mailboxId)
       updateEmail.mutate({ mailboxId, id: email.id, data: { read: true } });
   };
+
   const folderDisplayName = (name: string | null | undefined): string => {
     if (!name) return "";
+
     const map = {
       inbox: "Inbox",
       sent: "Sent",
@@ -116,6 +130,7 @@ export default function SearchResultsRoute() {
       archive: "Archive",
       trash: "Trash",
     } satisfies Record<string, string>;
+
     // SAFETY: `name` is a dynamic folder identifier; it is a known key of `map` when recognized.
     return map[name.toLowerCase() as keyof typeof map] ?? name;
   };
@@ -177,6 +192,7 @@ export default function SearchResultsRoute() {
                 const snippet = getSnippetText(email.snippet, 120);
                 // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
                 const folderName = (email as Email & { folder_name?: string }).folder_name;
+
                 return (
                   <div
                     key={email.id}

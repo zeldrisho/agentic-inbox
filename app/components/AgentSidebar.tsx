@@ -36,6 +36,7 @@ function LazyAgentPanel() {
       </div>
     );
   }
+
   if (!AgentChat) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-2">
@@ -44,6 +45,7 @@ function LazyAgentPanel() {
       </div>
     );
   }
+
   return <AgentChat />;
 }
 

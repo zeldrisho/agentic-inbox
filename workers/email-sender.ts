@@ -57,13 +57,16 @@ export function queueEmailDelivery(
       .catch(async (error) => {
         // SAFETY: Promise rejection values are normalized before persistence.
         const message = error instanceof Error ? error.message : String(error);
+
         try {
           await mailbox.updateDeliveryStatus(emailId, "failed", message);
         } catch (statusError) {
           const statusMessage =
             statusError instanceof Error ? statusError.message : String(statusError);
+
           console.error("Failed to persist delivery failure status:", statusMessage);
         }
+
         console.error("Deferred email delivery failed:", message);
       }),
   );
@@ -80,9 +83,13 @@ export async function sendEmail(
   };
 
   if (params.html) message.html = params.html;
+
   if (params.text) message.text = params.text;
+
   if (params.cc) message.cc = params.cc;
+
   if (params.bcc) message.bcc = params.bcc;
+
   if (params.replyTo) message.replyTo = params.replyTo;
 
   if (params.headers && Object.keys(params.headers).length > 0) {
@@ -101,5 +108,6 @@ export async function sendEmail(
 
   // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
   const result = await binding.send(message as any);
+
   return { messageId: result.messageId };
 }

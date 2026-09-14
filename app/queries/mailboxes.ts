@@ -40,6 +40,7 @@ export function useMailbox(mailboxId: string | undefined) {
  */
 export function useCreateMailbox() {
   const qc = useQueryClient();
+
   return useMutation({
     mutationFn: ({ email, name }: { email: string; name: string }) =>
       api.createMailbox(email, name),
@@ -56,6 +57,7 @@ export function useCreateMailbox() {
  */
 export function useUpdateMailbox() {
   const qc = useQueryClient();
+
   return useMutation({
     mutationFn: ({ mailboxId, settings }: { mailboxId: string; settings: MailboxSettings }) =>
       api.updateMailbox(mailboxId, settings),
@@ -73,6 +75,7 @@ export function useUpdateMailbox() {
  */
 export function useDeleteMailbox() {
   const qc = useQueryClient();
+
   return useMutation({
     mutationFn: (mailboxId: string) => api.deleteMailbox(mailboxId),
     onSuccess: () => {

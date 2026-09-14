@@ -66,10 +66,12 @@ const TOOLS = [
  */
 export default function MCPPanel() {
   const { mailboxId: _mailboxId } = useParams<{ mailboxId: string }>();
+
   const baseUrl =
     globalThis.window !== undefined
       ? globalThis.window.location.origin
       : "https://your-app.workers.dev";
+
   const mcpUrl = `${baseUrl}/mcp`;
 
   return (

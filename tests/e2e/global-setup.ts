@@ -16,12 +16,14 @@ import { chromium, request } from "@playwright/test";
 
 /** Must match `use.baseURL` in playwright.config.ts. */
 const BASE_URL = "http://localhost:5173";
+
 const WARMUP_MAILBOX = "e2e-warmup@example.com";
 
 export default async function globalSetup(): Promise<void> {
   // Scratch mailbox so the warm-up drives a real route payload. A stale one
   // from a previous run is fine — creation failures are ignored either way.
   let api: Awaited<ReturnType<typeof request.newContext>> | undefined;
+
   try {
     api = await request.newContext({ baseURL: BASE_URL });
     await api.post("/api/v1/mailboxes", {
@@ -36,6 +38,7 @@ export default async function globalSetup(): Promise<void> {
   const inboxUrl = `/mailbox/${encodeURIComponent(WARMUP_MAILBOX)}/emails/inbox`;
 
   const browser = await chromium.launch();
+
   try {
     const page = await browser.newPage();
     // Use domcontentloaded — Vite's HMR websocket keeps networkidle from settling.

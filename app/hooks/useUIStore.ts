@@ -58,6 +58,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     set((state) => {
       const mode = options?.mode || "new";
       const isReplyOrForward = mode === "reply" || mode === "reply-all" || mode === "forward";
+
       return {
         isComposing: true,
         _previousEmailId: state.selectedEmailId,
@@ -90,11 +91,13 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   toggleAgentPanel: () => {
     const v = !get().isAgentPanelOpen;
+
     try {
       localStorage.setItem("agentPanelOpen", JSON.stringify(v));
     } catch {
       // ignore storage errors
     }
+
     set({ isAgentPanelOpen: v });
   },
 
@@ -114,8 +117,10 @@ export const useUIStore = create<UIState>((set, get) => ({
 // Hydrate isAgentPanelOpen from localStorage (SSR-safe via try/catch)
 try {
   const stored = localStorage.getItem("agentPanelOpen");
+
   if (stored !== null) {
     const parsed = JSON.parse(stored);
+
     if (parsed === true) {
       useUIStore.setState({ isAgentPanelOpen: true });
     }

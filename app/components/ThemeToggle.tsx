@@ -17,12 +17,15 @@ export function ThemeToggle() {
 
   const getIcon = () => {
     if (mode === "system") return <MonitorIcon size={20} />;
+
     return resolved === "dark" ? <MoonIcon size={20} /> : <SunIcon size={20} />;
   };
 
   const getLabel = () => {
     if (mode === "system") return `Theme: system (${resolved}) — click for light`;
+
     if (mode === "light") return "Theme: light — click for dark";
+
     return "Theme: dark — click for system";
   };
 
@@ -44,6 +47,7 @@ export function ThemeToggle() {
  */
 export function ThemeSelector() {
   const { mode, setMode } = useTheme();
+
   return (
     <div className="flex items-center gap-1 rounded-md border border-kumo-line p-1 bg-kumo-base w-fit">
       <button

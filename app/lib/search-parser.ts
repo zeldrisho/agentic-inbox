@@ -97,11 +97,13 @@ export function parseSearchQuery(input: string): ParsedSearch {
             result.is_starred = false;
             break;
         }
+
         break;
       case "has":
         if (value.toLowerCase() === "attachment") {
           result.has_attachment = true;
         }
+
         break;
       case "before":
         result.date_end = normalizeDate(value);
@@ -124,7 +126,9 @@ export function parseSearchQuery(input: string): ParsedSearch {
 function normalizeDate(value: string): string | undefined {
   try {
     const d = new Date(value);
+
     if (isNaN(d.getTime())) return undefined;
+
     return d.toISOString();
   } catch {
     return undefined;

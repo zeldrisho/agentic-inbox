@@ -39,12 +39,14 @@ export default function SettingsRoute() {
   const handleSave = async () => {
     if (!mailbox || !mailboxId) return;
     setIsSaving(true);
+
     const settings = {
       ...mailbox.settings,
       fromName: displayName,
       agentSystemPrompt: agentPrompt.trim() || undefined,
       agentAutoDraft,
     };
+
     try {
       await updateMailboxMutation.mutateAsync({ mailboxId, settings });
       toastManager.add({ title: "Settings saved!" });

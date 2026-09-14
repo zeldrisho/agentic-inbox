@@ -33,6 +33,7 @@ export default function EmailAttachmentList({
   if (!mailboxId) return null;
 
   const files = getNonInlineAttachments(attachments);
+
   if (files.length === 0) return null;
 
   return (

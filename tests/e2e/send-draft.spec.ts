@@ -16,14 +16,21 @@ import { expect, test, type APIRequestContext, type Locator, type Page } from "@
 
 /** Unique-per-run mailbox addresses so reruns never collide with stale data. */
 const RUN_ID = Date.now();
+
 const DRAFT_MAILBOX = `e2e-draft-${RUN_ID}@example.com`;
+
 const SEND_MAILBOX = `e2e-send-${RUN_ID}@example.com`;
+
 const AGENT_MAILBOX = `e2e-agent-${RUN_ID}@example.com`;
 
 const DRAFT_SUBJECT = "E2E draft subject";
+
 const DRAFT_BODY = "E2E draft body text";
+
 const SENT_SUBJECT = "E2E sent subject";
+
 const SENT_BODY = "E2E sent body text";
+
 const RECIPIENT = "recipient@example.com";
 
 /**
@@ -34,10 +41,13 @@ async function createMailbox(
   email: string,
 ): Promise<{ mailboxId: string; mailboxUrl: string }> {
   const res = await request.post("/api/v1/mailboxes", { data: { email, name: "E2E" } });
+
   if (res.status() !== 201) {
     throw new Error(`Mailbox creation failed (${res.status()}): ${await res.text()}`);
   }
+
   const mailboxId = encodeURIComponent(email);
+
   return { mailboxId, mailboxUrl: `/mailbox/${mailboxId}` };
 }
 
@@ -64,6 +74,7 @@ async function openCompose(page: Page, mailboxUrl: string): Promise<Locator> {
   // The compose inputs are identified by their placeholders (panel uses exact, modal uses longer list).
   const toInput = page.getByPlaceholder(/recipient@example\.com/);
   await expect(toInput).toBeVisible({ timeout: COLD_START_TIMEOUT });
+
   return toInput;
 }
 

@@ -62,12 +62,15 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
     }
 
     const contentType = res.headers.get("content-type") ?? "";
+
     if (contentType.includes("application/json")) {
       // SAFETY: the JSON envelope matches the caller's expected `T` shape.
       return res.json() as Promise<T>;
     }
+
     // SAFETY: a non-JSON response is returned verbatim and cast to the caller's `T`.
     const blob = res.blob() as unknown;
+
     // SAFETY: `blob` is the verbatim response; cast it to the caller's `T`.
     return blob as T;
   } finally {
@@ -88,9 +91,11 @@ function get<T>(
 ) {
   const query = opts?.params ? `?${new URLSearchParams(opts.params)}` : "";
   const requestOptions: RequestInit = { method: "GET", signal: opts?.signal };
+
   if (opts?.responseType === "blob") {
     requestOptions.headers = { Accept: "*/*" };
   }
+
   return request<T>(`${url}${query}`, requestOptions);
 }
 

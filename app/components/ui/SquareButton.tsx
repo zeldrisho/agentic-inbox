@@ -19,5 +19,6 @@ export function SquareButton(props: ButtonProps) {
   // through an object spread, so assert the merged props back to ButtonProps
   // after injecting the required square shape.
   const merged = { ...props, ...SQUARE_PROPS } as ButtonProps;
+
   return <Button {...merged} />;
 }

@@ -64,12 +64,14 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
   useEffect(() => {
     if (editor && !editor.isDestroyed && value !== editor.getHTML()) {
       editor.commands.setContent(value);
+
       // Place cursor at the start of the document (above quoted text)
       const rafId = requestAnimationFrame(() => {
         if (!editor.isDestroyed) {
           editor.commands.focus("start");
         }
       });
+
       return () => cancelAnimationFrame(rafId);
     }
   }, [value, editor]);
@@ -78,11 +80,15 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
     if (!editor) return;
     const previousUrl = editor.getAttributes("link").href;
     const url = window.prompt("URL", previousUrl);
+
     if (url === null) return;
+
     if (url === "") {
       editor.chain().focus().extendMarkRange("link").unsetLink().run();
+
       return;
     }
+
     editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
   }, [editor]);
 

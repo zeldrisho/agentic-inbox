@@ -27,6 +27,7 @@ export function applyMigrations(
 
   for (const migration of migrations) {
     const applied = [...sql.exec(`SELECT 1 FROM d1_migrations WHERE name = ?`, migration.name)];
+
     if (applied.length > 0) continue;
 
     // Strip any existing BEGIN/COMMIT wrapper from the migration SQL.
@@ -37,6 +38,7 @@ export function applyMigrations(
     migrationSql = migrationSql.replace(/\s*COMMIT\s*;?\s*$/i, "");
 
     const escapedName = migration.name.replace(/'/g, "''");
+
     const run = () => {
       sql.exec(migrationSql);
       sql.exec(`INSERT INTO d1_migrations (name) VALUES ('${escapedName}')`);
@@ -64,8 +66,10 @@ interface DurableObjectStorage {
  */
 function txn(sql: string): string {
   const trimmed = sql.trim();
+
   // Don't double-wrap if someone already added BEGIN/COMMIT
   if (/^\s*BEGIN\b/i.test(trimmed)) return trimmed;
+
   return `BEGIN TRANSACTION;\n${trimmed}\nCOMMIT;`;
 }
 

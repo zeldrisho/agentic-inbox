@@ -18,8 +18,10 @@
  */
 function safeParse(dateStr: string | undefined | null): Date | null {
   if (!dateStr) return null;
+
   try {
     const d = new Date(dateStr);
+
     return isNaN(d.getTime()) ? null : d;
   } catch {
     return null;
@@ -34,21 +36,25 @@ function safeParse(dateStr: string | undefined | null): Date | null {
  */
 export function formatListDate(dateStr: string): string {
   const date = safeParse(dateStr);
+
   if (!date) return dateStr;
 
   const now = new Date();
+
   if (date.toDateString() === now.toDateString()) {
     return date.toLocaleTimeString(undefined, {
       hour: "numeric",
       minute: "2-digit",
     });
   }
+
   if (date.getFullYear() === now.getFullYear()) {
     return date.toLocaleDateString(undefined, {
       month: "short",
       day: "numeric",
     });
   }
+
   return date.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
@@ -64,6 +70,7 @@ export function formatListDate(dateStr: string): string {
  */
 export function formatDetailDate(dateStr: string): string {
   const date = safeParse(dateStr);
+
   if (!date) return dateStr;
 
   return date.toLocaleDateString(undefined, {
@@ -83,6 +90,7 @@ export function formatDetailDate(dateStr: string): string {
  */
 export function formatShortDate(dateStr: string): string {
   const date = safeParse(dateStr);
+
   if (!date) return dateStr;
 
   return date.toLocaleTimeString(undefined, {
@@ -100,6 +108,7 @@ export function formatShortDate(dateStr: string): string {
 export function formatQuotedDate(dateStr: string | undefined): string {
   if (!dateStr) return "";
   const date = safeParse(dateStr);
+
   if (!date) return dateStr;
 
   return date.toLocaleString("en-US", {

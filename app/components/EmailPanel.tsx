@@ -61,10 +61,12 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
   const { mailboxId, folder } = useParams<{ mailboxId: string; folder: string }>();
   // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
   const { data: email } = useEmail(mailboxId, emailId) as { data?: Email };
+
   // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
   const { data: threadRepliesRaw } = useThreadReplies(mailboxId, email?.thread_id) as {
     data?: Email[];
   };
+
   const updateEmail = useUpdateEmail();
   const deleteEmailMut = useDeleteEmail();
   const moveEmailMut = useMoveEmail();
@@ -72,10 +74,12 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
   const replyMut = useReplyToEmail();
   // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
   const { data: folders = [] } = useFolders(mailboxId) as { data?: Folder[] };
+
   // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
   const { data: currentMailbox } = useMailbox(mailboxId) as {
     data?: Mailbox;
   };
+
   const { closePanel, startCompose } = useUIStore();
   const toastManager = useKumoToastManager();
   const [isSending, setIsSending] = useState(false);
@@ -86,11 +90,13 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 
   const threadReplies = useMemo(() => {
     if (!threadRepliesRaw || !email) return [];
+
     return threadRepliesRaw.filter((e) => e.id !== email.id);
   }, [threadRepliesRaw, email]);
 
   const allMessages = useMemo(() => {
     if (!email) return [];
+
     return [email, ...threadReplies].sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
     );
@@ -106,31 +112,38 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
   const toggleExpand = (msgId: string) => {
     setExpandedMessages((prev) => {
       const next = new Set(prev);
+
       if (next.has(msgId)) next.delete(msgId);
       else next.add(msgId);
+
       return next;
     });
   };
 
   const draftMessageIds = useMemo(() => {
     const ids = new Set<string>();
+
     for (const msg of allMessages) {
       if (msg.folder_id === Folders.DRAFT) ids.add(msg.id);
       else if (isDraftFolder && msg.id === emailId) ids.add(msg.id);
     }
+
     return ids;
   }, [allMessages, isDraftFolder, emailId]);
 
   const lastReceivedMessage = useMemo(() => {
     const ce = currentMailbox?.email;
     const received = allMessages.filter((msg) => !draftMessageIds.has(msg.id) && msg.sender !== ce);
+
     if (received.length > 0) return received[0];
     const nonDrafts = allMessages.filter((msg) => !draftMessageIds.has(msg.id));
+
     return nonDrafts.length > 0 ? nonDrafts[0] : email;
   }, [allMessages, draftMessageIds, currentMailbox?.email, email]);
 
   const moveToFolders = useMemo(() => {
     const cur = folder || email?.folder_id;
+
     return folders.filter((f) => f.id !== cur);
   }, [folders, folder, email?.folder_id]);
 
@@ -140,12 +153,14 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
     if (mailboxId)
       updateEmail.mutate({ mailboxId, id: email.id, data: { starred: !email.starred } });
   };
+
   const handleMove = (folderId: string) => {
     if (mailboxId) {
       moveEmailMut.mutate({ mailboxId, id: email.id, folderId });
       closePanel();
     }
   };
+
   const handleDelete = () => {
     if (mailboxId) {
       if (!window.confirm("Are you sure you want to delete this email?")) return;
@@ -156,6 +171,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 
   const handleEditDraft = (draftMsg?: Email) => {
     const target = draftMsg || email;
+
     if (target.in_reply_to) {
       startCompose({
         mode: "reply",
@@ -169,48 +185,63 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
 
   const handleDeleteDraft = async (draftMsg?: Email) => {
     const target = draftMsg || email;
+
     if (!mailboxId) return;
+
     if (!window.confirm("Discard this draft?")) return;
     deleteEmailMut.mutate({ mailboxId, id: target.id });
     toastManager.add({ title: "Draft discarded" });
+
     if (target.id === emailId) closePanel();
   };
 
   const handleSendDraft = async (draftMsg?: Email) => {
     let target = draftMsg || email;
+
     if (!mailboxId || !currentMailbox) return;
     setIsSending(true);
+
     try {
       if (!target.recipient || !target.subject) {
         try {
           // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
           const fresh = (await api.getEmail(mailboxId, target.id)) as Email;
+
           if (fresh) target = fresh;
         } catch {}
       }
+
       if (!target.recipient) {
         toastManager.add({
           title: "Cannot send: no recipient set on this draft.",
           variant: "error",
         });
+
         return;
       }
+
       const toRecipients = splitEmailList(target.recipient);
+
       if (toRecipients.length === 0) {
         toastManager.add({
           title: "Cannot send: no valid recipient set on this draft.",
           variant: "error",
         });
+
         return;
       }
+
       const fromName = currentMailbox.settings?.fromName || currentMailbox.name;
+
       const from =
         fromName && fromName !== currentMailbox.email
           ? { email: currentMailbox.email, name: fromName }
           : currentMailbox.email;
+
       const originalEmail = target.in_reply_to
         ? allMessages.find((msg) => msg.id === target.in_reply_to)
         : undefined;
+
       const emailData = {
         to: toEmailListValue(toRecipients) ?? "",
         cc: toEmailListValue(splitEmailList(target.cc)),
@@ -220,11 +251,13 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
         html: target.body || "",
         text: target.body ? DOMPurify.sanitize(target.body, { ALLOWED_TAGS: [] }).trim() : "",
       };
+
       if (originalEmail)
         await replyMut.mutateAsync({ mailboxId, emailId: originalEmail.id, email: emailData });
       else await sendEmailMut.mutateAsync({ mailboxId, email: emailData });
       await deleteEmailMut.mutateAsync({ mailboxId, id: target.id });
       toastManager.add({ title: "Email sent!" });
+
       if (isDraftFolder) closePanel();
     } catch (err) {
       const message = (err instanceof Error ? err.message : null) || "Failed to send email.";
@@ -280,6 +313,7 @@ export default function EmailPanel({ emailId }: { emailId: string }) {
         {hasThread ? (
           allMessages.map((msg, idx) => {
             const isDraft = draftMessageIds.has(msg.id);
+
             return (
               <ThreadMessage
                 key={msg.id}

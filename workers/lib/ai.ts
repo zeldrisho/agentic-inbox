@@ -34,6 +34,7 @@ export async function isPromptInjection(
   if (!bodyHtml) return false;
 
   const plainText = stripHtmlToText(bodyHtml).trim();
+
   if (plainText.length < 10) return false;
 
   try {
@@ -51,6 +52,7 @@ export async function isPromptInjection(
 
     if (result.includes("YES")) {
       console.warn("Prompt injection detected in incoming email, blocking auto-draft");
+
       return true;
     }
 
@@ -58,6 +60,7 @@ export async function isPromptInjection(
   } catch (e) {
     // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     console.error("Prompt injection scanner failed, skipping auto-draft:", (e as Error).message);
+
     // Fail closed: treat scanner failures as potential injection to avoid
     // auto-drafting replies to emails we couldn't verify.
     // The email is still stored in the inbox — only auto-draft is skipped.
@@ -115,11 +118,14 @@ RULES:
  */
 function splitQuotedBlock(html: string) {
   const match = html.match(/(\s*(?:<br\s*\/?>)\s*)?(<blockquote[\s\S]*<\/blockquote>)\s*$/i);
+
   if (match) {
     const quoted = match[0];
     const reply = html.slice(0, html.length - quoted.length);
+
     return { reply, quoted };
   }
+
   return { reply: html, quoted: "" };
 }
 
@@ -134,6 +140,7 @@ export async function verifyDraft(ai: Ai, body: string): Promise<string> {
 
   // Separate the quoted reply block so the AI only reviews the user's text
   const isHtml = /<[a-z][\s\S]*>/i.test(body);
+
   const { reply: replyHtml, quoted: quotedBlock } = isHtml
     ? splitQuotedBlock(body)
     : { reply: body, quoted: "" };
@@ -178,6 +185,7 @@ export async function verifyDraft(ai: Ai, body: string): Promise<string> {
         "Draft verifier removed >50% of content, falling back to original.",
         `Original: ${replyText.trim().length} chars, Cleaned: ${cleanedTrimmed.length} chars`,
       );
+
       return body;
     }
 
@@ -194,6 +202,7 @@ export async function verifyDraft(ai: Ai, body: string): Promise<string> {
       // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
       (e as Error).message,
     );
+
     return "";
   }
 }
