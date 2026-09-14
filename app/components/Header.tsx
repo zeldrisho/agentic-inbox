@@ -46,6 +46,7 @@ export default function Header() {
 
   const clearSearch = () => {
     setSearchQuery("");
+
     if (location.pathname.includes("/search") && mailboxId) {
       void navigate(`/mailbox/${mailboxId}/emails/inbox`);
     }
@@ -55,6 +56,7 @@ export default function Header() {
     if (e.key === "Enter") {
       performSearch();
     }
+
     if (e.key === "Escape") {
       if (searchQuery) {
         clearSearch();

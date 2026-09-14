@@ -39,14 +39,17 @@ export async function storeAttachments(
   if (!attachments?.length) return [];
 
   const results: StoredAttachment[] = [];
+
   for (const att of attachments) {
     const attachmentId = crypto.randomUUID();
+
     // Sanitize filename to prevent path traversal in R2 keys
     const safeFilename = (att.filename || "untitled")
       .split("")
       .filter((ch) => ch.charCodeAt(0) > 31)
       .join("")
       .replace(/[/\\:*?"<>|]/g, "_");
+
     const key = `attachments/${emailId}/${attachmentId}/${safeFilename}`;
     const binaryStr = atob(att.content);
     const bytes = Uint8Array.from(binaryStr, (c) => c.charCodeAt(0));
@@ -61,5 +64,6 @@ export async function storeAttachments(
       disposition: att.disposition,
     });
   }
+
   return results;
 }

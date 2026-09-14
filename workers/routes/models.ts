@@ -7,6 +7,7 @@ import { FALLBACK_MODELS } from "shared/models";
 import type { Env } from "../types";
 
 const CACHE_R2_KEY = "cache/models.json";
+
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 
 type CatalogModel = {
@@ -55,11 +56,14 @@ async function fetchLiveCatalog(ai: Ai): Promise<CatalogModel[] | null> {
   try {
     // SAFETY: the binding returns AiModelsSearchObject entries; the runtime payload additionally carries `deprecated`, modeled by SearchEntry.
     const raw = (await ai.models({ task: "Text Generation" })) as SearchEntry[];
+
     if (!Array.isArray(raw) || raw.length === 0) return null;
 
     const models: CatalogModel[] = [];
+
     for (const m of raw) {
       if (!m.name || !m.name.startsWith("@")) continue;
+
       if (m.deprecated === true) continue;
       models.push({
         id: m.name,
@@ -68,7 +72,9 @@ async function fetchLiveCatalog(ai: Ai): Promise<CatalogModel[] | null> {
         functionCalling: true,
       });
     }
+
     if (models.length === 0) return null;
+
     return models.sort((a, b) => a.id.localeCompare(b.id));
   } catch {
     return null;
@@ -91,18 +97,23 @@ export async function handleGetModels(c: Context<{ Bindings: Env }>) {
       // eslint-disable-next-line anti-slop/no-runtime-typeof, anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion
       const defaultCache = (globalThis as unknown as { caches?: { default: Cache } }).caches
         ?.default;
+
       if (defaultCache) {
         const cached = await defaultCache.match(new Request(url.toString()));
+
         if (cached) {
           const data = await cached.json();
+
           return c.json(data);
         }
       }
     } catch {
       // ignore
     }
+
     try {
       const obj = await c.env.BUCKET.get(CACHE_R2_KEY);
+
       if (obj) {
         // SAFETY: R2 cached JSON was written by this handler as a typed catalog payload; shape is trusted and validated by length check.
         const data = (await obj.json()) as {
@@ -110,7 +121,9 @@ export async function handleGetModels(c: Context<{ Bindings: Env }>) {
           models: CatalogModel[];
           source: string;
         };
+
         const age = Date.now() - new Date(data.cachedAt).getTime();
+
         if (age < CACHE_TTL_MS && data.models?.length) {
           return c.json(data);
         }
@@ -140,6 +153,7 @@ export async function handleGetModels(c: Context<{ Bindings: Env }>) {
     cachedAt: new Date().toISOString(),
     source,
   };
+
   if (warning) payload.warning = warning;
 
   // Write caches (best-effort) — but only for live data to avoid masking recovery from transient failures
@@ -149,11 +163,13 @@ export async function handleGetModels(c: Context<{ Bindings: Env }>) {
     } catch {
       // ignore
     }
+
     try {
       // SAFETY: caches global may be absent outside Workers; guard via optional chaining.
       // eslint-disable-next-line anti-slop/require-safety-comment-for-type-assertion, anti-slop/no-chained-type-assertions
       const defaultCache2 = (globalThis as unknown as { caches?: { default: Cache } }).caches
         ?.default;
+
       if (defaultCache2) {
         const cacheRes = new Response(JSON.stringify(payload), {
           headers: {
@@ -161,6 +177,7 @@ export async function handleGetModels(c: Context<{ Bindings: Env }>) {
             "Cache-Control": "public, max-age=10",
           },
         });
+
         const cacheKey = new Request(url.origin + url.pathname);
         void defaultCache2.put(cacheKey, cacheRes);
       }

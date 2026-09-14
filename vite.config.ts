@@ -13,6 +13,7 @@ import { createLogger } from "vite";
 
 /* oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-chained-type-assertions, anti-slop/no-unsafe-dictionary-type, anti-slop/require-safety-comment-for-type-assertion */
 const viteLogger = createLogger();
+
 const filteredLogger = {
   ...viteLogger,
   warn(msg: string, opts?: unknown) {
@@ -27,26 +28,33 @@ const filteredLogger = {
 // (vite-plus internal Vite instance). This runs at config load time.
 /* oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-unsafe-argument, anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion */
 const _origConsoleWarn = console.warn;
+
 console.warn = (...args: unknown[]) => {
   if (args.some((a) => String(a).includes("envFile"))) return;
   // SAFETY: forwarding original console.warn args with same signature.
   (_origConsoleWarn as (...a: unknown[]) => void)(...args);
 };
+
 const _origConsoleError = console.error;
+
 console.error = (...args: unknown[]) => {
   if (args.some((a) => String(a).includes("envFile"))) return;
   // SAFETY: forwarding original console.error args with same signature.
   (_origConsoleError as (...a: unknown[]) => void)(...args);
 };
+
 const _origConsoleLog = console.log;
+
 console.log = (...args: unknown[]) => {
   if (args.some((a) => String(a).includes("envFile"))) return;
   // SAFETY: forwarding original console.log args with same signature.
   (_origConsoleLog as (...a: unknown[]) => void)(...args);
 };
+
 /* oxlint-enable anti-slop/no-unknown-parameters, anti-slop/no-unsafe-argument, anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion */
 /* oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-unsafe-argument, anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion */
 const _origStderrWrite = process.stderr.write.bind(process.stderr);
+
 // SAFETY: filtering Vite's deprecated envFile warning at stderr level; forwarding otherwise preserves original semantics.
 process.stderr.write = ((
   chunk: unknown,
@@ -54,10 +62,13 @@ process.stderr.write = ((
   callback?: (error?: Error) => void,
 ) => {
   const str = String(chunk);
+
   if (str.includes("envFile") && str.includes("deprecated")) {
     callback?.();
+
     return true;
   }
+
   // oxlint-disable-next-line anti-slop/no-unsafe-argument -- forwarding original args
   return (_origStderrWrite as (c: unknown, e?: unknown, cb?: (error?: Error) => void) => boolean)(
     chunk,
@@ -65,7 +76,9 @@ process.stderr.write = ((
     callback,
   );
 }) as typeof process.stderr.write;
+
 const _origStdoutWrite = process.stdout.write.bind(process.stdout);
+
 // SAFETY: same filtering for stdout (Vite may log to stdout in some environments).
 process.stdout.write = ((
   chunk: unknown,
@@ -73,10 +86,13 @@ process.stdout.write = ((
   callback?: (error?: Error) => void,
 ) => {
   const str = String(chunk);
+
   if (str.includes("envFile") && str.includes("deprecated")) {
     callback?.();
+
     return true;
   }
+
   // oxlint-disable-next-line anti-slop/no-unsafe-argument -- forwarding original args
   return (_origStdoutWrite as (c: unknown, e?: unknown, cb?: (error?: Error) => void) => boolean)(
     chunk,
@@ -185,6 +201,9 @@ export default defineConfig(({ mode }) => ({
       "eslint/no-unused-vars": "error",
       "eslint/no-control-regex": "error",
       // Anti-slop: reject low-evidence / low-signal implementation patterns.
+      "oxc/no-accumulating-spread": "error",
+      "anti-slop/no-array-filter-map": "error",
+      "anti-slop/no-reduce-accumulator-copy": "error",
       "anti-slop/no-chained-type-assertions": "error",
       "anti-slop/no-conditional-empty-object-spread": "error",
       "anti-slop/no-known-value-widening": "error",
@@ -199,6 +218,7 @@ export default defineConfig(({ mode }) => ({
       "anti-slop/no-unknown-type-aliases": "error",
       "anti-slop/no-unsafe-dictionary-type": "error",
       "anti-slop/no-widen-then-assert": "error",
+      "anti-slop/require-readable-spacing": "error",
       "anti-slop/require-safety-comment-for-type-assertion": "error",
     },
     options: { typeAware: true, typeCheck: true },
@@ -222,6 +242,7 @@ export default defineConfig(({ mode }) => ({
         // SAFETY: `envFile` is a legacy Vite option not in UserConfig types but may be present as `false` from older plugins; deleting it silences the deprecation warning.
         // oxlint-disable-next-line anti-slop/no-chained-type-assertions, anti-slop/no-unsafe-dictionary-type -- single delete of legacy key after SAFETY check; no value contract needed.
         const c = cfg as unknown as Record<string, unknown>;
+
         if (c.envFile === false) delete c.envFile;
       },
     },

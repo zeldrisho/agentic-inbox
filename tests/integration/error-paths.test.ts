@@ -78,6 +78,22 @@ async function requestApp(env: unknown, method: string, path: string, body?: unk
   return { res };
 }
 
+/** Delivers a raw RFC 822 message to the inbound-email handler under test. */
+async function receiveRaw(
+  raw: string,
+  env: Parameters<typeof receiveEmail>[1],
+): Promise<void> {
+  const bytes = new TextEncoder().encode(raw);
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  });
+  const ctx = { waitUntil: vi.fn(), passThroughOnException: vi.fn() } as unknown as ExecutionContext;
+  await receiveEmail({ raw: stream as unknown as ReadableStream, rawSize: bytes.length }, env, ctx);
+}
+
 describe("error paths: workers/index.ts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -182,6 +198,90 @@ describe("error paths: workers/index.ts", () => {
     expect(stub.updateEmail).toHaveBeenCalledWith("e1", { read: true, starred: false });
   });
 
+  it("ignores an inbound recipient with no parseable domain", async () => {
+    const bucket = mockBucket();
+    const stub = mockMailboxStub();
+    const env = {
+      BUCKET: bucket,
+      MAILBOX: { idFromName: vi.fn((n: string) => n), get: vi.fn(() => stub) },
+      EMAIL_AGENT: { idFromName: vi.fn((n: string) => n), get: vi.fn() },
+      EMAIL_ADDRESSES: [],
+      DOMAINS: "example.com",
+    };
+
+    // PostalMime accepts `missing@` as an address, while split("@")[1]
+    // becomes undefined and exercises resolveAdminMailboxId's guard.
+    await receiveRaw(
+      "From: sender@example.net\r\nTo: missing@\r\nSubject: no domain\r\n\r\nbody",
+      env as never,
+    );
+    expect(bucket.head).toHaveBeenCalledWith("mailboxes/missing@.json");
+    expect(stub.createEmail).not.toHaveBeenCalled();
+  });
+
+  it("ignores inbound email when its mailbox and domain catch-all do not exist", async () => {
+    const bucket = mockBucket();
+    const stub = mockMailboxStub();
+    const env = {
+      BUCKET: bucket,
+      MAILBOX: { idFromName: vi.fn((n: string) => n), get: vi.fn(() => stub) },
+      EMAIL_AGENT: { idFromName: vi.fn((n: string) => n), get: vi.fn() },
+      EMAIL_ADDRESSES: [],
+      DOMAINS: "example.com",
+    };
+
+    await receiveRaw(
+      "From: sender@example.net\r\nTo: missing@example.net\r\nSubject: no mailbox\r\n\r\nbody",
+      env as never,
+    );
+    expect(bucket.head).toHaveBeenCalledWith("mailboxes/missing@example.net.json");
+    expect(stub.createEmail).not.toHaveBeenCalled();
+  });
+
+  it("routes unknown recipients to the first same-domain mailbox", async () => {
+    const bucket = mockBucket();
+    bucket._store.set("mailboxes/zebra@example.net.json", JSON.stringify({}));
+    bucket._store.set("mailboxes/alpha@example.net.json", JSON.stringify({}));
+    const stub = mockMailboxStub();
+    const env = {
+      BUCKET: bucket,
+      MAILBOX: { idFromName: vi.fn((n: string) => n), get: vi.fn(() => stub) },
+      EMAIL_AGENT: { idFromName: vi.fn((n: string) => n), get: vi.fn() },
+      EMAIL_ADDRESSES: [],
+      DOMAINS: "example.net",
+    };
+
+    await receiveRaw(
+      "From: sender@elsewhere.net\r\nTo: missing@example.net\r\nSubject: catch-all\r\n\r\nbody",
+      env as never,
+    );
+    expect(env.MAILBOX.idFromName).toHaveBeenCalledWith("alpha@example.net");
+  });
+
+  it("receiveEmail tolerates missing sender/subject and plain message IDs", async () => {
+    const bucket = mockBucket();
+    bucket._store.set("mailboxes/user@example.com.json", JSON.stringify({}));
+    const stub = mockMailboxStub();
+    const env = {
+      BUCKET: bucket,
+      MAILBOX: { idFromName: vi.fn((n: string) => n), get: vi.fn(() => stub) },
+      EMAIL_AGENT: { idFromName: vi.fn((n: string) => n), get: vi.fn() },
+      EMAIL_ADDRESSES: [],
+      DOMAINS: "example.com",
+    };
+
+    await receiveRaw(
+      "To: user@example.com\r\nMessage-ID: plain-message-id\r\n\r\ntext body",
+      env as never,
+    );
+    const createCall = stub.createEmail.mock.calls[0] as unknown[];
+    const email = createCall[1] as Record<string, unknown>;
+    expect(email.subject).toBe("");
+    expect(email.sender).toBe("");
+    expect(email.message_id).toBe("plain-message-id");
+    expect(email.body).toBe("text body\n");
+  });
+
   it("receiveEmail stores inbound attachments, cc, and bcc", async () => {
     const bucket = mockBucket();
     bucket._store.set("mailboxes/user@example.com.json", JSON.stringify({}));
@@ -238,6 +338,104 @@ describe("error paths: workers/index.ts", () => {
     const attachments = (createCall?.[2] ?? []) as { filename: string }[];
     expect(attachments).toHaveLength(1);
     expect(attachments[0].filename).toBe("note.txt");
+  });
+
+  it("returns 404 for a missing mailbox object", async () => {
+    const env = mockEnv(mockBucket());
+    const { res } = await requestApp(env, "GET", "/api/v1/mailboxes/missing@example.com");
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 404 when an email row does not exist", async () => {
+    const bucket = mockBucket();
+    bucket._store.set("mailboxes/alice@example.com.json", JSON.stringify({}));
+    const stub = mockMailboxStub({ getEmail: vi.fn(async () => null) });
+    const env = mockEnv(bucket, stub);
+    const { res } = await requestApp(
+      env,
+      "GET",
+      "/api/v1/mailboxes/alice@example.com/emails/missing",
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 404 when deleting an email row does not find it", async () => {
+    const bucket = mockBucket();
+    bucket._store.set("mailboxes/alice@example.com.json", JSON.stringify({}));
+    const stub = mockMailboxStub({ deleteEmail: vi.fn(async () => null) });
+    const env = mockEnv(bucket, stub);
+    const { res } = await requestApp(
+      env,
+      "DELETE",
+      "/api/v1/mailboxes/alice@example.com/emails/missing",
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("continues mailbox creation when catch-all migration fails", async () => {
+    const bucket = mockBucket();
+    bucket._store.set("mailboxes/admin@example.com.json", JSON.stringify({}));
+    const env = mockEnv(bucket);
+    const { res } = await requestApp(env, "POST", "/api/v1/mailboxes", {
+      email: "new@example.com",
+      name: "New",
+    });
+    expect(res.status).toBe(201);
+    expect(bucket._store.has("mailboxes/new@example.com.json")).toBe(true);
+  });
+
+  it("returns 404 when replacing a draft that does not exist", async () => {
+    const bucket = mockBucket();
+    bucket._store.set("mailboxes/alice@example.com.json", JSON.stringify({}));
+    const stub = mockMailboxStub({ replaceDraft: vi.fn(async () => false) });
+    const env = mockEnv(bucket, stub);
+    const { res } = await requestApp(env, "POST", "/api/v1/mailboxes/alice@example.com/drafts", {
+      draft_id: "missing",
+      to: "bob@example.com",
+      body: "draft",
+    });
+    expect(res.status).toBe(404);
+    expect(stub.replaceDraft).toHaveBeenCalled();
+  });
+
+  it("returns 404 when an attachment row has no stored R2 object", async () => {
+    const bucket = mockBucket();
+    bucket._store.set("mailboxes/alice@example.com.json", JSON.stringify({}));
+    const stub = mockMailboxStub({
+      getAttachment: vi.fn(async () => ({ filename: "missing.txt", mimetype: "text/plain" })),
+    });
+    const env = mockEnv(bucket, stub);
+    const { res } = await requestApp(
+      env,
+      "GET",
+      "/api/v1/mailboxes/alice@example.com/emails/e1/attachments/a1",
+    );
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Attachment file not found" });
+  });
+
+  it("propagates non-validation errors through app.onError", async () => {
+    const bucket = mockBucket();
+    bucket._store.set("mailboxes/alice@example.com.json", "not-json");
+    const env = mockEnv(bucket);
+    await expect(
+      requestApp(env, "GET", "/api/v1/mailboxes/alice@example.com"),
+    ).rejects.toThrow();
+  });
+
+  it("DELETE mailbox resumes from an existing deletion manifest", async () => {
+    const bucket = mockBucket();
+    bucket._store.set("mailboxes/alice@example.com.json", JSON.stringify({}));
+    bucket._store.set(
+      "deletions/alice%40example.com.json",
+      JSON.stringify({ keys: ["attachments/e1/a1/file.txt"] }),
+    );
+    const stub = mockMailboxStub({ destroy: vi.fn(async () => []) });
+    const env = mockEnv(bucket, stub);
+    const { res } = await requestApp(env, "DELETE", "/api/v1/mailboxes/alice@example.com");
+    expect(res.status).toBe(204);
+    expect(stub.listAttachmentKeys).not.toHaveBeenCalled();
+    expect(bucket.delete).toHaveBeenCalledWith(["attachments/e1/a1/file.txt"]);
   });
 
   it("DELETE mailbox wipes the DO even when no blobs exist", async () => {

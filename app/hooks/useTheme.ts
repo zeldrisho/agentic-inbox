@@ -5,21 +5,26 @@
 import { useEffect, useState, useCallback } from "react";
 
 export type ThemeMode = "light" | "dark" | "system";
+
 export type ResolvedTheme = "light" | "dark";
 
 const STORAGE_KEY = "kumo-theme-mode";
 
 function getSystemTheme(): ResolvedTheme {
   if (globalThis.window === undefined) return "light";
+
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 function safeGetStoredMode(): ThemeMode {
   if (globalThis.window === undefined) return "system";
+
   try {
     // SAFETY: localStorage.getItem returns string | null; we validate against ThemeMode union on next line before using
     const stored = localStorage.getItem(STORAGE_KEY) as ThemeMode | null;
+
     if (stored === "light" || stored === "dark" || stored === "system") return stored;
+
     return "system";
   } catch {
     return "system";
@@ -28,6 +33,7 @@ function safeGetStoredMode(): ThemeMode {
 
 function safeSetStoredMode(mode: ThemeMode): void {
   if (globalThis.window === undefined) return;
+
   try {
     localStorage.setItem(STORAGE_KEY, mode);
   } catch {
@@ -37,6 +43,7 @@ function safeSetStoredMode(mode: ThemeMode): void {
 
 function resolveTheme(mode: ThemeMode): ResolvedTheme {
   if (mode === "system") return getSystemTheme();
+
   return mode;
 }
 
@@ -83,12 +90,15 @@ export function useTheme() {
   useEffect(() => {
     if (mode !== "system") return;
     const mql = window.matchMedia("(prefers-color-scheme: dark)");
+
     const handler = () => {
       const r = getSystemTheme();
       setResolved(r);
       applyTheme(r);
     };
+
     mql.addEventListener("change", handler);
+
     return () => mql.removeEventListener("change", handler);
   }, [mode]);
 

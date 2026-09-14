@@ -105,9 +105,11 @@ async function getSystemPrompt(
   try {
     const key = `mailboxes/${mailboxId}.json`;
     const obj = await env.BUCKET.get(key);
+
     if (obj) {
       const settings = await obj.json<{ agentSystemPrompt?: string }>();
       const prompt = settings.agentSystemPrompt?.trim();
+
       if (prompt) {
         // If custom prompt is set and we're in auto-draft mode, adapt it
         if (autoDraftMode) {
@@ -121,6 +123,7 @@ async function getSystemPrompt(
               "Draft replies automatically when triggered by new emails.",
             );
         }
+
         return prompt;
       }
     }
@@ -138,6 +141,7 @@ async function getSystemPrompt(
       "Draft replies automatically when triggered by new emails.",
     );
   }
+
   return DEFAULT_SYSTEM_PROMPT;
 }
 
@@ -151,14 +155,17 @@ async function getAgentModel(env: Env, mailboxId: string): Promise<string> {
   try {
     const key = `mailboxes/${mailboxId}.json`;
     const obj = await env.BUCKET.get(key);
+
     if (obj) {
       const settings = await obj.json<{ agentModel?: string }>();
       const m = settings.agentModel?.trim();
+
       if (m) return m;
     }
   } catch {
     // fall through
   }
+
   return DEFAULT_AGENT_MODEL;
 }
 
@@ -172,14 +179,18 @@ async function isAutoDraftEnabled(env: Env, mailboxId: string): Promise<boolean>
   try {
     const key = `mailboxes/${mailboxId}.json`;
     const obj = await env.BUCKET.get(key);
+
     if (obj) {
       const settings = await obj.json<{ agentAutoDraft?: boolean }>();
+
       if (settings.agentAutoDraft === true) return true;
+
       if (settings.agentAutoDraft === false) return false;
     }
   } catch {
     // fall through
   }
+
   return false;
 }
 
@@ -192,6 +203,7 @@ async function isAutoDraftEnabled(env: Env, mailboxId: string): Promise<boolean>
 function resolveModelWithFallback(primaryId: string) {
   const primary = primaryId === AUTOROUTE_SENTINEL ? DEFAULT_AGENT_MODEL : primaryId;
   const fallbacks = [...AUTOROUTE_FALLBACKS].filter((m) => m !== primary);
+
   return { primary, fallbacks };
 }
 
@@ -343,6 +355,7 @@ export class EmailAgent extends AIChatAgent<Env> {
     const systemPrompt = await getSystemPrompt(env, mailboxId);
     const modelId = await getAgentModel(env, mailboxId);
     const { primary, fallbacks } = resolveModelWithFallback(modelId);
+
     const model = workersai(primary, {
       fallback: { mode: "client", models: fallbacks },
     });
@@ -365,6 +378,7 @@ export class EmailAgent extends AIChatAgent<Env> {
    */
   async onRequest(request: Request): Promise<Response> {
     const url = new URL(request.url);
+
     if (url.pathname === "/onNewEmail" && request.method === "POST") {
       try {
         // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
@@ -375,13 +389,16 @@ export class EmailAgent extends AIChatAgent<Env> {
           subject: string;
           threadId: string;
         };
+
         const result = await this.handleNewEmail(emailData);
+
         return new Response(JSON.stringify(result), {
           headers: { "Content-Type": "application/json" },
         });
       } catch (e) {
         // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
         console.error("onNewEmail handler failed:", (e as Error).message);
+
         // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
         return new Response(JSON.stringify({ error: (e as Error).message }), {
           status: 500,
@@ -389,6 +406,7 @@ export class EmailAgent extends AIChatAgent<Env> {
         });
       }
     }
+
     return super.onRequest(request);
   }
 
@@ -404,9 +422,11 @@ export class EmailAgent extends AIChatAgent<Env> {
     threadId: string;
   }) {
     const env = this.env;
+
     if (!(await isAutoDraftEnabled(env, emailData.mailboxId))) {
       return { status: "skipped", reason: "auto_draft_disabled" };
     }
+
     const workersai = createWorkersAI({ binding: env.AI });
     const tools = createEmailTools(env, emailData.mailboxId);
     const systemPrompt = await getSystemPrompt(env, emailData.mailboxId, true);
@@ -417,10 +437,13 @@ export class EmailAgent extends AIChatAgent<Env> {
 
     let emailBody = "";
     let threadContext = "";
+
     try {
       const email = await stub.getEmail(emailData.emailId);
+
       if (email?.body) {
         const isInjection = await isPromptInjection(env.AI, email.body);
+
         if (isInjection) {
           console.warn("Skipping auto-draft due to detected prompt injection:", emailData.emailId);
 
@@ -452,6 +475,7 @@ export class EmailAgent extends AIChatAgent<Env> {
               ],
             },
           ];
+
           await this.persistMessages([...this.messages, ...newMessages]);
 
           return;
@@ -464,11 +488,13 @@ export class EmailAgent extends AIChatAgent<Env> {
       const threadEmails = await stub.getEmails({
         thread_id: emailData.threadId,
       });
+
       if (threadEmails.length > 1) {
         const fullThread = await Promise.all(
           threadEmails.map(async (e) => {
             const full = await stub.getEmail(e.id);
             const text = full?.body ? stripHtmlToText(full.body) : "";
+
             return {
               id: e.id,
               sender: e.sender,
@@ -480,6 +506,7 @@ export class EmailAgent extends AIChatAgent<Env> {
             };
           }),
         );
+
         fullThread.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         threadContext = fullThread
           .map(
@@ -493,11 +520,13 @@ export class EmailAgent extends AIChatAgent<Env> {
         // that gets included in the agent's prompt.
         if (threadContext) {
           const threadInjection = await isPromptInjection(env.AI, threadContext);
+
           if (threadInjection) {
             console.warn(
               "Skipping auto-draft due to prompt injection in thread context:",
               emailData.threadId,
             );
+
             const newMessages = [
               {
                 id: crypto.randomUUID(),
@@ -525,7 +554,9 @@ export class EmailAgent extends AIChatAgent<Env> {
                 ],
               },
             ];
+
             await this.persistMessages([...this.messages, ...newMessages]);
+
             return;
           }
         }
@@ -576,9 +607,11 @@ Based on the email content and thread context above, draft a reply using draft_r
     try {
       const modelId = await getAgentModel(env, emailData.mailboxId);
       const { primary, fallbacks } = resolveModelWithFallback(modelId);
+
       const model = workersai(primary, {
         fallback: { mode: "client", models: fallbacks },
       });
+
       const result = await generateText({
         model,
         system: systemPrompt,
@@ -596,14 +629,17 @@ Based on the email content and thread context above, draft a reply using draft_r
       if (!draftToolCalled && result.text.trim()) {
         // Model generated a draft inline as text -- verify with AI
         const sanitizedText = await verifyDraft(env.AI, result.text.trim());
+
         if (!sanitizedText) {
           // Inline text was entirely agent commentary, skip
         } else {
           const draftId = crypto.randomUUID();
           const draftStub = getMailboxStub(env, emailData.mailboxId);
+
           const reSubject = emailData.subject.startsWith("Re:")
             ? emailData.subject
             : `Re: ${emailData.subject}`;
+
           await draftStub.createEmail(
             Folders.DRAFT,
             {
@@ -667,6 +703,7 @@ Based on the email content and thread context above, draft a reply using draft_r
     } catch (e) {
       // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
       console.error("Auto-draft failed:", (e as Error).message);
+
       // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
       return { status: "error", error: (e as Error).message };
     }

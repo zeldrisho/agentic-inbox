@@ -1,23 +1,26 @@
-# Remaining Work
+# Project Status and Plans
 
-The main implementation work is complete. Keep this file for actionable
-follow-ups only; historical audits and upgrade narratives belong in git history.
+The main implementation work is complete. This document records the current
+browser-test coverage gaps and the maintenance approach for future work.
 
-## Browser E2E
+## Browser E2E coverage
 
-The Playwright suite is in `tests/e2e/send-draft.spec.ts` and currently runs as
-non-blocking CI coverage while it soaks.
+The Playwright suite is in `tests/e2e/send-draft.spec.ts` and runs in CI. It
+currently contains three tests. Six tests or fewer and a runtime under three
+minutes are targets, not enforced requirements.
+The current smoke coverage includes saving a draft, sending an email, and
+switching the agent model.
 
-- [x] E2E is blocking in CI; retain the suite as a small smoke-test gate.
-- [ ] Add reply/forward coverage against a seeded inbound email, including
-      threading and sanitized HTML rendering.
-- [ ] Add mailbox-deletion E2E coverage for the destructive cascade.
+Reply and forward flows are not yet covered against a seeded inbound email.
+Future coverage for these flows should include thread preservation and
+sanitized HTML rendering. Mailbox deletion also needs browser coverage that
+verifies its destructive cascade.
 
-Keep the suite at six tests or fewer and under three minutes. Lower-priority
-folder-move and search flows should be added only if regressions justify them.
+Folder-move and search flows are lower-priority additions. They should be added
+when a regression or other risk justifies expanding the smoke suite.
 
-## Maintenance
+## Dependency maintenance
 
-- Apply patch/minor dependency updates as needed.
-- Stage major upgrades separately and verify peer dependencies, generated types,
-  `vp check`, tests, and build together.
+Patch and minor dependency updates can be applied as needed. Major upgrades
+should be staged separately and verified together with peer dependencies,
+generated types, `vp check`, tests, and the production build.

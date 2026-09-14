@@ -26,6 +26,7 @@ import { formatQuotedDate } from "shared/dates";
 export function getMailboxStub(env: Env, mailboxId: string): MailboxRpc {
   const ns = env.MAILBOX;
   const id = ns.idFromName(mailboxId);
+
   return asMailboxRpc(ns.get(id));
 }
 
@@ -40,10 +41,12 @@ export async function listMailboxes(bucket: R2Bucket): Promise<{ id: string; ema
 
   do {
     const list = await bucket.list({ prefix: "mailboxes/", cursor });
+
     for (const obj of list.objects) {
       const id = obj.key.replace("mailboxes/", "").replace(".json", "");
       result.push({ id, email: id });
     }
+
     cursor = list.truncated ? list.cursor : undefined;
   } while (cursor);
 
@@ -74,6 +77,7 @@ export function validateSender(
   }
 
   const fromDomain = fromEmail.split("@")[1];
+
   if (!fromDomain) {
     throw new SenderValidationError("Invalid sender email address");
   }
@@ -99,6 +103,7 @@ export class SenderValidationError extends Error {
 export function generateMessageId(fromDomain: string) {
   const messageId = crypto.randomUUID();
   const outgoingMessageId = `${messageId}@${fromDomain}`;
+
   return { messageId, outgoingMessageId };
 }
 
@@ -113,6 +118,7 @@ export function generateMessageId(fromDomain: string) {
 export function buildReferencesChain(original: EmailFull) {
   const originalMsgId = original.message_id || original.id;
   let existingRefs: string[] = [];
+
   if (original.email_references) {
     try {
       existingRefs = JSON.parse(original.email_references);
@@ -120,8 +126,10 @@ export function buildReferencesChain(original: EmailFull) {
       // Malformed JSON in email_references — treat as empty
     }
   }
+
   const references = [...existingRefs, originalMsgId].filter(Boolean);
   const threadId = original.thread_id || original.id;
+
   return { originalMsgId, references, threadId };
 }
 
@@ -145,9 +153,11 @@ export function buildThreadingHeaders(
   references: string[],
 ): ThreadingHeaders {
   const headers: ThreadingHeaders = { "In-Reply-To": `<${originalMsgId}>` };
+
   if (references.length > 0) {
     headers.References = references.map((r) => `<${r}>`).join(" ");
   }
+
   return headers;
 }
 
@@ -161,8 +171,10 @@ export function buildThreadingHeaders(
 export async function resolveOriginalEmail(stub: MailboxRpc, email: EmailFull): Promise<EmailFull> {
   if (email.folder_id === Folders.DRAFT && email.in_reply_to) {
     const realOriginal = await stub.getEmail(email.in_reply_to);
+
     if (realOriginal) return realOriginal;
   }
+
   return email;
 }
 
@@ -174,6 +186,7 @@ export async function resolveOriginalEmail(stub: MailboxRpc, email: EmailFull): 
  */
 export function escapeHtml(text: string): string {
   if (!text) return "";
+
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -190,6 +203,7 @@ export function escapeHtml(text: string): string {
 export function textToHtml(text: string): string {
   if (!text) return "";
   const escaped = escapeHtml(text).replace(/\n/g, "<br>");
+
   return `<div style="white-space:pre-wrap">${escaped}</div>`;
 }
 
@@ -208,48 +222,63 @@ export function stripHtmlToText(html: string): string {
   // being fed to the agent (coderabbit review).
   let out = html;
   let lower = out.toLowerCase();
+
   // Remove <style>...</style> blocks
   while (true) {
     const start = lower.indexOf("<style");
+
     if (start === -1) break;
     const endTag = lower.indexOf("</style", start);
+
     if (endTag === -1) {
       out = `${out.slice(0, start)} `;
       lower = out.toLowerCase();
       break;
     }
+
     const endClose = out.indexOf(">", endTag);
+
     if (endClose === -1) {
       out = `${out.slice(0, start)} `;
       lower = out.toLowerCase();
       break;
     }
+
     out = `${out.slice(0, start)} ${out.slice(endClose + 1)}`;
     lower = out.toLowerCase();
   }
+
   // Remove <script>...</script> blocks
   lower = out.toLowerCase();
+
   while (true) {
     const start = lower.indexOf("<script");
+
     if (start === -1) break;
     const endTag = lower.indexOf("</script", start);
+
     if (endTag === -1) {
       out = `${out.slice(0, start)} `;
       lower = out.toLowerCase();
       break;
     }
+
     const endClose = out.indexOf(">", endTag);
+
     if (endClose === -1) {
       out = `${out.slice(0, start)} `;
       lower = out.toLowerCase();
       break;
     }
+
     out = `${out.slice(0, start)} ${out.slice(endClose + 1)}`;
     lower = out.toLowerCase();
   }
+
   // Strip remaining HTML tags via single-char scan (CodeQL-safe; no multi-char regex).
   let result = "";
   let inTag = false;
+
   for (const ch of out) {
     if (ch === "<") {
       inTag = true;
@@ -261,6 +290,7 @@ export function stripHtmlToText(html: string): string {
       result += ch;
     }
   }
+
   return result.replace(/\s+/g, " ").trim();
 }
 
@@ -306,9 +336,11 @@ export function buildQuotedReplyBlock(original: {
  */
 export async function getFullEmail(stub: MailboxRpc, emailId: string) {
   const email = await stub.getEmail(emailId);
+
   if (!email) return null;
 
   const textBody = email.body ? stripHtmlToText(email.body) : "";
+
   return { ...email, body_text: textBody, body_html: email.body };
 }
 
@@ -323,6 +355,7 @@ export async function getFullThread(stub: MailboxRpc, threadId: string) {
 
   const enriched = emails.map((email) => {
     const textBody = email.body ? stripHtmlToText(email.body) : "";
+
     return { ...email, body_text: textBody };
   });
 

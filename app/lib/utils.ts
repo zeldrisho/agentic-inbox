@@ -26,6 +26,7 @@ export function formatBytes(bytes: number, decimals = 1): string {
   const dm = decimals < 0 ? 0 : decimals;
   const sizes = ["B", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
+
   return `${Number.parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 }
 
@@ -47,6 +48,7 @@ export function splitEmailList(value?: string | null): string[] {
  */
 export function toEmailListValue(addresses: string[]): string | string[] | undefined {
   if (addresses.length === 0) return undefined;
+
   return addresses.length === 1 ? addresses[0] : addresses;
 }
 
@@ -65,9 +67,11 @@ export function htmlToPlainText(html: string): string {
     .replace(/<p[^>]*>/gi, "")
     .replace(/<div[^>]*>/gi, "")
     .replace(/<\/div>/gi, "\n");
+
   const sanitized = DOMPurify.sanitize(withLineBreaks, { FORBID_TAGS: ["style", "script"] });
   const div = document.createElement("div");
   div.innerHTML = sanitized;
+
   return (div.textContent || div.innerText || "").trim();
 }
 
@@ -76,6 +80,7 @@ export function htmlToPlainText(html: string): string {
  */
 export function stripHtml(html: string): string {
   const sanitized = DOMPurify.sanitize(html, { ALLOWED_TAGS: [] });
+
   return sanitized.replace(/\s+/g, " ").trim();
 }
 
@@ -112,11 +117,13 @@ export function getSnippetText(snippet?: string | null, maxLength = 100): string
 
   // Sanitize with DOMPurify first (CodeQL-recognized), then fallback regex for stray brackets.
   const sanitized = DOMPurify.sanitize(snippet, { ALLOWED_TAGS: [] });
+
   const clean = decodeHtmlEntities(sanitized.replace(/<[^>]*>?/g, " "))
     .replace(/\s+/g, " ")
     .trim();
 
   if (!clean) return "";
+
   return clean.length > maxLength ? `${clean.slice(0, maxLength)}...` : clean;
 }
 
@@ -128,6 +135,7 @@ export function getSnippetText(snippet?: string | null, maxLength = 100): string
  */
 export function escapeHtml(text: string): string {
   if (!text) return "";
+
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -146,13 +154,16 @@ export function getSignatureBlock(settings?: {
   signature?: { enabled: boolean; text?: string; html?: string };
 }): string {
   const sig = settings?.signature;
+
   if (sig?.enabled && (sig?.html || sig?.text)) {
     // Sanitize HTML signatures with DOMPurify to allow safe formatting
     // (bold, italic, links, etc.) while stripping scripts and event handlers.
     // Text signatures are HTML-escaped since they have no formatting.
     const content = sig.html ? DOMPurify.sanitize(sig.html) : escapeHtml(sig.text || "");
+
     return `<div style="border-top: 1px solid #ccc; margin-top: 16px; padding-top: 12px;">${content}</div>`;
   }
+
   return "";
 }
 
@@ -202,10 +213,12 @@ function replaceAllCaseInsensitive(haystack: string, needle: string, replacement
   let out = "";
   let idx = 0;
   let pos: number;
+
   while ((pos = lowerHay.indexOf(lowerNeedle, idx)) !== -1) {
     out += haystack.slice(idx, pos) + replacement;
     idx = pos + needle.length;
   }
+
   return out + haystack.slice(idx);
 }
 
@@ -226,6 +239,7 @@ export function rewriteInlineImages(
 ): string {
   if (!body || !attachments?.length) return body;
   let result = body;
+
   for (const att of attachments) {
     if (att.disposition === "inline" && att.content_id) {
       const url = `/api/v1/mailboxes/${mailboxId}/emails/${emailId}/attachments/${att.id}`;
@@ -234,6 +248,7 @@ export function rewriteInlineImages(
       result = replaceAllCaseInsensitive(result, `cid:${cid}`, url);
     }
   }
+
   return result;
 }
 

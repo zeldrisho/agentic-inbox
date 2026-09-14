@@ -34,6 +34,7 @@ function makeQueryClient() {
           if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
             return false;
           }
+
           return failureCount < 2;
         },
       },
@@ -51,6 +52,7 @@ function makeQueryClient() {
 // Lazy singleton for the browser — avoids module-scope instantiation that
 // leaks cache across SSR requests.
 let browserQueryClient: QueryClient | undefined;
+
 /**
  * Provides the query client for the current rendering environment.
  *
@@ -61,8 +63,10 @@ function getQueryClient() {
     // SSR: always create a fresh client per request to prevent cross-user cache leaks
     return makeQueryClient();
   }
+
   // Browser: reuse the same client across navigations
   if (!browserQueryClient) browserQueryClient = makeQueryClient();
+
   return browserQueryClient;
 }
 
@@ -73,6 +77,7 @@ const KumoLink = forwardRef<
   if (href && !href.startsWith("http")) {
     return <RouterLink to={href} ref={ref} {...props} />;
   }
+
   return <a href={href} ref={ref} {...props} />;
 });
 
@@ -123,6 +128,7 @@ export default function App() {
   // Use useState to ensure each SSR request gets a fresh client while the
   // browser reuses the same singleton across navigations.
   const [queryClient] = useState(getQueryClient);
+
   return (
     <QueryClientProvider client={queryClient}>
       <LinkProvider component={KumoLink}>
@@ -149,6 +155,7 @@ export function ErrorBoundary({ error }: { error: unknown }) {
 
   if (isRouteErrorResponse(error)) {
     status = error.status;
+
     if (error.status === 404) {
       title = "Page not found";
       description = "The page you're looking for doesn't exist or has been moved.";

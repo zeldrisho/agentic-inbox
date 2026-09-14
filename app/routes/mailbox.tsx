@@ -23,6 +23,7 @@ export default function MailboxRoute() {
   const prevMailboxIdRef = useRef<string | undefined>(undefined);
   const agentPanelRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
+
   const {
     isSidebarOpen,
     closeSidebar,
@@ -46,10 +47,13 @@ export default function MailboxRoute() {
   useEffect(() => {
     if (!isAgentPanelOpen) return;
     const isMobile = () => window.innerWidth < 1024; // lg breakpoint
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isMobile()) toggleAgentPanel();
     };
+
     window.addEventListener("keydown", onKeyDown);
+
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isAgentPanelOpen, toggleAgentPanel]);
 
@@ -61,6 +65,7 @@ export default function MailboxRoute() {
         returnFocusRef.current.focus();
         returnFocusRef.current = null;
       }
+
       return;
     }
 
@@ -78,6 +83,7 @@ export default function MailboxRoute() {
       const focusableElements = agentPanelRef.current.querySelectorAll<HTMLElement>(
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
       );
+
       const firstElement = focusableElements[0];
       const lastElement = focusableElements[focusableElements.length - 1];
 
@@ -91,6 +97,7 @@ export default function MailboxRoute() {
     };
 
     window.addEventListener("keydown", handleTabKey);
+
     return () => window.removeEventListener("keydown", handleTabKey);
   }, [isAgentPanelOpen]);
 

@@ -118,6 +118,7 @@ export function MessageBubble({
       >
         {message.parts.map((part, i) => {
           const key = `${message.id}-part-${i}`;
+
           if (part.type === "text" && part.text.trim()) {
             return (
               <div
@@ -138,12 +139,15 @@ export function MessageBubble({
               </div>
             );
           }
+
           const toolName = getToolNameFromPart(part);
+
           if (toolName) {
             return (
               <ToolCallBadge key={key} toolName={toolName} state={getToolStateFromPart(part)} />
             );
           }
+
           return null;
         })}
         {/* Show action buttons for draft replies */}

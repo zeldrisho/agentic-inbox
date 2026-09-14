@@ -51,11 +51,13 @@ function mcpResult<T>(result: T) {
       isError: true as const,
     };
   }
+
   return mcpText(result);
 }
 
 /** Minimal structural type for MCP tool responses produced by this file. */
 type McpToolContent = { type: "text"; text: string };
+
 type McpToolResult = { content: McpToolContent[]; isError?: boolean };
 
 type ToolFields = Record<string, z.ZodTypeAny>;
@@ -85,11 +87,13 @@ export class EmailMCP extends McpAgent<Env> {
      */
     const verifyMailbox = async (mailboxId: string) => {
       const obj = await env.BUCKET.head(`mailboxes/${mailboxId}.json`);
+
       if (!obj) {
         return mcpError(
           `Mailbox "${mailboxId}" not found. Use list_mailboxes to see available mailboxes.`,
         );
       }
+
       return null;
     };
 
@@ -107,6 +111,7 @@ export class EmailMCP extends McpAgent<Env> {
       handler: (mailboxId: string, args: z.output<z.ZodObject<S>>) => Promise<McpToolResult>,
     ): RegisteredTool => {
       const inputSchema = { mailboxId: MAILBOX_ID_PARAM, ...fields };
+
       // SAFETY: MCP SDK 1.30 narrowed registerTool generics with zod 4; runtime shape is unchanged and covered by integration tests (tests/integration/mcp.test.ts).
       return (
         // SAFETY: widen to any to bridge zod 4 / SDK compat types; handler is validated at runtime.
@@ -119,7 +124,9 @@ export class EmailMCP extends McpAgent<Env> {
             // field and validated by the SDK before the handler runs.
             const mailboxId = rawMailboxId as string;
             const denied = await verifyMailbox(mailboxId);
+
             if (denied) return denied;
+
             // SAFETY: the MCP SDK validated `rawArgs` against `{ mailboxId } & S`, so
             // `rest` satisfies the caller-declared shape S.
             return handler(mailboxId, rest as z.output<z.ZodObject<S>>);
@@ -131,6 +138,7 @@ export class EmailMCP extends McpAgent<Env> {
     // ── list_mailboxes ─────────────────────────────────────────
     this.server.tool("list_mailboxes", "List all available mailboxes", {}, async () => {
       const result = await toolListMailboxes(env);
+
       return mcpText(result);
     });
 
@@ -145,6 +153,7 @@ export class EmailMCP extends McpAgent<Env> {
       },
       async (mailboxId, { folder, limit, page }) => {
         const result = await toolListEmails(env, mailboxId, { folder, limit, page });
+
         return mcpText(result);
       },
     );
@@ -158,12 +167,14 @@ export class EmailMCP extends McpAgent<Env> {
       },
       async (mailboxId, { emailId }) => {
         const result = await toolGetEmail(env, mailboxId, emailId);
+
         if ("error" in result) {
           return {
             content: [{ type: "text" as const, text: "Email not found" }],
             isError: true,
           };
         }
+
         return mcpText(result);
       },
     );
@@ -177,6 +188,7 @@ export class EmailMCP extends McpAgent<Env> {
       },
       async (mailboxId, { threadId }) => {
         const result = await toolGetThread(env, mailboxId, threadId);
+
         return mcpText(result);
       },
     );
@@ -191,6 +203,7 @@ export class EmailMCP extends McpAgent<Env> {
       },
       async (mailboxId, { query, folder }) => {
         const result = await toolSearchEmails(env, mailboxId, { query, folder });
+
         return mcpText(result);
       },
     );
@@ -214,6 +227,7 @@ export class EmailMCP extends McpAgent<Env> {
           isPlainText: false,
           runVerifyDraft: true,
         });
+
         return mcpResult(result);
       },
     );
@@ -242,9 +256,11 @@ export class EmailMCP extends McpAgent<Env> {
           in_reply_to,
           thread_id,
         });
+
         if ("error" in result) {
           return mcpResult(result);
         }
+
         // Map the response to match the original create_draft output shape
         return mcpText({
           status: "draft_created",
@@ -272,6 +288,7 @@ export class EmailMCP extends McpAgent<Env> {
           subject,
           bodyHtml,
         });
+
         if ("error" in result) {
           if (result.error === "Draft not found") {
             return {
@@ -279,8 +296,10 @@ export class EmailMCP extends McpAgent<Env> {
               isError: true,
             };
           }
+
           return mcpResult(result);
         }
+
         return mcpText(result);
       },
     );
@@ -294,6 +313,7 @@ export class EmailMCP extends McpAgent<Env> {
       },
       async (mailboxId, { emailId }) => {
         const result = await toolDeleteEmail(env, mailboxId, emailId);
+
         return mcpResult(result);
       },
     );
@@ -315,6 +335,7 @@ export class EmailMCP extends McpAgent<Env> {
           subject,
           bodyHtml,
         });
+
         if ("error" in result) {
           // Preserve the original MCP error format for send failures
           if (result.error?.startsWith("Failed to send")) {
@@ -323,14 +344,17 @@ export class EmailMCP extends McpAgent<Env> {
               isError: true,
             };
           }
+
           if (result.error === "Original email not found") {
             return {
               content: [{ type: "text" as const, text: "Original email not found" }],
               isError: true,
             };
           }
+
           return mcpResult(result);
         }
+
         return mcpText(result);
       },
     );
@@ -350,6 +374,7 @@ export class EmailMCP extends McpAgent<Env> {
           subject,
           bodyHtml,
         });
+
         if ("error" in result) {
           if (result.error?.startsWith("Failed to send")) {
             return {
@@ -357,8 +382,10 @@ export class EmailMCP extends McpAgent<Env> {
               isError: true,
             };
           }
+
           return mcpResult(result);
         }
+
         return mcpText(result);
       },
     );
@@ -373,6 +400,7 @@ export class EmailMCP extends McpAgent<Env> {
       },
       async (mailboxId, { emailId, read }) => {
         const result = await toolMarkEmailRead(env, mailboxId, emailId, read);
+
         return mcpText(result);
       },
     );
@@ -387,6 +415,7 @@ export class EmailMCP extends McpAgent<Env> {
       },
       async (mailboxId, { emailId, folderId }) => {
         const result = await toolMoveEmail(env, mailboxId, emailId, folderId);
+
         if ("error" in result) {
           return {
             content: [
@@ -398,6 +427,7 @@ export class EmailMCP extends McpAgent<Env> {
             isError: true,
           };
         }
+
         return mcpText(result);
       },
     );

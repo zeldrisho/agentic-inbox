@@ -148,11 +148,13 @@ export class MailboxDO extends DurableObject<Env> {
     const offset = (page - 1) * limit;
 
     const conditions: SQL[] = [];
+
     if (folder) {
       conditions.push(
         sql`${schema.emails.folder_id} = (SELECT id FROM folders WHERE name = ${folder} OR id = ${folder} LIMIT 1)`,
       );
     }
+
     if (thread_id) {
       conditions.push(eq(schema.emails.thread_id, thread_id));
     }
@@ -212,6 +214,7 @@ export class MailboxDO extends DurableObject<Env> {
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
     // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     const row = [
       ...this.ctx.storage.sql.exec(`SELECT COUNT(*) as total FROM emails ${where}`, ...params),
@@ -289,6 +292,7 @@ export class MailboxDO extends DurableObject<Env> {
       );
 
       const rows = [...result];
+
       return rows.map((row: any) => ({
         ...row,
         read: !!row.read,
@@ -387,6 +391,7 @@ export class MailboxDO extends DurableObject<Env> {
     );
 
     const rows = [...result];
+
     return rows.map((row: any) => ({
       ...row,
       read: !!row.read,
@@ -416,6 +421,7 @@ export class MailboxDO extends DurableObject<Env> {
           folder,
         ),
       ][0] as { total: number } | undefined;
+
       return row?.total ?? 0;
     }
 
@@ -447,6 +453,7 @@ export class MailboxDO extends DurableObject<Env> {
         folder,
       ),
     ][0] as { total: number } | undefined;
+
     return row?.total ?? 0;
   }
 
@@ -492,6 +499,7 @@ export class MailboxDO extends DurableObject<Env> {
 
     // Batch-fetch all attachments for the thread in a single query
     const placeholders = emailIds.map((_, i) => `?${i + 1}`).join(",");
+
     // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     const attachmentRows = [
       ...this.ctx.storage.sql.exec(
@@ -502,6 +510,7 @@ export class MailboxDO extends DurableObject<Env> {
 
     // Group attachments by email_id
     const attachmentsByEmail = new Map<string, any[]>();
+
     for (const att of attachmentRows) {
       const list = attachmentsByEmail.get(att.email_id) || [];
       list.push(att);
@@ -518,9 +527,11 @@ export class MailboxDO extends DurableObject<Env> {
 
   async updateEmail(id: string, { read, starred }: { read?: boolean; starred?: boolean }) {
     const data: EmailUpdateData = {};
+
     if (read !== undefined) {
       data.read = read ? 1 : 0;
     }
+
     if (starred !== undefined) {
       data.starred = starred ? 1 : 0;
     }
@@ -540,17 +551,21 @@ export class MailboxDO extends DurableObject<Env> {
       .from(schema.emails)
       .where(eq(schema.emails.id, draftId))
       .get();
+
     const draftFolder = this.db
       .select({ id: schema.folders.id })
       .from(schema.folders)
       .where(or(eq(schema.folders.id, Folders.DRAFT), eq(schema.folders.name, Folders.DRAFT)))
       .get();
+
     if (!existing || !draftFolder || existing.folder_id !== draftFolder.id) return false;
+
     const targetFolder = this.db
       .select({ id: schema.folders.id })
       .from(schema.folders)
       .where(or(eq(schema.folders.id, folder), eq(schema.folders.name, folder)))
       .get();
+
     if (!targetFolder) throw new Error(`replaceDraft: folder "${folder}" not found`);
     this.ctx.storage.transactionSync(() => {
       this.db.delete(schema.emails).where(eq(schema.emails.id, draftId)).run();
@@ -578,6 +593,7 @@ export class MailboxDO extends DurableObject<Env> {
         })
         .run();
     });
+
     return true;
   }
 
@@ -610,6 +626,7 @@ export class MailboxDO extends DurableObject<Env> {
       `UPDATE emails SET read = 1 WHERE thread_id = ? AND read = 0`,
       threadId,
     );
+
     return { threadId, markedRead: true };
   }
 
@@ -658,6 +675,7 @@ export class MailboxDO extends DurableObject<Env> {
       .leftJoin(schema.emails, eq(schema.emails.folder_id, schema.folders.id))
       .groupBy(schema.folders.id, schema.folders.name)
       .all();
+
     return result;
   }
 
@@ -668,11 +686,13 @@ export class MailboxDO extends DurableObject<Env> {
         .values({ id, name, is_deletable })
         .returning({ id: schema.folders.id, name: schema.folders.name })
         .get();
+
       return { ...result, unreadCount: 0 };
     } catch (e: unknown) {
       if (e instanceof Error && e.message.includes("UNIQUE constraint failed")) {
         return null;
       }
+
       throw e;
     }
   }
@@ -684,6 +704,7 @@ export class MailboxDO extends DurableObject<Env> {
       .where(eq(schema.folders.id, id))
       .returning({ id: schema.folders.id, name: schema.folders.name })
       .get();
+
     return result;
   }
 
@@ -740,6 +761,7 @@ export class MailboxDO extends DurableObject<Env> {
       is_starred,
       has_attachment,
     } = options;
+
     const prefix = tableAlias ? `${tableAlias}.` : "";
     const conditions: string[] = [];
     const params: (string | number)[] = [];
@@ -748,6 +770,7 @@ export class MailboxDO extends DurableObject<Env> {
     const addParam = (value: string | number) => {
       paramIdx++;
       params.push(value);
+
       return `?${paramIdx}`;
     };
 
@@ -760,42 +783,51 @@ export class MailboxDO extends DurableObject<Env> {
         `(${prefix}subject LIKE ${p1} OR ${prefix}body LIKE ${p2} OR ${prefix}sender LIKE ${p3} OR ${prefix}recipient LIKE ${p4} OR ${prefix}cc LIKE ${p4} OR ${prefix}bcc LIKE ${p4})`,
       );
     }
+
     if (folder) {
       const p = addParam(folder);
       conditions.push(
         `${prefix}folder_id = (SELECT id FROM folders WHERE name = ${p} OR id = ${p} LIMIT 1)`,
       );
     }
+
     if (from) {
       const p = addParam(`%${from}%`);
       conditions.push(`${prefix}sender LIKE ${p}`);
     }
+
     if (to) {
       const p = addParam(`%${to}%`);
       conditions.push(
         `(${prefix}recipient LIKE ${p} OR ${prefix}cc LIKE ${p} OR ${prefix}bcc LIKE ${p})`,
       );
     }
+
     if (subject) {
       const p = addParam(`%${subject}%`);
       conditions.push(`${prefix}subject LIKE ${p}`);
     }
+
     if (date_start) {
       const p = addParam(date_start);
       conditions.push(`${prefix}date >= ${p}`);
     }
+
     if (date_end) {
       const p = addParam(date_end);
       conditions.push(`${prefix}date <= ${p}`);
     }
+
     if (is_read !== undefined) {
       const p = addParam(is_read ? 1 : 0);
       conditions.push(`${prefix}read = ${p}`);
     }
+
     if (is_starred !== undefined) {
       const p = addParam(is_starred ? 1 : 0);
       conditions.push(`${prefix}starred = ${p}`);
     }
+
     if (has_attachment) {
       conditions.push(`${prefix}id IN (SELECT DISTINCT email_id FROM attachments)`);
     }
@@ -821,9 +853,11 @@ export class MailboxDO extends DurableObject<Env> {
 			LEFT JOIN folders f ON e.folder_id = f.id
 			${where}
 			ORDER BY e.date DESC LIMIT ?${params.length + 1} OFFSET ?${params.length + 2}`;
+
     params.push(limit, offset);
 
     const result = this.ctx.storage.sql.exec(query, ...params);
+
     return [...result].map((row: any) => ({
       ...row,
       read: !!row.read,
@@ -844,6 +878,7 @@ export class MailboxDO extends DurableObject<Env> {
     const row = [...this.ctx.storage.sql.exec(query, ...params)][0] as
       | { total: number }
       | undefined;
+
     return row?.total ?? 0;
   }
 
@@ -878,6 +913,7 @@ export class MailboxDO extends DurableObject<Env> {
         .replace(/^(?:(?:re|fwd?|fw|aw|wg|r[eé]f|sv)\s*:\s*)+/i, "")
         .trim()
         .toLowerCase();
+
       if (rowSubject !== normalized) continue;
 
       if (normalizedSender) {
@@ -886,6 +922,7 @@ export class MailboxDO extends DurableObject<Env> {
         // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
         const threadRecipients = String((row as any).recipients || "");
         const allParticipants = `${threadSenders},${threadRecipients}`;
+
         if (!allParticipants.includes(normalizedSender)) {
           continue;
         }
@@ -894,6 +931,7 @@ export class MailboxDO extends DurableObject<Env> {
       // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
       return String((row as any).thread_id);
     }
+
     return null;
   }
 
@@ -1008,6 +1046,7 @@ export class MailboxDO extends DurableObject<Env> {
     attachments: AttachmentData[];
   } | null> {
     const lower = recipient.toLowerCase().trim();
+
     if (!lower) return null;
 
     const rows = this.db
@@ -1025,9 +1064,11 @@ export class MailboxDO extends DurableObject<Env> {
         .map((s) => s.trim())
         .includes(lower),
     );
+
     if (matched.length === 0) return null;
 
     const ids = matched.map((m) => m.id);
+
     const attRows = this.db
       .select()
       .from(schema.attachments)

@@ -2,18 +2,22 @@ allowBuilds:
   core-js-pure: true
   esbuild: true
   workerd: true
+catalog:
+  vite: npm:@voidzero-dev/vite-plus-core@0.3.1
+  vite-plus: 0.3.1
 minimumReleaseAgeExclude:
-  - "@voidzero-dev/vite-plus-core@0.3.0"
-  - "@voidzero-dev/vite-plus-darwin-arm64@0.3.0"
-  - "@voidzero-dev/vite-plus-darwin-x64@0.3.0"
-  - "@voidzero-dev/vite-plus-linux-arm64-gnu@0.3.0"
-  - "@voidzero-dev/vite-plus-linux-arm64-musl@0.3.0"
-  - "@voidzero-dev/vite-plus-linux-x64-gnu@0.3.0"
-  - "@voidzero-dev/vite-plus-linux-x64-musl@0.3.0"
-  - "@voidzero-dev/vite-plus-win32-arm64-msvc@0.3.0"
-  - "@voidzero-dev/vite-plus-win32-x64-msvc@0.3.0"
-  - vite-plus@0.3.0
+  - "@voidzero-dev/vite-plus-core@0.3.1"
+  - "@voidzero-dev/vite-plus-darwin-arm64@0.3.1"
+  - "@voidzero-dev/vite-plus-darwin-x64@0.3.1"
+  - "@voidzero-dev/vite-plus-linux-arm64-gnu@0.3.1"
+  - "@voidzero-dev/vite-plus-linux-arm64-musl@0.3.1"
+  - "@voidzero-dev/vite-plus-linux-x64-gnu@0.3.1"
+  - "@voidzero-dev/vite-plus-linux-x64-musl@0.3.1"
+  - "@voidzero-dev/vite-plus-win32-arm64-msvc@0.3.1"
+  - "@voidzero-dev/vite-plus-win32-x64-msvc@0.3.1"
+  - vite-plus@0.3.1
 overrides:
+  vite@*: "catalog:"
   "@cloudflare/kumo>zod": "^3.25.76"
   "@tiptap/core": "3.20.2"
   "@tiptap/extension-blockquote": "3.20.2"

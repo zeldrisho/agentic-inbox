@@ -4,13 +4,13 @@
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
-    "build": "react-router build",
-    "cf-typegen": "pnpm exec wrangler types",
-    "deploy": "pnpm run build && pnpm exec wrangler deploy",
-    "test:e2e": "playwright test",
-    "dev": "react-router dev",
+    "build": "vp exec react-router build",
+    "cf-typegen": "vp exec wrangler types",
+    "deploy": "vp run build && vp exec wrangler deploy",
+    "test:e2e": "vp exec playwright test",
+    "dev": "vp exec react-router dev",
     "preview": "vp run build && vp preview",
-    "typecheck": "vp run cf-typegen && react-router typegen && tsc -b",
+    "typecheck": "vp run cf-typegen && vp exec react-router typegen && tsc -b",
     "prepare": "vp config"
   },
   "dependencies": {
@@ -48,7 +48,7 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.53.1",
     "@cloudflare/workers-types": "^4.20251128.0",
-    "@oxlint/plugins": "1.79.0",
+    "@oxlint/plugins": "1.81.0",
     "@playwright/test": "^1.62.1",
     "@react-router/dev": "^8.3.0",
     "@tailwindcss/vite": "^4.3.3",
@@ -61,16 +61,16 @@
     "@vitest/coverage-v8": "4.1.11",
     "jsdom": "^26.0.0",
     "tailwindcss": "^4.1.4",
-    "typescript": "^5.8.3",
-    "vite": "npm:@voidzero-dev/vite-plus-core@0.3.0",
-    "vite-plus": "0.3.0",
+    "typescript": "~6.0.2",
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
     "vite-tsconfig-paths": "^5.1.4",
     "wrangler": "^4.125.0"
   },
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
-      "version": "11.22.0",
+      "version": "12.4.1",
       "onFail": "download"
     }
   },

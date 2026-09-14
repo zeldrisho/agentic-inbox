@@ -26,9 +26,11 @@ export default function EmailIframe({ body, autoSize }: EmailIframeProps) {
   const handleMessage = useCallback(
     (event: MessageEvent) => {
       if (!autoSize) return;
+
       // Only accept messages from our own iframe
       if (event.source !== iframeRef.current?.contentWindow) return;
       const data = event.data;
+
       if (data && data.__emailIframeHeight && Number.isFinite(data.height) && data.height > 0) {
         setHeight(data.height);
       }
@@ -38,11 +40,13 @@ export default function EmailIframe({ body, autoSize }: EmailIframeProps) {
 
   useEffect(() => {
     window.addEventListener("message", handleMessage);
+
     return () => window.removeEventListener("message", handleMessage);
   }, [handleMessage]);
 
   useEffect(() => {
     const iframe = iframeRef.current;
+
     if (!iframe || !body) return;
 
     const cleanBody = DOMPurify.sanitize(body, {

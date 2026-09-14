@@ -32,7 +32,9 @@ type AgentPart = UIMessage["parts"][number];
  */
 export function getToolNameFromPart(part: AgentPart): string | null {
   if (isDynamicToolUIPart(part)) return part.toolName;
+
   if (part.type.startsWith("tool-")) return part.type.replace("tool-", "");
+
   return null;
 }
 
@@ -45,6 +47,7 @@ export function getToolNameFromPart(part: AgentPart): string | null {
  */
 export function getToolStateFromPart(part: AgentPart): string {
   if (isDynamicToolUIPart(part)) return part.state;
+
   // Static `tool-<name>` parts are a discriminated union with a `state`
   // member; the fallback covers exotic/older stream shapes.
   return "state" in part && part.state ? String(part.state) : "running";
@@ -68,13 +71,17 @@ export function hasDraftReplyTool(message: UIMessage): boolean {
 export function extractDraftReplyResult(message: UIMessage): DraftReplyResult | null {
   for (const part of message.parts) {
     if (getToolNameFromPart(part) !== "draft_reply") continue;
+
     // SAFETY: the streamed result field is named `output` per the AI SDK types
     // but older stream chunks carry it as `result`; accept either shape.
     const output =
       (part as { output?: DraftReplyResult }).output ??
       (part as { result?: DraftReplyResult }).result;
+
     if (!output || !("to" in output || "subject" in output || "body" in output)) continue;
+
     return output;
   }
+
   return null;
 }

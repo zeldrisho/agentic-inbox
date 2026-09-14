@@ -70,7 +70,7 @@ Additional setup: `npx wrangler secret put DOMAINS` and `wrangler r2 bucket crea
 | Architecture and security | [`docs/architecture.md`](docs/architecture.md) |
 | REST API                  | [`docs/api.md`](docs/api.md)                   |
 | Testing                   | [`docs/testing.md`](docs/testing.md)           |
-| Remaining work            | [`docs/plan.md`](docs/plan.md)                 |
+| Project status and plans  | [`docs/plan.md`](docs/plan.md)                 |
 
 ## License
 

@@ -30,12 +30,14 @@ function getSourceHeaders(msg: Email): { key: string; value: string }[] {
   if (msg.raw_headers) {
     try {
       const parsed = JSON.parse(msg.raw_headers);
+
       if (Array.isArray(parsed)) {
         return parsed.map((header) => ({
           key: header.key || header.name || "",
           value: String(header.value || ""),
         }));
       }
+
       if (parsed instanceof Object) {
         return Object.entries(parsed).map(([key, value]) => ({
           key,
@@ -48,18 +50,29 @@ function getSourceHeaders(msg: Email): { key: string; value: string }[] {
   }
 
   const headers: { key: string; value: string }[] = [];
+
   if (msg.sender) headers.push({ key: "From", value: msg.sender });
+
   if (msg.recipient) headers.push({ key: "To", value: msg.recipient });
+
   if (msg.cc) headers.push({ key: "Cc", value: msg.cc });
+
   if (msg.bcc) headers.push({ key: "Bcc", value: msg.bcc });
+
   if (msg.subject) headers.push({ key: "Subject", value: msg.subject });
+
   if (msg.date) headers.push({ key: "Date", value: msg.date });
+
   if (msg.message_id) headers.push({ key: "Message-ID", value: msg.message_id });
+
   if (msg.in_reply_to) headers.push({ key: "In-Reply-To", value: msg.in_reply_to });
+
   if (msg.email_references) {
     headers.push({ key: "References", value: msg.email_references });
   }
+
   if (msg.thread_id) headers.push({ key: "X-Thread-ID", value: msg.thread_id });
+
   return headers;
 }
 

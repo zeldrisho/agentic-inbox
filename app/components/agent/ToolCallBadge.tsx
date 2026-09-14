@@ -67,6 +67,7 @@ export function ToolCallBadge({ toolName, state }: { toolName: string; state: st
     label: toolName,
     icon: <WrenchIcon size={14} weight="bold" />,
   };
+
   const isDone = state === "output-available" || state === "result" || state === "output-error";
   const isError = state === "output-error";
 

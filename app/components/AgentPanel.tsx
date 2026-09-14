@@ -62,10 +62,12 @@ function AgentChatConnected({
   const updateMailbox = useUpdateMailbox();
   const toastManager = useKumoToastManager();
   const currentModel = mailbox?.settings?.agentModel || AUTOROUTE_SENTINEL;
+
   const modelLabel =
     currentModel === AUTOROUTE_SENTINEL
       ? "autoroute"
       : currentModel.split("/").pop() || currentModel;
+
   const [models, setModels] = useState<ModelOption[]>(() =>
     FALLBACK_MODELS.map((id) => ({
       id,
@@ -74,6 +76,7 @@ function AgentChatConnected({
       functionCalling: true,
     })),
   );
+
   const [isRefreshingModels, setIsRefreshingModels] = useState(false);
   const [isSwitchingModel, setIsSwitchingModel] = useState(false);
 
@@ -83,6 +86,7 @@ function AgentChatConnected({
 
   useEffect(() => {
     const el = scrollRef.current;
+
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
@@ -92,12 +96,15 @@ function AgentChatConnected({
 
   const fetchModels = async (refresh = false) => {
     setIsRefreshingModels(true);
+
     try {
       const url = refresh ? "/api/v1/models?refresh=1" : "/api/v1/models";
       const res = await fetch(url);
+
       if (!res.ok) throw new Error(String(res.status));
       // SAFETY: same-origin JSON, shape validated below
       const data = (await res.json()) as { models: ModelOption[]; warning?: string };
+
       if (Array.isArray(data.models) && data.models.length > 0) setModels(data.models);
     } catch {
       // keep fallback
@@ -113,12 +120,14 @@ function AgentChatConnected({
   const handleModelChange = async (next: string) => {
     if (!mailbox || next === currentModel || isSwitchingModel) return;
     setIsSwitchingModel(true);
+
     try {
       // eslint-disable-next-line unicorn/no-useless-fallback-in-spread
       const nextSettings: MailboxSettings = {
         ...mailbox.settings,
         agentModel: next,
       };
+
       await updateMailbox.mutateAsync({
         mailboxId,
         settings: nextSettings,
@@ -133,9 +142,11 @@ function AgentChatConnected({
 
   const handleSend = () => {
     const text = inputValue.trim();
+
     if (!text || isStreaming) return;
     setInputValue("");
     void sendMessage({ text });
+
     if (inputRef.current) inputRef.current.style.height = "auto";
   };
 
@@ -348,12 +359,15 @@ function AgentChatConnected({
    */
   function editDraftInComposer(msg: UIMessage) {
     const draftData = extractDraftReplyResult(msg);
+
     if (!draftData) {
       void sendMessage({
         text: "Let me edit this draft first. Show me what you have so I can modify it.",
       });
+
       return;
     }
+
     startCompose({
       mode: "reply",
       originalEmail: null,
@@ -373,6 +387,7 @@ function AgentChatConnected({
 
 export default function AgentPanel() {
   const { mailboxId } = useParams<{ mailboxId: string }>();
+
   const [hooks, setHooks] = useState<{
     useAgent: typeof import("agents/react").useAgent;
     useAgentChat: typeof import("@cloudflare/ai-chat/react").useAgentChat;

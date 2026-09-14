@@ -41,6 +41,7 @@ export async function handleReplyEmail(c: AppContext) {
   const { originalMsgId, references, threadId: thread_id } = buildReferencesChain(originalEmail);
 
   let toStr: string, fromEmail: string, fromDomain: string;
+
   try {
     ({ toStr, fromEmail, fromDomain } = validateSender(to, from, mailboxId));
   } catch (e) {
@@ -51,6 +52,7 @@ export async function handleReplyEmail(c: AppContext) {
   const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
 
   const rateLimitError = await stub.checkSendRateLimit();
+
   if (rateLimitError) {
     return c.json({ error: rateLimitError }, 429);
   }
@@ -134,6 +136,7 @@ export async function handleForwardEmail(c: AppContext) {
   await resolveOriginalEmail(stub, rawOriginal);
 
   let toStr: string, fromEmail: string, fromDomain: string;
+
   try {
     ({ toStr, fromEmail, fromDomain } = validateSender(to, from, mailboxId));
   } catch (e) {
@@ -144,6 +147,7 @@ export async function handleForwardEmail(c: AppContext) {
   const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
 
   const rateLimitError = await stub.checkSendRateLimit();
+
   if (rateLimitError) {
     return c.json({ error: rateLimitError }, 429);
   }

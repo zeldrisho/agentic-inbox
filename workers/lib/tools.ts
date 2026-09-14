@@ -54,6 +54,7 @@ export async function toolListEmails(
   params: { folder: string; limit: number; page: number },
 ) {
   const stub = getMailboxStub(env, mailboxId);
+
   return stub.getEmails({
     folder: params.folder,
     limit: params.limit,
@@ -74,7 +75,9 @@ export async function toolListEmails(
 export async function toolGetEmail(env: Env, mailboxId: string, emailId: string) {
   const stub = getMailboxStub(env, mailboxId);
   const email = await getFullEmail(stub, emailId);
+
   if (!email) return { error: "Email not found" };
+
   return email;
 }
 
@@ -88,6 +91,7 @@ export async function toolGetEmail(env: Env, mailboxId: string, emailId: string)
 
 export async function toolGetThread(env: Env, mailboxId: string, threadId: string) {
   const stub = getMailboxStub(env, mailboxId);
+
   return getFullThread(stub, threadId);
 }
 
@@ -105,6 +109,7 @@ export async function toolSearchEmails(
   params: { query: string; folder?: string },
 ) {
   const stub = getMailboxStub(env, mailboxId);
+
   return stub.searchEmails({
     query: params.query,
     folder: params.folder,
@@ -146,11 +151,14 @@ export async function toolDraftReply(
 
   // Verify/sanitize if requested
   let processedBody = params.body.trim();
+
   if (params.runVerifyDraft) {
     const sanitized = await verifyDraft(env.AI, processedBody);
+
     if (!sanitized) {
       return { error: "Draft verification failed — body could not be verified. Please try again." };
     }
+
     processedBody = sanitized;
   }
 
@@ -174,6 +182,7 @@ export async function toolDraftReply(
         body: original.body ?? undefined,
       })
     : "";
+
   const bodyHtml = processedBody + quotedBlock;
 
   await stub.createEmail(
@@ -240,11 +249,14 @@ export async function toolDraftEmail(
   const stub = getMailboxStub(env, mailboxId);
 
   let processedBody = params.body.trim();
+
   if (params.runVerifyDraft) {
     const sanitized = await verifyDraft(env.AI, processedBody);
+
     if (!sanitized) {
       return { error: "Draft verification failed — body could not be verified. Please try again." };
     }
+
     processedBody = sanitized;
   }
 
@@ -256,11 +268,13 @@ export async function toolDraftEmail(
 
   // Resolve thread ID
   let resolvedThreadId = params.thread_id;
+
   if (!resolvedThreadId && params.in_reply_to) {
     // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     const original = await stub.getEmail(params.in_reply_to);
     resolvedThreadId = original?.thread_id || params.in_reply_to;
   }
+
   if (!resolvedThreadId) {
     resolvedThreadId = draftId;
   }
@@ -318,6 +332,7 @@ export async function toolUpdateDraft(
 
   // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
   const oldDraft = await stub.getEmail(params.draftId);
+
   if (!oldDraft) {
     return { error: "Draft not found" };
   }
@@ -344,6 +359,7 @@ export async function toolUpdateDraft(
     email_references: oldDraft.email_references || null,
     thread_id: oldDraft.thread_id || newDraftId,
   });
+
   if (!replaced) return { error: "Draft not found" };
 
   return {
@@ -370,6 +386,7 @@ export async function toolMarkEmailRead(
 ) {
   const stub = getMailboxStub(env, mailboxId);
   await stub.updateEmail(emailId, { read });
+
   return { status: "updated", emailId, read };
 }
 
@@ -390,9 +407,11 @@ export async function toolMoveEmail(
 ) {
   const stub = getMailboxStub(env, mailboxId);
   const success = await stub.moveEmail(emailId, folderId);
+
   if (success) {
     return { status: "moved", emailId, folder: folderId };
   }
+
   return { error: "Failed to move email" };
 }
 
@@ -407,13 +426,17 @@ export async function toolDiscardDraft(env: Env, mailboxId: string, draftId: str
   const stub = getMailboxStub(env, mailboxId);
   // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
   const email = (await stub.getEmail(draftId)) as { folder_id?: string } | null;
+
   if (!email) {
     return { error: "Draft not found" };
   }
+
   if (email.folder_id !== Folders.DRAFT) {
     return { error: "Cannot discard: email is not a draft" };
   }
+
   await stub.deleteEmail(draftId);
+
   return { status: "discarded", draftId };
 }
 
@@ -428,9 +451,11 @@ export async function toolDiscardDraft(env: Env, mailboxId: string, draftId: str
 export async function toolDeleteEmail(env: Env, mailboxId: string, emailId: string) {
   const stub = getMailboxStub(env, mailboxId);
   const result = await stub.deleteEmail(emailId);
+
   if (result === null) {
     return { error: "Email not found", emailId };
   }
+
   return { status: "deleted", emailId };
 }
 
@@ -457,32 +482,38 @@ export async function toolSendReply(
 
   // Check send rate limit
   const rateLimitError = await stub.checkSendRateLimit();
+
   if (rateLimitError) {
     return { error: rateLimitError };
   }
 
   const originalEmail = await stub.getEmail(params.originalEmailId);
+
   if (!originalEmail) {
     return { error: "Original email not found" };
   }
 
   const { originalMsgId, references, threadId } = buildReferencesChain(originalEmail);
   const fromDomain = mailboxId.split("@")[1];
+
   if (!fromDomain) throw new Error("Invalid mailbox email address");
   const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
 
   // Verify and append quoted original message
   const sanitizedBody = await verifyDraft(env.AI, params.bodyHtml);
+
   if (!sanitizedBody) {
     return {
       error: "Draft verification failed — refusing to send unverified content. Please try again.",
     };
   }
+
   const quotedBlock = buildQuotedReplyBlock({
     date: originalEmail.date,
     sender: originalEmail.sender || params.to,
     body: originalEmail.body ?? undefined,
   });
+
   const fullBodyHtml = sanitizedBody + quotedBlock;
 
   try {
@@ -496,6 +527,7 @@ export async function toolSendReply(
   } catch (e) {
     // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     console.error("Email send failed:", (e as Error).message);
+
     // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     return { error: `Failed to send reply: ${(e as Error).message}` };
   }
@@ -542,15 +574,18 @@ export async function toolSendEmail(
 
   // Check send rate limit
   const rateLimitError = await stub.checkSendRateLimit();
+
   if (rateLimitError) {
     return { error: rateLimitError };
   }
 
   const fromDomain = mailboxId.split("@")[1];
+
   if (!fromDomain) throw new Error("Invalid mailbox email address");
   const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
 
   const sanitizedBody = await verifyDraft(env.AI, params.bodyHtml);
+
   if (!sanitizedBody) {
     return {
       error: "Draft verification failed — refusing to send unverified content. Please try again.",
@@ -567,6 +602,7 @@ export async function toolSendEmail(
   } catch (e) {
     // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     console.error("Email send failed:", (e as Error).message);
+
     // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
     return { error: `Failed to send email: ${(e as Error).message}` };
   }

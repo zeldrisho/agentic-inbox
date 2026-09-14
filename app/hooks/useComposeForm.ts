@@ -40,9 +40,11 @@ function appendUniqueAddress(
   exclude?: string,
 ) {
   const trimmed = address.trim();
+
   if (!trimmed) return;
 
   const normalized = trimmed.toLowerCase();
+
   if (normalized === exclude || seen.has(normalized)) return;
 
   seen.add(normalized);
@@ -76,6 +78,7 @@ const EMPTY_FIELDS: ComposeFormFields = {
  */
 function getPrefixedSubject(subject: string, prefix: "Re" | "Fwd") {
   const expectedPrefix = `${prefix}: `;
+
   return subject.startsWith(expectedPrefix) ? subject : `${expectedPrefix}${subject}`;
 }
 
@@ -95,6 +98,7 @@ function buildForwardBody(
   const safeBody = escapeHtml(stripHtml(original.body || "")).replace(/\n/g, "<br>");
 
   const raw = `<p><br></p>${sigBlock ? `${sigBlock}<br>` : ""}<div style="border: 1px solid #ddd; padding: 1em; background-color: #f9f9f9; margin: 1em 0;"><strong>Forwarded message:</strong><br><strong>From:</strong> ${safeSender}<br><strong>Date:</strong> ${formatComposeDate(original.date)}<br><strong>Subject:</strong> ${safeSubject}<br><br>${safeBody}</div>`;
+
   // Defense-in-depth: DOMPurify is the final step before the HTML reaches the
   // compose editor, so even a future caller passing unsanitized input stays safe.
   return DOMPurify.sanitize(raw);
@@ -121,11 +125,14 @@ function buildReplyAllFields(
 
   const ccRecipients: string[] = [];
   const ccSeen = new Set<string>();
+
   for (const recipient of splitEmailList(original.cc)) {
     const normalized = recipient.toLowerCase();
+
     if (normalized === selfAddress || toSeen.has(normalized) || ccSeen.has(normalized)) {
       continue;
     }
+
     ccSeen.add(normalized);
     ccRecipients.push(recipient);
   }
@@ -181,6 +188,7 @@ function buildInitialComposeFields(
 
   if (mode === "reply-all") {
     const recipients = buildReplyAllFields(original, mailboxEmail?.toLowerCase());
+
     return {
       ...EMPTY_FIELDS,
       ...recipients,
@@ -233,6 +241,7 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 
   const formTitle = useMemo(() => {
     if (isDraftEdit) return "Edit Draft";
+
     switch (composeOptions.mode) {
       case "reply":
         return "Reply";
@@ -256,6 +265,7 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
       currentMailbox?.email,
       sigBlock,
     );
+
     setError(null);
     setTo(initialFields.to);
     setCc(initialFields.cc);
@@ -269,6 +279,7 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
     if (!mailboxId || isSending) return;
     setIsSavingDraft(true);
     setError(null);
+
     try {
       await saveDraftMutation.mutateAsync({
         mailboxId,
@@ -299,24 +310,33 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
 
   const handleSend = async (e: FormEvent, onClose: () => void) => {
     e.preventDefault();
+
     if (isSending) return;
     setError(null);
+
     if (!currentMailbox || !mailboxId) {
       setError("No mailbox selected.");
+
       return;
     }
+
     const toRecipients = splitEmailList(to);
+
     if (toRecipients.length === 0) {
       setError("Add at least one recipient.");
+
       return;
     }
+
     const ccRecipients = splitEmailList(cc);
     const bccRecipients = splitEmailList(bcc);
     const fromName = currentMailbox.settings?.fromName || currentMailbox.name;
+
     const from =
       fromName && fromName !== currentMailbox.email
         ? { email: currentMailbox.email, name: fromName }
         : currentMailbox.email;
+
     const emailData = {
       to: toEmailListValue(toRecipients) ?? "",
       cc: toEmailListValue(ccRecipients),
@@ -326,17 +346,20 @@ export function useComposeForm(mailboxId?: string, _folder?: string) {
       html: body,
       text: htmlToPlainText(body),
     };
+
     const draftId = composeOptions.draftEmail?.id;
     const mode = composeOptions.mode;
     const originalId = composeOptions.originalEmail?.id || composeOptions.draftEmail?.in_reply_to;
     setIsSending(true);
     toastManager.add({ title: "Sending email..." });
+
     try {
       if ((mode === "reply" || mode === "reply-all") && originalId)
         await replyMutation.mutateAsync({ mailboxId, emailId: originalId, email: emailData });
       else if (mode === "forward" && originalId)
         await forwardMutation.mutateAsync({ mailboxId, emailId: originalId, email: emailData });
       else await sendEmailMutation.mutateAsync({ mailboxId, email: emailData });
+
       if (draftId) deleteEmailMutation.mutate({ mailboxId, id: draftId });
       toastManager.add({ title: "Email sent!" });
       onClose();

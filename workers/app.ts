@@ -11,7 +11,9 @@ import { EmailMCP } from "./mcp";
 import type { Env } from "./types";
 
 export { MailboxDO } from "./durableObject";
+
 export { EmailAgent } from "./agent";
+
 export { EmailMCP } from "./mcp";
 
 export const cloudflareContext = createContext<{ env: Env; ctx: ExecutionContext }>();
@@ -57,6 +59,7 @@ app.use("*", async (c, next) => {
   }
 
   const token = c.req.header("cf-access-jwt-assertion");
+
   if (!token) {
     return c.text("Missing required CF Access JWT", 403);
   }
@@ -80,10 +83,12 @@ app.use("*", async (c, next) => {
 // MCP server endpoint — used by AI coding tools (ProtoAgent, Claude Code, Cursor, etc.)
 // Must be before API routes and React Router catch-all
 const mcpHandler = EmailMCP.serve("/mcp", { binding: "EMAIL_MCP" });
+
 app.all("/mcp", async (c) => {
   // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
   return mcpHandler.fetch(c.req.raw, c.env, c.executionCtx as ExecutionContext);
 });
+
 app.all("/mcp/*", async (c) => {
   // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
   return mcpHandler.fetch(c.req.raw, c.env, c.executionCtx as ExecutionContext);
@@ -95,7 +100,9 @@ app.route("/", apiApp);
 // Agent WebSocket routing - must be before React Router catch-all
 app.all("/agents/*", async (c) => {
   const response = await routeAgentRequest(c.req.raw, c.env);
+
   if (response) return response;
+
   return c.text("Agent not found", 404);
 });
 
@@ -107,6 +114,7 @@ app.all("*", (c) => {
     // SAFETY: Hono's executionCtx is the Cloudflare ExecutionContext at runtime.
     ctx: c.executionCtx as ExecutionContext,
   });
+
   return requestHandler(c.req.raw, provider);
 });
 

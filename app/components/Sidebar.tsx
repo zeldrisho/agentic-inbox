@@ -94,11 +94,13 @@ export default function Sidebar() {
 
   const getUnreadCount = (folderId: string) => {
     const found = folders.find((f) => f.id === folderId);
+
     return found?.unreadCount || 0;
   };
 
   const handleCreateFolder = (e: React.FormEvent) => {
     e.preventDefault();
+
     if (newFolderName.trim() && mailboxId) {
       createFolderMutation.mutate({ mailboxId, name: newFolderName.trim() });
       setNewFolderName("");
@@ -108,13 +110,16 @@ export default function Sidebar() {
 
   const displayName = useMemo(() => {
     if (!currentMailbox) return mailboxId?.split("@")[0] || "Mailbox";
+
     // Prefer settings.fromName > name > local part of email
     if (currentMailbox.settings?.fromName) {
       return currentMailbox.settings.fromName;
     }
+
     if (currentMailbox.name && currentMailbox.name !== currentMailbox.email) {
       return currentMailbox.name;
     }
+
     return currentMailbox.email.split("@")[0] || currentMailbox.name;
   }, [currentMailbox, mailboxId]);
 

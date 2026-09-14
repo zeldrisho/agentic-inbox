@@ -62,5 +62,6 @@ export function getFolderDisplayName(folderId: string): string {
   // SAFETY: folderId arrives as an untrusted API string; only known FolderId keys resolve,
   // and the `??` fallback covers any value outside that closed set.
   const name = FOLDER_DISPLAY_NAMES[folderId.toLowerCase() as FolderId];
+
   return name ?? folderId.charAt(0).toUpperCase() + folderId.slice(1);
 }

@@ -34,13 +34,16 @@ export function useEmails(
     queryKey: mailboxId ? queryKeys.emails.list(mailboxId, queryParams) : ["emails", "_disabled"],
     queryFn: async () => {
       const data = await api.listEmails(mailboxId!, queryParams);
+
       if (data && "emails" in data) {
         return {
           emails: data.emails ?? [],
           totalCount: data.totalCount ?? 0,
         };
       }
+
       const arr = Array.isArray(data) ? data : [];
+
       return { emails: arr, totalCount: arr.length };
     },
     enabled: !!mailboxId && (options?.enabled ?? true),
@@ -107,6 +110,7 @@ export function useThreadReplies(
 /** Invalidate both the email list and folder counts after any email mutation. */
 function useInvalidateEmailData() {
   const qc = useQueryClient();
+
   return (mailboxId: string) => {
     void qc.invalidateQueries({ queryKey: ["emails", mailboxId] });
     void qc.invalidateQueries({
@@ -122,6 +126,7 @@ function useInvalidateEmailData() {
  */
 export function useSendEmail() {
   const invalidate = useInvalidateEmailData();
+
   return useMutation({
     mutationFn: ({ mailboxId, email }: { mailboxId: string; email: OutboundEmail }) =>
       api.sendEmail(mailboxId, email),
@@ -136,6 +141,7 @@ export function useSendEmail() {
  */
 export function useUpdateEmail() {
   const qc = useQueryClient();
+
   return useMutation({
     mutationFn: ({
       mailboxId,
@@ -178,6 +184,7 @@ export function useUpdateEmail() {
       // Also patch the detail cache
       const detailKey = queryKeys.emails.detail(mailboxId, id);
       const prevDetail = qc.getQueryData<Email>(detailKey);
+
       if (prevDetail) {
         qc.setQueryData(detailKey, { ...prevDetail, ...data });
       }
@@ -191,6 +198,7 @@ export function useUpdateEmail() {
           qc.setQueryData(key, cached);
         }
       }
+
       if (context?.prevDetail) {
         qc.setQueryData(context.detailKey, context.prevDetail);
       }
@@ -212,6 +220,7 @@ export function useUpdateEmail() {
  */
 export function useMarkThreadRead() {
   const qc = useQueryClient();
+
   return useMutation({
     mutationFn: ({ mailboxId, threadId }: { mailboxId: string; threadId: string }) =>
       api.markThreadRead(mailboxId, threadId),
@@ -231,6 +240,7 @@ export function useMarkThreadRead() {
  */
 export function useDeleteEmail() {
   const invalidate = useInvalidateEmailData();
+
   return useMutation({
     mutationFn: ({ mailboxId, id }: { mailboxId: string; id: string }) =>
       api.deleteEmail(mailboxId, id),
@@ -245,6 +255,7 @@ export function useDeleteEmail() {
  */
 export function useMoveEmail() {
   const invalidate = useInvalidateEmailData();
+
   return useMutation({
     mutationFn: ({
       mailboxId,
@@ -267,6 +278,7 @@ export function useMoveEmail() {
  */
 export function useSaveDraft() {
   const invalidate = useInvalidateEmailData();
+
   return useMutation({
     mutationFn: ({
       mailboxId,
@@ -295,6 +307,7 @@ export function useSaveDraft() {
  */
 export function useReplyToEmail() {
   const invalidate = useInvalidateEmailData();
+
   return useMutation({
     mutationFn: ({
       mailboxId,
@@ -316,6 +329,7 @@ export function useReplyToEmail() {
  */
 export function useForwardEmail() {
   const invalidate = useInvalidateEmailData();
+
   return useMutation({
     mutationFn: ({
       mailboxId,
