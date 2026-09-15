@@ -190,9 +190,21 @@ export default defineConfig(({ mode }) => ({
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
       { name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" },
+      { name: "shadcn", specifier: "@shadcn/lint" },
     ],
+    settings: {
+      shadcn: {
+        ui: "~/components/ui",
+      },
+    },
     rules: {
       "vite-plus/prefer-vite-plus-imports": "error",
+      "shadcn/no-restyle": ["error", { allow: ["layout"] }],
+      "shadcn/no-raw-colors": "error",
+      "shadcn/no-arbitrary-values": "error",
+      "shadcn/no-inline-styles": "error",
+      "shadcn/no-unknown-classes": "error",
+      "shadcn/require-static-classes": "error",
       // Pre-existing code patterns the old `tsc -b` check never enforced. The underlying
       // code has since been fixed (fire-and-forget promises wrapped with `void`, unused
       // imports/params removed, control-character regexes rewritten without control chars),

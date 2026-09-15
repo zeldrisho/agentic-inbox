@@ -144,7 +144,7 @@ export default function MailboxRoute() {
           />
           <div
             ref={agentPanelRef}
-            className="fixed inset-y-0 right-0 z-40 flex w-full max-w-[100vw] flex-col bg-kumo-base overflow-hidden shadow-xl sm:w-[380px] sm:max-w-[85vw] lg:relative lg:inset-auto lg:z-auto lg:w-[380px] lg:max-w-none lg:shrink-0 lg:shadow-none border-l border-kumo-line"
+            className="fixed inset-y-0 right-0 z-40 flex w-full max-w-full flex-col bg-kumo-base overflow-hidden shadow-xl sm:w-95 sm:max-w-full lg:relative lg:inset-auto lg:z-auto lg:w-95 lg:max-w-none lg:shrink-0 lg:shadow-none border-l border-kumo-line"
             role="complementary"
             aria-label="Agent panel"
             tabIndex={-1}

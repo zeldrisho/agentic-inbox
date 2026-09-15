@@ -110,7 +110,7 @@ export default function EmailPanelDialogs({
             )}
           </Dialog.Title>
           {sourceViewEmail && (
-            <div className="mt-4 max-h-[60vh] overflow-y-auto">
+            <div className="mt-4 max-h-screen overflow-y-auto">
               <table className="w-full text-sm border-collapse">
                 <tbody>
                   {sourceHeaders.map((header, idx) => (
@@ -118,7 +118,7 @@ export default function EmailPanelDialogs({
                       key={`${header.key}-${idx}`}
                       className={idx % 2 === 0 ? "bg-kumo-tint/50" : ""}
                     >
-                      <td className="py-1.5 px-3 font-mono font-semibold text-kumo-default whitespace-nowrap align-top w-[160px]">
+                      <td className="py-1.5 px-3 font-mono font-semibold text-kumo-default whitespace-nowrap align-top w-40">
                         {header.key}
                       </td>
                       <td className="py-1.5 px-3 font-mono text-kumo-subtle break-all">
@@ -154,11 +154,11 @@ export default function EmailPanelDialogs({
         <Dialog size="lg">
           <Dialog.Title>{previewImage?.filename}</Dialog.Title>
           {previewImage && (
-            <div className="mt-4 flex flex-col items-center justify-center bg-kumo-tint/30 rounded-lg p-4 min-h-[200px]">
+            <div className="mt-4 flex flex-col items-center justify-center bg-kumo-tint/30 rounded-lg p-4 min-h-50">
               <img
                 src={previewImage.url}
                 alt={previewImage.filename}
-                className="max-w-full max-h-[70vh] object-contain rounded shadow-sm"
+                className="max-w-full max-h-screen object-contain rounded shadow-sm"
               />
             </div>
           )}
