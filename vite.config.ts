@@ -6,10 +6,8 @@ import { reactRouter } from "@react-router/dev/vite";
 import { cloudflare } from "@cloudflare/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, lazyPlugins } from "vite-plus";
-// oxlint-disable-next-line vite-plus/prefer-vite-plus-imports -- UserConfig type lives in `vite` (vite-plus re-exports defineConfig only).
-import type { UserConfig } from "vite";
-// oxlint-disable-next-line vite-plus/prefer-vite-plus-imports -- createLogger is a Vite core utility not re-exported by vite-plus.
-import { createLogger } from "vite";
+import type { UserConfig } from "vite-plus";
+import { createLogger } from "vite-plus";
 
 /* oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-chained-type-assertions, anti-slop/no-unsafe-dictionary-type, anti-slop/require-safety-comment-for-type-assertion */
 const viteLogger = createLogger();
