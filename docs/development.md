@@ -55,8 +55,8 @@ is the sole authorization boundary; see [`architecture.md`](architecture.md).
   and `workers/lib/`; shared client/worker code belongs in `packages/shared/`.
 - Validate API bodies with Zod. Preserve same-origin CORS and the Cloudflare
   Access trust boundary.
-- Intentional toolchain pins in `package.json` (including the `vite` alias and
-  `@oxlint/plugins`) must not be removed without verifying pnpm isolation.
+- Intentional toolchain pins in `package.json` (including the `vite` alias)
+  must not be removed without verifying pnpm isolation.
 
 ## Layout
 

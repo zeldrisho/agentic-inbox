@@ -48,9 +48,9 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.53.1",
     "@cloudflare/workers-types": "^4.20251128.0",
-    "@oxlint/plugins": "1.81.0",
     "@playwright/test": "^1.62.1",
     "@react-router/dev": "^8.3.0",
+    "@shadcn/lint": "^0.1.0",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
@@ -58,13 +58,14 @@
     "@types/node": "^20.19.37",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
-    "@vitest/coverage-v8": "4.1.11",
+    "@vitest/coverage-v8": "catalog:",
     "jsdom": "^26.0.0",
     "tailwindcss": "^4.1.4",
     "typescript": "~6.0.2",
     "vite": "catalog:",
     "vite-plus": "catalog:",
     "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "catalog:",
     "wrangler": "^4.125.0"
   },
   "devEngines": {

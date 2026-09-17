@@ -155,7 +155,7 @@ export default function ThreadMessage({
                   icon={<CodeIcon size={14} />}
                   onClick={onViewSource}
                   aria-label="View source"
-                  className="transition-opacity !h-6 !w-6"
+                  className="!h-6 !w-6"
                 />
               </Tooltip>
             )}
@@ -173,7 +173,7 @@ export default function ThreadMessage({
           </div>
         </div>
 
-        <div className="md:ml-[42px]">
+        <div className="md:ml-10.5">
           <EmailIframe
             body={rewriteInlineImages(
               email.body || "",
@@ -186,7 +186,7 @@ export default function ThreadMessage({
         </div>
 
         {isDraft && (onSendDraft || onEditDraft || onDeleteDraft) && (
-          <div className="flex gap-2 mt-3 md:ml-[42px]">
+          <div className="flex gap-2 mt-3 md:ml-10.5">
             {onSendDraft && (
               <Button
                 variant="primary"
@@ -229,7 +229,7 @@ export default function ThreadMessage({
           emailId={email.id}
           attachments={email.attachments}
           onPreviewImage={onPreviewImage}
-          className="mt-3 md:ml-[42px]"
+          className="mt-3 md:ml-10.5"
         />
       </div>
     </div>

@@ -6,10 +6,8 @@ import { reactRouter } from "@react-router/dev/vite";
 import { cloudflare } from "@cloudflare/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, lazyPlugins } from "vite-plus";
-// oxlint-disable-next-line vite-plus/prefer-vite-plus-imports -- UserConfig type lives in `vite` (vite-plus re-exports defineConfig only).
-import type { UserConfig } from "vite";
-// oxlint-disable-next-line vite-plus/prefer-vite-plus-imports -- createLogger is a Vite core utility not re-exported by vite-plus.
-import { createLogger } from "vite";
+import type { UserConfig } from "vite-plus";
+import { createLogger } from "vite-plus";
 
 /* oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-chained-type-assertions, anti-slop/no-unsafe-dictionary-type, anti-slop/require-safety-comment-for-type-assertion */
 const viteLogger = createLogger();
@@ -190,9 +188,21 @@ export default defineConfig(({ mode }) => ({
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
       { name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" },
+      { name: "shadcn", specifier: "@shadcn/lint" },
     ],
+    settings: {
+      shadcn: {
+        ui: "~/components/ui",
+      },
+    },
     rules: {
       "vite-plus/prefer-vite-plus-imports": "error",
+      "shadcn/no-restyle": ["error", { allow: ["layout"] }],
+      "shadcn/no-raw-colors": "error",
+      "shadcn/no-arbitrary-values": "error",
+      "shadcn/no-inline-styles": "error",
+      "shadcn/no-unknown-classes": "error",
+      "shadcn/require-static-classes": "error",
       // Pre-existing code patterns the old `tsc -b` check never enforced. The underlying
       // code has since been fixed (fire-and-forget promises wrapped with `void`, unused
       // imports/params removed, control-character regexes rewritten without control chars),

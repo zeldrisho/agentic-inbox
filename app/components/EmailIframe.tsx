@@ -132,8 +132,8 @@ ul, ol { padding-left: 20px; margin: 4px 0; }
   return (
     <iframe
       ref={iframeRef}
-      className="block w-full border-0"
-      style={autoSize ? { height: `${height}px` } : { height: "100%" }}
+      className={`block w-full border-0 ${autoSize ? "" : "h-full"}`}
+      height={autoSize ? height : undefined}
       sandbox="allow-scripts allow-popups allow-top-navigation-by-user-activation"
       title="Email content"
     />

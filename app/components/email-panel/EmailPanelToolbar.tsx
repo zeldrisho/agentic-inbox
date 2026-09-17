@@ -246,7 +246,7 @@ function MoveToFolderMenu({
         />
       </Tooltip>
       {open && (
-        <div className="absolute top-full left-0 z-50 mt-1 min-w-[160px] rounded-lg border border-kumo-line bg-kumo-elevated shadow-lg py-1">
+        <div className="absolute top-full left-0 z-50 mt-1 min-w-40 rounded-lg border border-kumo-line bg-kumo-elevated shadow-lg py-1">
           <div className="px-3 py-1.5 text-xs font-medium text-kumo-subtle">Move to</div>
           <div className="h-px bg-kumo-line my-1" />
           {folders.map((f) => (

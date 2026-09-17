@@ -46,7 +46,7 @@ export default function ComposeEmail() {
       open={isComposeModalOpen}
       onOpenChange={(open) => !open && !isSending && closeComposeModal()}
     >
-      <Dialog size="lg" className="p-6 max-h-[85vh] overflow-y-auto">
+      <Dialog size="lg" className="p-6 max-h-screen overflow-y-auto">
         <Dialog.Title className="text-lg font-semibold mb-5">{formTitle}</Dialog.Title>
         <form onSubmit={(e) => handleSend(e, closeComposeModal)} className="space-y-4">
           {error && <Banner variant="error" text={error} />}

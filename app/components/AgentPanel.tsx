@@ -171,7 +171,7 @@ function AgentChatConnected({
           <Badge variant="beta">AI</Badge>
           <span className="text-xs text-kumo-subtle">Email Agent</span>
           <span
-            className="text-[10px] px-1.5 py-0.5 rounded bg-kumo-fill text-kumo-subtle font-mono truncate max-w-[140px]"
+            className="text-xs px-1.5 py-0.5 rounded bg-kumo-fill text-kumo-subtle font-mono truncate max-w-35"
             title={currentModel}
           >
             {modelLabel}
@@ -284,7 +284,7 @@ function AgentChatConnected({
                   <DropdownMenu.RadioItem key={m.id} value={m.id}>
                     <span className="flex flex-col min-w-0">
                       <span className="truncate">{m.name}</span>
-                      <span className="text-[10px] text-kumo-subtle truncate font-mono">
+                      <span className="text-xs text-kumo-subtle truncate font-mono">
                         {m.id}
                         {m.functionCalling ? " · tools" : ""}
                       </span>
@@ -329,8 +329,7 @@ function AgentChatConnected({
               placeholder="Ask your email agent..."
               rows={1}
               aria-label="Chat message input"
-              className="flex-1 resize-none rounded-lg border border-kumo-line bg-kumo-control px-3 py-2 text-xs text-kumo-default placeholder:text-kumo-subtle focus:outline-none focus:ring-1 focus:ring-kumo-ring min-h-[36px] max-h-[100px]"
-              style={{ height: "auto", overflow: "hidden" }}
+              className="flex-1 resize-none rounded-lg border border-kumo-line bg-kumo-control px-3 py-2 text-xs text-kumo-default placeholder:text-kumo-subtle focus:outline-none focus:ring-1 focus:ring-kumo-ring min-h-9 max-h-25"
               onInput={(e) => {
                 // SAFETY: the casted value's invariant holds at this boundary (validated upstream or guaranteed by the call contract).
                 const t = e.target as HTMLTextAreaElement;
