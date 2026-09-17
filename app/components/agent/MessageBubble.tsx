@@ -116,7 +116,7 @@ export function MessageBubble({
             return (
               <div
                 key={key}
-                className={`rounded-lg px-3 py-2 text-xs leading-relaxed break-words break-all ${
+                className={`rounded-lg px-3 py-2 text-xs leading-relaxed break-words ${
                   isUser
                     ? "bg-kumo-brand text-kumo-inverse rounded-br-sm"
                     : "bg-kumo-elevated text-kumo-default border border-kumo-line rounded-bl-sm overflow-hidden"
