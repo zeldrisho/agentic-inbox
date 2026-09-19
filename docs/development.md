@@ -57,6 +57,10 @@ is the sole authorization boundary; see [`architecture.md`](architecture.md).
   Access trust boundary.
 - Intentional toolchain pins in `package.json` (including the `vite` alias)
   must not be removed without verifying pnpm isolation.
+- Dependency installs enforce a seven-day release-age window, block exotic
+  transitive dependencies, and reject publisher trust downgrades. Add narrowly
+  scoped entries to `minimumReleaseAgeExclude` only when a pinned toolchain
+  package requires an exception.
 
 ## Layout
 
