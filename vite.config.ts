@@ -140,6 +140,9 @@ export default defineConfig(({ mode }) => ({
       ["tests/components/**", "jsdom"],
       ["tests/e2e/**", "jsdom"],
     ],
+    environmentOptions: {
+      jsdom: { url: "http://localhost" },
+    },
     coverage: {
       provider: "v8",
       // Measure only modules executed by tests — untested UI shells (route

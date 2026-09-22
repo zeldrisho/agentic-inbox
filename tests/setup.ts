@@ -9,6 +9,22 @@
 // so stub the flag whenever a DOM is available. Must live here because the
 // injected check executes before any user code inside the wrapped module.
 if (typeof window !== "undefined") {
+  // Node 24 exposes an unusable global localStorage accessor; prefer jsdom's
+  // origin-backed storage for browser-environment tests.
+  const storage = window.localStorage ?? (() => {
+    const values = new Map<string, string>();
+    return {
+      clear: () => values.clear(),
+      getItem: (key: string) => values.get(key) ?? null,
+      removeItem: (key: string) => values.delete(key),
+      setItem: (key: string, value: string) => values.set(key, value),
+    };
+  })();
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: storage,
+  });
+
   // SAFETY: React Router dev plugin guarantees __vite_plugin_react_preamble_installed__
   // exists on window during dev. In tests, we stub it before any module loads, ensuring
   // the check never throws. The boolean type is enforced by the plugin's injected code.

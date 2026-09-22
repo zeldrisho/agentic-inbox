@@ -8,7 +8,7 @@ import {
   generateText,
   convertToModelMessages,
   stepCountIs,
-  type StreamTextOnFinishCallback,
+  type GenerateTextOnFinishCallback,
   type ToolSet,
 } from "ai";
 import { createWorkersAI } from "workers-ai-provider";
@@ -347,7 +347,7 @@ function createEmailTools(env: Env, mailboxId: string): ToolSet {
 // The Env generic is our workers/types.ts Env (extends Cloudflare.Env), so the
 // binding shapes satisfy AIChatAgent's constraint; tools close over the typed env.
 export class EmailAgent extends AIChatAgent<Env> {
-  async onChatMessage(onFinish: StreamTextOnFinishCallback<ToolSet>) {
+  async onChatMessage(onFinish: GenerateTextOnFinishCallback<ToolSet>) {
     const env = this.env;
     const mailboxId = this.name;
     const workersai = createWorkersAI({ binding: env.AI });
