@@ -49,13 +49,24 @@ export default function EmailIframe({ body, autoSize }: EmailIframeProps) {
 
     if (!iframe || !body) return;
 
-    const cleanBody = DOMPurify.sanitize(body, {
+    const sanitizedBody = DOMPurify.sanitize(body, {
       USE_PROFILES: { html: true },
       FORBID_TAGS: ["style"],
       ADD_ATTR: ["target"],
       FORCE_BODY: true,
     });
 
+    // Email links must never navigate the inbox iframe. Set this after
+    // sanitizing so sender-provided target values cannot override it.
+    const template = document.createElement("template");
+    template.innerHTML = sanitizedBody;
+
+    for (const link of template.content.querySelectorAll("a[href]")) {
+      link.setAttribute("target", "_blank");
+      link.setAttribute("rel", "noopener noreferrer");
+    }
+
+    const cleanBody = template.innerHTML;
     const padding = autoSize ? "0" : "24px";
 
     // Height-reporting script: sends body.scrollHeight to the parent.
@@ -134,7 +145,7 @@ ul, ol { padding-left: 20px; margin: 4px 0; }
       ref={iframeRef}
       className={`block w-full border-0 ${autoSize ? "" : "h-full"}`}
       height={autoSize ? height : undefined}
-      sandbox="allow-scripts allow-popups allow-top-navigation-by-user-activation"
+      sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
       title="Email content"
     />
   );

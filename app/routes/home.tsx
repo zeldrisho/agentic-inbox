@@ -32,6 +32,7 @@ export default function HomeRoute() {
     data: mailboxes = [],
     refetch: refetchMailboxes,
     isFetched: mailboxesFetched,
+    isLoading: isMailboxesLoading,
   } = useMailboxes();
 
   const createMailbox = useCreateMailbox();
@@ -211,7 +212,7 @@ export default function HomeRoute() {
       }))
     : mailboxes;
 
-  const isLoading = isConfigLoading && !configData;
+  const isLoading = (isConfigLoading && !configData) || (isMailboxesLoading && !mailboxesFetched);
 
   return (
     <div className="min-h-screen bg-kumo-recessed">
