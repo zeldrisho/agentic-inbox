@@ -14,6 +14,10 @@ const viteLogger = createLogger();
 
 const filteredLogger = {
   ...viteLogger,
+  /**
+   * Suppress messages containing `envFile`; forward other warnings and options to Vite.
+   * Errors thrown by the forwarded logger call propagate.
+   */
   warn(msg: string, opts?: unknown) {
     if (String(msg).includes("envFile")) return;
     // SAFETY: forwarding to Vite's built-in logger with the same signature.
@@ -27,6 +31,10 @@ const filteredLogger = {
 /* oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-unsafe-argument, anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion */
 const _origConsoleWarn = console.warn;
 
+/**
+ * Suppress the entire warning if any argument's string form contains `envFile`.
+ * Otherwise, forward the original arguments. Conversion and console errors propagate.
+ */
 console.warn = (...args: unknown[]) => {
   if (args.some((a) => String(a).includes("envFile"))) return;
   // SAFETY: forwarding original console.warn args with same signature.
@@ -35,6 +43,10 @@ console.warn = (...args: unknown[]) => {
 
 const _origConsoleError = console.error;
 
+/**
+ * Suppress the entire error message if any argument's string form contains `envFile`.
+ * Otherwise, forward the original arguments. Conversion and console errors propagate.
+ */
 console.error = (...args: unknown[]) => {
   if (args.some((a) => String(a).includes("envFile"))) return;
   // SAFETY: forwarding original console.error args with same signature.
@@ -43,6 +55,10 @@ console.error = (...args: unknown[]) => {
 
 const _origConsoleLog = console.log;
 
+/**
+ * Suppress the entire log message if any argument's string form contains `envFile`.
+ * Otherwise, forward the original arguments. Conversion and console errors propagate.
+ */
 console.log = (...args: unknown[]) => {
   if (args.some((a) => String(a).includes("envFile"))) return;
   // SAFETY: forwarding original console.log args with same signature.
@@ -53,6 +69,13 @@ console.log = (...args: unknown[]) => {
 /* oxlint-disable anti-slop/no-unknown-parameters, anti-slop/no-unsafe-argument, anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion */
 const _origStderrWrite = process.stderr.write.bind(process.stderr);
 
+/**
+ * Discard chunks whose string form contains both `envFile` and `deprecated`.
+ * For discarded chunks, synchronously call only the third-argument callback, if
+ * present, without an error, then return true; a callback in the encoding slot is
+ * not called. Otherwise, forward all arguments and return the original write result.
+ * Errors from string conversion, the callback, or the original write propagate.
+ */
 // SAFETY: filtering Vite's deprecated envFile warning at stderr level; forwarding otherwise preserves original semantics.
 process.stderr.write = ((
   chunk: unknown,
@@ -77,6 +100,13 @@ process.stderr.write = ((
 
 const _origStdoutWrite = process.stdout.write.bind(process.stdout);
 
+/**
+ * Discard chunks whose string form contains both `envFile` and `deprecated`.
+ * For discarded chunks, synchronously call only the third-argument callback, if
+ * present, without an error, then return true; a callback in the encoding slot is
+ * not called. Otherwise, forward all arguments and return the original write result.
+ * Errors from string conversion, the callback, or the original write propagate.
+ */
 // SAFETY: same filtering for stdout (Vite may log to stdout in some environments).
 process.stdout.write = ((
   chunk: unknown,
@@ -108,6 +138,10 @@ const playwrightServerConfig: UserConfig["server"] = process.env.PLAYWRIGHT_PORT
     }
   : undefined;
 
+/**
+ * Return project configuration with env-file loading disabled in test mode.
+ * Test mode omits the React Router and Cloudflare plugins.
+ */
 export default defineConfig(({ mode }) => ({
   server: playwrightServerConfig,
   /* oxlint-disable anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion -- test mode disables env loading to silence Vite's envFile deprecation */
@@ -259,6 +293,7 @@ export default defineConfig(({ mode }) => ({
     {
       name: "fix-deprecated-envFile",
       enforce: "post",
+      /** Delete the legacy `envFile` option in place only when its value is exactly false. */
       config(cfg: UserConfig) {
         // SAFETY: `envFile` is a legacy Vite option not in UserConfig types but may be present as `false` from older plugins; deleting it silences the deprecation warning.
         // oxlint-disable-next-line anti-slop/no-chained-type-assertions, anti-slop/no-unsafe-dictionary-type -- single delete of legacy key after SAFETY check; no value contract needed.
